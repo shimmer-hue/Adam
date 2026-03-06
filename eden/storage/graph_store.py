@@ -542,6 +542,78 @@ class GraphStore:
         ).fetchall()
         return [_row_to_dict(row) for row in rows if row is not None]
 
+    def update_memode(
+        self,
+        *,
+        memode_id: str,
+        label: str | None = None,
+        member_ids: list[str] | None = None,
+        summary: str | None = None,
+        domain: str | None = None,
+        scope: str | None = None,
+        metadata_updates: dict[str, Any] | None = None,
+        evidence_inc: float = 0.0,
+    ) -> dict[str, Any]:
+        existing = self.get_memode(memode_id)
+        metadata = json.loads(existing["metadata_json"] or "{}")
+        next_member_ids = sorted(dict.fromkeys(member_ids or metadata.get("member_ids", [])))
+        if len(next_member_ids) < 2:
+            raise ValueError("Memodes require at least two member memes.")
+        next_domain = domain or existing["domain"]
+        next_member_hash = slugify("-".join(next_member_ids))
+        duplicate = self._conn.execute(
+            """
+            SELECT id FROM memodes
+            WHERE experiment_id = ? AND member_hash = ? AND domain = ? AND id != ?
+            """,
+            (existing["experiment_id"], next_member_hash, next_domain, memode_id),
+        ).fetchone()
+        if duplicate is not None:
+            raise ValueError("A memode with the requested membership already exists.")
+        metadata["member_ids"] = next_member_ids
+        if metadata_updates:
+            metadata.update(metadata_updates)
+        with self.transaction() as conn:
+            conn.execute(
+                """
+                UPDATE memodes
+                SET label = ?, member_hash = ?, summary = ?, domain = ?, scope = ?,
+                    evidence_n = evidence_n + ?, updated_at = ?, metadata_json = ?
+                WHERE id = ?
+                """,
+                (
+                    label or existing["label"],
+                    next_member_hash,
+                    summary or existing["summary"],
+                    next_domain,
+                    scope or existing["scope"],
+                    evidence_inc,
+                    now_utc(),
+                    compact_json(metadata),
+                    memode_id,
+                ),
+            )
+            conn.execute("DELETE FROM memode_fts WHERE memode_id = ?", (memode_id,))
+            conn.execute(
+                "INSERT INTO memode_fts(memode_id, label, summary, domain) VALUES(?, ?, ?, ?)",
+                (memode_id, label or existing["label"], summary or existing["summary"], next_domain),
+            )
+        return self.get_memode(memode_id)
+
+    def delete_memode(self, memode_id: str) -> dict[str, Any]:
+        existing = self.get_memode(memode_id)
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM memode_fts WHERE memode_id = ?", (memode_id,))
+            conn.execute(
+                """
+                DELETE FROM edges
+                WHERE (src_kind = 'memode' AND src_id = ?) OR (dst_kind = 'memode' AND dst_id = ?)
+                """,
+                (memode_id, memode_id),
+            )
+            conn.execute("DELETE FROM memodes WHERE id = ?", (memode_id,))
+        return existing
+
     def add_edge(
         self,
         *,
@@ -585,11 +657,154 @@ class GraphStore:
                 ),
             )
 
+    def set_edge(
+        self,
+        *,
+        experiment_id: str,
+        src_kind: str,
+        src_id: str,
+        dst_kind: str,
+        dst_id: str,
+        edge_type: str,
+        weight: float = 1.0,
+        provenance: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        existing = self.get_edge(
+            experiment_id=experiment_id,
+            src_kind=src_kind,
+            src_id=src_id,
+            dst_kind=dst_kind,
+            dst_id=dst_id,
+            edge_type=edge_type,
+        )
+        edge_id = existing["id"] if existing is not None else str(uuid4())
+        created_at = existing["created_at"] if existing is not None else now_utc()
+        updated_at = now_utc()
+        with self.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO edges(
+                    id, experiment_id, src_kind, src_id, dst_kind, dst_id, edge_type, weight,
+                    provenance_json, created_at, updated_at
+                )
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(experiment_id, src_kind, src_id, dst_kind, dst_id, edge_type)
+                DO UPDATE SET
+                    weight = excluded.weight,
+                    provenance_json = excluded.provenance_json,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    edge_id,
+                    experiment_id,
+                    src_kind,
+                    src_id,
+                    dst_kind,
+                    dst_id,
+                    edge_type,
+                    weight,
+                    compact_json(provenance or {}),
+                    created_at,
+                    updated_at,
+                ),
+            )
+        row = self.get_edge(
+            experiment_id=experiment_id,
+            src_kind=src_kind,
+            src_id=src_id,
+            dst_kind=dst_kind,
+            dst_id=dst_id,
+            edge_type=edge_type,
+        )
+        if row is None:
+            raise KeyError("Failed to persist edge.")
+        return row
+
+    def get_edge(
+        self,
+        *,
+        experiment_id: str,
+        src_kind: str,
+        src_id: str,
+        dst_kind: str,
+        dst_id: str,
+        edge_type: str,
+    ) -> dict[str, Any] | None:
+        row = self._conn.execute(
+            """
+            SELECT * FROM edges
+            WHERE experiment_id = ? AND src_kind = ? AND src_id = ? AND dst_kind = ? AND dst_id = ? AND edge_type = ?
+            """,
+            (experiment_id, src_kind, src_id, dst_kind, dst_id, edge_type),
+        ).fetchone()
+        return _row_to_dict(row)
+
+    def delete_edge(
+        self,
+        *,
+        experiment_id: str,
+        src_kind: str,
+        src_id: str,
+        dst_kind: str,
+        dst_id: str,
+        edge_type: str,
+    ) -> dict[str, Any] | None:
+        existing = self.get_edge(
+            experiment_id=experiment_id,
+            src_kind=src_kind,
+            src_id=src_id,
+            dst_kind=dst_kind,
+            dst_id=dst_id,
+            edge_type=edge_type,
+        )
+        if existing is None:
+            return None
+        with self.transaction() as conn:
+            conn.execute(
+                """
+                DELETE FROM edges
+                WHERE experiment_id = ? AND src_kind = ? AND src_id = ? AND dst_kind = ? AND dst_id = ? AND edge_type = ?
+                """,
+                (experiment_id, src_kind, src_id, dst_kind, dst_id, edge_type),
+            )
+        return existing
+
     def list_edges(self, experiment_id: str) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT * FROM edges WHERE experiment_id = ? ORDER BY weight DESC, updated_at DESC",
             (experiment_id,),
         ).fetchall()
+        return [_row_to_dict(row) for row in rows if row is not None]
+
+    def list_edges_for_node(
+        self,
+        experiment_id: str,
+        *,
+        node_kind: str,
+        node_id: str,
+        edge_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if edge_type:
+            rows = self._conn.execute(
+                """
+                SELECT * FROM edges
+                WHERE experiment_id = ?
+                  AND ((src_kind = ? AND src_id = ?) OR (dst_kind = ? AND dst_id = ?))
+                  AND edge_type = ?
+                ORDER BY updated_at DESC
+                """,
+                (experiment_id, node_kind, node_id, node_kind, node_id, edge_type),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                """
+                SELECT * FROM edges
+                WHERE experiment_id = ?
+                  AND ((src_kind = ? AND src_id = ?) OR (dst_kind = ? AND dst_id = ?))
+                ORDER BY updated_at DESC
+                """,
+                (experiment_id, node_kind, node_id, node_kind, node_id),
+            ).fetchall()
         return [_row_to_dict(row) for row in rows if row is not None]
 
     def touch_nodes(self, node_kind: str, node_ids: list[str]) -> None:
@@ -759,6 +974,87 @@ class GraphStore:
                 (str(uuid4()), experiment_id, session_id, artifact_type, str(path), compact_json(metadata or {}), now_utc()),
             )
 
+    def record_measurement_event(
+        self,
+        *,
+        experiment_id: str,
+        session_id: str | None,
+        turn_id: str | None,
+        action_type: str,
+        target_ids: list[dict[str, Any]],
+        before_state: dict[str, Any],
+        proposed_state: dict[str, Any],
+        committed_state: dict[str, Any],
+        rationale: str,
+        operator_label: str,
+        evidence_label: str,
+        measurement_method: str,
+        confidence: float,
+        reverted_from_event_id: str | None = None,
+    ) -> dict[str, Any]:
+        event_id = str(uuid4())
+        created_at = now_utc()
+        with self.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO measurement_events(
+                    id, experiment_id, session_id, turn_id, action_type, target_ids_json,
+                    before_state_json, proposed_state_json, committed_state_json,
+                    rationale, operator_label, evidence_label, measurement_method,
+                    confidence, created_at, reverted_from_event_id
+                )
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_id,
+                    experiment_id,
+                    session_id,
+                    turn_id,
+                    action_type,
+                    compact_json(target_ids),
+                    compact_json(before_state),
+                    compact_json(proposed_state),
+                    compact_json(committed_state),
+                    rationale,
+                    operator_label,
+                    evidence_label,
+                    measurement_method,
+                    confidence,
+                    created_at,
+                    reverted_from_event_id,
+                ),
+            )
+        return self.get_measurement_event(event_id)
+
+    def get_measurement_event(self, event_id: str) -> dict[str, Any]:
+        row = self._conn.execute("SELECT * FROM measurement_events WHERE id = ?", (event_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown measurement event: {event_id}")
+        return _row_to_dict(row) or {}
+
+    def list_measurement_events(
+        self,
+        experiment_id: str,
+        *,
+        limit: int = 250,
+        session_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if session_id:
+            rows = self._conn.execute(
+                """
+                SELECT * FROM measurement_events
+                WHERE experiment_id = ? AND session_id = ?
+                ORDER BY created_at DESC LIMIT ?
+                """,
+                (experiment_id, session_id, limit),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM measurement_events WHERE experiment_id = ? ORDER BY created_at DESC LIMIT ?",
+                (experiment_id, limit),
+            ).fetchall()
+        return [_row_to_dict(row) for row in rows if row is not None]
+
     def list_export_artifacts(self, experiment_id: str) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT * FROM export_artifacts WHERE experiment_id = ? ORDER BY created_at DESC",
@@ -870,6 +1166,14 @@ class GraphStore:
                 ).fetchall()
                 if row is not None
             ],
+            "measurement_events": [
+                _row_to_dict(row)
+                for row in self._conn.execute(
+                    "SELECT * FROM measurement_events WHERE experiment_id = ? ORDER BY created_at ASC",
+                    (experiment_id,),
+                ).fetchall()
+                if row is not None
+            ],
         }
 
     def graph_counts(self, experiment_id: str) -> dict[str, int]:
@@ -885,6 +1189,7 @@ class GraphStore:
             "memodes": count("memodes"),
             "edges": count("edges"),
             "feedback": count("feedback_events"),
+            "measurement_events": count("measurement_events"),
         }
 
     def summarize_history(self, session_id: str, *, limit: int = 5) -> list[str]:

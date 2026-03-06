@@ -22,6 +22,7 @@ from .models.mlx_backend import MLXModelAdapter
 from .models.mock import MockModelAdapter
 from .observatory.exporters import ObservatoryExporter
 from .observatory.server import ObservatoryServer
+from .observatory.service import ObservatoryService
 from .regard import ema, feedback_signal
 from .retrieval import RetrievalService
 from .storage.graph_store import GraphStore
@@ -68,11 +69,18 @@ class EdenRuntime:
         self.ingest_service = IngestService(self.store, self.runtime_log)
         self.retrieval_service = RetrievalService(self.store)
         self.exporter = ObservatoryExporter(self.store, self.retrieval_service, self.runtime_log)
+        self.observatory_service = ObservatoryService(
+            store=self.store,
+            exporter=self.exporter,
+            runtime_log=self.runtime_log,
+            export_root=EXPORT_DIR,
+        )
         self.observatory_server = ObservatoryServer(
             EXPORT_DIR,
             self.settings.observatory_port,
             host=self.settings.observatory_host,
             port_span=self.settings.observatory_port_span,
+            service=self.observatory_service,
         )
         self.agent_profile = json.loads((Path(__file__).resolve().parent / "agents" / "adam" / "profile.json").read_text())
         self.agent_id = self.store.upsert_agent(
@@ -755,6 +763,51 @@ class EdenRuntime:
         out_dir = self.export_dir_for_experiment(experiment_id)
         return self.exporter.export_all(experiment_id=experiment_id, session_id=session_id, out_dir=out_dir)
 
+    def preview_observatory_action(
+        self,
+        *,
+        experiment_id: str,
+        session_id: str | None,
+        turn_id: str | None,
+        action: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.observatory_service.preview_action(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            turn_id=turn_id,
+            action=action,
+        )
+
+    def commit_observatory_action(
+        self,
+        *,
+        experiment_id: str,
+        session_id: str | None,
+        turn_id: str | None,
+        action: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.observatory_service.commit_action(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            turn_id=turn_id,
+            action=action,
+        )
+
+    def revert_observatory_action(
+        self,
+        *,
+        experiment_id: str,
+        session_id: str | None,
+        turn_id: str | None,
+        event_id: str,
+    ) -> dict[str, Any]:
+        return self.observatory_service.revert_event(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            turn_id=turn_id,
+            event_id=event_id,
+        )
+
     def start_observatory(
         self,
         *,
@@ -781,6 +834,8 @@ class EdenRuntime:
             "owned_by_process": status.owned_by_process,
             "root": status.root,
             "info_url": status.info_url,
+            "api_version": status.api_version,
+            "capabilities": status.capabilities,
         }
 
     def observatory_status(self) -> dict[str, Any] | None:
@@ -795,6 +850,8 @@ class EdenRuntime:
             "owned_by_process": status.owned_by_process,
             "root": status.root,
             "info_url": status.info_url,
+            "api_version": status.api_version,
+            "capabilities": status.capabilities,
         }
 
     def stop_observatory(self) -> dict[str, Any]:

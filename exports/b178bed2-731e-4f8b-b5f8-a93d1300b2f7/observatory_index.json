@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-03-06T21:33:18+00:00",
+  "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+  "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+  "artifacts": {
+    "graph": {
+      "graph_html": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/graph_knowledge_base.html",
+      "graph_json": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/graph_knowledge_base.json",
+      "graph_manifest": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/graph_knowledge_base.manifest.json"
+    },
+    "basin": {
+      "basin_html": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/behavioral_attractor_basin.html",
+      "basin_json": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/behavioral_attractor_basin.json",
+      "basin_manifest": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/behavioral_attractor_basin.manifest.json"
+    },
+    "geometry": {
+      "geometry_html": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/geometry_lab.html",
+      "geometry_json": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/geometry_diagnostics.json",
+      "geometry_manifest": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/geometry_manifest.json"
+    },
+    "measurement": {
+      "measurement_html": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_ledger.html",
+      "measurement_json": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_events.json",
+      "measurement_manifest": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_events.manifest.json"
+    }
+  },
+  "summary": {
+    "nodes": 32,
+    "edges": 93,
+    "turns": 1,
+    "sessions": 1,
+    "measurement_events": 2
+  }
+}

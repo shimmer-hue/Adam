@@ -1,0 +1,147 @@
+{
+  "generated_at": "2026-03-06T21:33:18+00:00",
+  "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+  "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+  "counts": {
+    "events": 2,
+    "action_types": {
+      "edge_add": 1,
+      "revert": 1
+    },
+    "evidence_labels": {
+      "OPERATOR_ASSERTED": 1,
+      "OPERATOR_REFINED": 1
+    }
+  },
+  "events": [
+    {
+      "id": "ed41de04-3244-4ba8-86fc-46ebb91cff06",
+      "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "turn_id": null,
+      "action_type": "edge_add",
+      "target_ids_json": "[{\"edge_type\":\"REINFORCES\",\"kind\":\"edge\",\"source_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"target_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\"}]",
+      "before_state_json": "{\"edge\":null,\"edge_existed\":false}",
+      "proposed_state_json": "{\"action_type\":\"edge_add\",\"confidence\":0.77,\"edge_type\":\"REINFORCES\",\"evidence_label\":\"OPERATOR_ASSERTED\",\"measurement_method\":\"local_geometry_preview\",\"operator_label\":\"validation_operator\",\"rationale\":\"live api validation\",\"source_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"source_kind\":\"meme\",\"target_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\",\"target_kind\":\"meme\",\"weight\":1.2}",
+      "committed_state_json": "{\"edge\":{\"created_at\":\"2026-03-06T21:33:18+00:00\",\"dst_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\",\"dst_kind\":\"meme\",\"edge_type\":\"REINFORCES\",\"experiment_id\":\"b178bed2-731e-4f8b-b5f8-a93d1300b2f7\",\"id\":\"ba31effa-3641-4d58-abf6-cc8f0b4274f4\",\"provenance_json\":\"{\\\"assertion_origin\\\":\\\"operator_asserted\\\",\\\"confidence\\\":0.77,\\\"evidence_label\\\":\\\"OPERATOR_ASSERTED\\\",\\\"measurement_method\\\":\\\"local_geometry_preview\\\",\\\"operator_label\\\":\\\"validation_operator\\\",\\\"rationale\\\":\\\"live api validation\\\",\\\"updated_at\\\":\\\"2026-03-06T21:33:18+00:00\\\"}\",\"src_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"src_kind\":\"meme\",\"updated_at\":\"2026-03-06T21:33:18+00:00\",\"weight\":1.2},\"summary\":\"edge_add b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3 [REINFORCES]\"}",
+      "rationale": "live api validation",
+      "operator_label": "validation_operator",
+      "evidence_label": "OPERATOR_ASSERTED",
+      "measurement_method": "local_geometry_preview",
+      "confidence": 0.77,
+      "created_at": "2026-03-06T21:33:18+00:00",
+      "reverted_from_event_id": null,
+      "target_ids": [
+        {
+          "edge_type": "REINFORCES",
+          "kind": "edge",
+          "source_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "target_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+        }
+      ],
+      "before_state": {
+        "edge": null,
+        "edge_existed": false
+      },
+      "proposed_state": {
+        "action_type": "edge_add",
+        "confidence": 0.77,
+        "edge_type": "REINFORCES",
+        "evidence_label": "OPERATOR_ASSERTED",
+        "measurement_method": "local_geometry_preview",
+        "operator_label": "validation_operator",
+        "rationale": "live api validation",
+        "source_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+        "source_kind": "meme",
+        "target_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+        "target_kind": "meme",
+        "weight": 1.2
+      },
+      "committed_state": {
+        "edge": {
+          "created_at": "2026-03-06T21:33:18+00:00",
+          "dst_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+          "dst_kind": "meme",
+          "edge_type": "REINFORCES",
+          "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+          "id": "ba31effa-3641-4d58-abf6-cc8f0b4274f4",
+          "provenance_json": "{\"assertion_origin\":\"operator_asserted\",\"confidence\":0.77,\"evidence_label\":\"OPERATOR_ASSERTED\",\"measurement_method\":\"local_geometry_preview\",\"operator_label\":\"validation_operator\",\"rationale\":\"live api validation\",\"updated_at\":\"2026-03-06T21:33:18+00:00\"}",
+          "src_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "src_kind": "meme",
+          "updated_at": "2026-03-06T21:33:18+00:00",
+          "weight": 1.2
+        },
+        "summary": "edge_add b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3 [REINFORCES]"
+      },
+      "summary": "live api validation"
+    },
+    {
+      "id": "f689054c-5889-4b1d-8459-3aae0f1a65b6",
+      "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "turn_id": null,
+      "action_type": "revert",
+      "target_ids_json": "[{\"edge_type\":\"REINFORCES\",\"kind\":\"edge\",\"source_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"target_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\"}]",
+      "before_state_json": "{\"edge\":{\"created_at\":\"2026-03-06T21:33:18+00:00\",\"dst_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\",\"dst_kind\":\"meme\",\"edge_type\":\"REINFORCES\",\"experiment_id\":\"b178bed2-731e-4f8b-b5f8-a93d1300b2f7\",\"id\":\"ba31effa-3641-4d58-abf6-cc8f0b4274f4\",\"provenance_json\":\"{\\\"assertion_origin\\\":\\\"operator_asserted\\\",\\\"confidence\\\":0.77,\\\"evidence_label\\\":\\\"OPERATOR_ASSERTED\\\",\\\"measurement_method\\\":\\\"local_geometry_preview\\\",\\\"operator_label\\\":\\\"validation_operator\\\",\\\"rationale\\\":\\\"live api validation\\\",\\\"updated_at\\\":\\\"2026-03-06T21:33:18+00:00\\\"}\",\"src_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"src_kind\":\"meme\",\"updated_at\":\"2026-03-06T21:33:18+00:00\",\"weight\":1.2},\"summary\":\"edge_add b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3 [REINFORCES]\"}",
+      "proposed_state_json": "{\"action_type\":\"revert\",\"confidence\":1.0,\"event_id\":\"ed41de04-3244-4ba8-86fc-46ebb91cff06\",\"evidence_label\":\"OPERATOR_REFINED\",\"measurement_method\":\"revert\",\"operator_label\":\"local_operator\",\"rationale\":\"Revert measurement event ed41de04-3244-4ba8-86fc-46ebb91cff06\"}",
+      "committed_state_json": "{\"edge\":{\"created_at\":\"2026-03-06T21:33:18+00:00\",\"dst_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\",\"dst_kind\":\"meme\",\"edge_type\":\"REINFORCES\",\"experiment_id\":\"b178bed2-731e-4f8b-b5f8-a93d1300b2f7\",\"id\":\"ba31effa-3641-4d58-abf6-cc8f0b4274f4\",\"provenance_json\":\"{\\\"assertion_origin\\\":\\\"operator_asserted\\\",\\\"confidence\\\":0.77,\\\"evidence_label\\\":\\\"OPERATOR_ASSERTED\\\",\\\"measurement_method\\\":\\\"local_geometry_preview\\\",\\\"operator_label\\\":\\\"validation_operator\\\",\\\"rationale\\\":\\\"live api validation\\\",\\\"updated_at\\\":\\\"2026-03-06T21:33:18+00:00\\\"}\",\"src_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"src_kind\":\"meme\",\"updated_at\":\"2026-03-06T21:33:18+00:00\",\"weight\":1.2},\"summary\":\"removed b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3\"}",
+      "rationale": "Reverted event ed41de04-3244-4ba8-86fc-46ebb91cff06",
+      "operator_label": "local_operator",
+      "evidence_label": "OPERATOR_REFINED",
+      "measurement_method": "revert",
+      "confidence": 1.0,
+      "created_at": "2026-03-06T21:33:18+00:00",
+      "reverted_from_event_id": "ed41de04-3244-4ba8-86fc-46ebb91cff06",
+      "target_ids": [
+        {
+          "edge_type": "REINFORCES",
+          "kind": "edge",
+          "source_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "target_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+        }
+      ],
+      "before_state": {
+        "edge": {
+          "created_at": "2026-03-06T21:33:18+00:00",
+          "dst_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+          "dst_kind": "meme",
+          "edge_type": "REINFORCES",
+          "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+          "id": "ba31effa-3641-4d58-abf6-cc8f0b4274f4",
+          "provenance_json": "{\"assertion_origin\":\"operator_asserted\",\"confidence\":0.77,\"evidence_label\":\"OPERATOR_ASSERTED\",\"measurement_method\":\"local_geometry_preview\",\"operator_label\":\"validation_operator\",\"rationale\":\"live api validation\",\"updated_at\":\"2026-03-06T21:33:18+00:00\"}",
+          "src_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "src_kind": "meme",
+          "updated_at": "2026-03-06T21:33:18+00:00",
+          "weight": 1.2
+        },
+        "summary": "edge_add b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3 [REINFORCES]"
+      },
+      "proposed_state": {
+        "action_type": "revert",
+        "confidence": 1.0,
+        "event_id": "ed41de04-3244-4ba8-86fc-46ebb91cff06",
+        "evidence_label": "OPERATOR_REFINED",
+        "measurement_method": "revert",
+        "operator_label": "local_operator",
+        "rationale": "Revert measurement event ed41de04-3244-4ba8-86fc-46ebb91cff06"
+      },
+      "committed_state": {
+        "edge": {
+          "created_at": "2026-03-06T21:33:18+00:00",
+          "dst_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+          "dst_kind": "meme",
+          "edge_type": "REINFORCES",
+          "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+          "id": "ba31effa-3641-4d58-abf6-cc8f0b4274f4",
+          "provenance_json": "{\"assertion_origin\":\"operator_asserted\",\"confidence\":0.77,\"evidence_label\":\"OPERATOR_ASSERTED\",\"measurement_method\":\"local_geometry_preview\",\"operator_label\":\"validation_operator\",\"rationale\":\"live api validation\",\"updated_at\":\"2026-03-06T21:33:18+00:00\"}",
+          "src_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "src_kind": "meme",
+          "updated_at": "2026-03-06T21:33:18+00:00",
+          "weight": 1.2
+        },
+        "summary": "removed b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3"
+      },
+      "summary": "Reverted event ed41de04-3244-4ba8-86fc-46ebb91cff06"
+    }
+  ]
+}

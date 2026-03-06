@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import networkx as nx
 
-from eden.observatory.geometry import compute_ablation_report, compute_coordinate_sets, compute_geometry_metrics
+from eden.observatory.geometry import (
+    compute_ablation_report,
+    compute_coordinate_sets,
+    compute_geometry_metrics,
+    compute_selection_geometry,
+    metric_deltas,
+)
 
 
 def _rename(graph):
@@ -59,3 +65,15 @@ def test_directed_cycle_has_nontrivial_chirality_and_ablation_changes_scores() -
     report = compute_ablation_report(graph, directed, edge_types=edge_types, node_order=ordered_nodes)
     assert report
     assert report[0]["persistence"] < 1.0
+
+
+def test_local_selection_geometry_and_edge_change_delta() -> None:
+    graph = _rename(nx.path_graph(5))
+    directed = nx.DiGraph(graph)
+    local_before = compute_selection_geometry(graph, directed, selected_node_ids=["n1", "n2"], radius=1, node_order=list(graph.nodes()))
+    graph.add_edge("n1", "n3", weight=1.0)
+    directed.add_edge("n1", "n3", weight=1.0)
+    local_after = compute_selection_geometry(graph, directed, selected_node_ids=["n1", "n2"], radius=1, node_order=list(graph.nodes()))
+    delta = metric_deltas(local_before["metrics"], local_after["metrics"])
+    assert local_before["metrics"]["counts"]["nodes"] >= 2
+    assert any(abs(value) > 0 for value in delta.values())

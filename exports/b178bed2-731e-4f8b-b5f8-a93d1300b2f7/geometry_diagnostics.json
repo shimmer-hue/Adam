@@ -1,0 +1,5018 @@
+{
+  "generated_at": "2026-03-06T21:33:18+00:00",
+  "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+  "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+  "legend": {
+    "OBSERVED": "Directly computed from graph topology or explicit recurrence counts.",
+    "DERIVED": "Computed from transforms, projections, or ordered-structure proxies.",
+    "SPECULATIVE": "Operator-facing hypothesis layer only. Not used for any current score."
+  },
+  "nodes": [
+    {
+      "id": "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+      "label": "ADAM",
+      "kind": "agent",
+      "domain": "behavior",
+      "source_kind": "agent",
+      "summary": "ADAM",
+      "session_id": "",
+      "cluster_id": 1,
+      "degree": 7,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 0.0,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.36068816924985997,
+          "y": 0.710292577769582
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.2758448055980498,
+          "y": 7.411257070175151e-17
+        },
+        "pca": {
+          "x": 1.259951540867425,
+          "y": -1.0759290752002634e-16
+        },
+        "circular_candidate": {
+          "x": -0.8314696123025453,
+          "y": 0.5555702330196022
+        },
+        "temporal": {
+          "x": 0.06451612903225806,
+          "y": 0.0
+        },
+        "basin_linked": {
+          "x": 0.2758448055980498,
+          "y": 7.411257070175151e-17
+        }
+      }
+    },
+    {
+      "id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "label": "Demo session",
+      "kind": "session",
+      "domain": "behavior",
+      "source_kind": "session",
+      "summary": "Demo session",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:28+00:00",
+      "requested_mode": "manual",
+      "verdicts": [],
+      "cluster_id": 1,
+      "degree": 2,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 0.0,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.1194169124660892,
+          "y": 0.2375072660573741
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.09124120221855102,
+          "y": 8.0822143800547385e-16
+        },
+        "pca": {
+          "x": 0.8693490290697755,
+          "y": 4.6719687516630455e-16
+        },
+        "circular_candidate": {
+          "x": -1.0,
+          "y": 1.2246467991473532e-16
+        },
+        "temporal": {
+          "x": 0.3225806451612903,
+          "y": 0.25
+        },
+        "basin_linked": {
+          "x": 0.09124120221855102,
+          "y": 8.0822143800547385e-16
+        }
+      }
+    },
+    {
+      "id": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "label": "T0",
+      "kind": "turn",
+      "domain": "behavior",
+      "source_kind": "turn",
+      "summary": "Map a reusable memode as a thick-present assembly motif and report the active set.",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "requested_mode": "manual",
+      "effective_mode": "manual",
+      "profile_name": "manual:balanced",
+      "budget_pressure": "LOW",
+      "verdicts": [
+        "accept"
+      ],
+      "time_order": 0,
+      "cluster_id": 0,
+      "degree": 23,
+      "clustering": 0.2253,
+      "triangle_participation": 57,
+      "community": 0,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 0.0,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.14566776892647476,
+          "y": -0.281009445628757
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.1003766411190536,
+          "y": 1.185340793984521e-16
+        },
+        "pca": {
+          "x": -3.2278410173431835,
+          "y": 2.3458173551035893e-15
+        },
+        "circular_candidate": {
+          "x": 0.9807852804032303,
+          "y": -0.19509032201612872
+        },
+        "temporal": {
+          "x": 0.0,
+          "y": 0.5
+        },
+        "basin_linked": {
+          "x": 0.0,
+          "y": 0.0
+        }
+      }
+    },
+    {
+      "id": "44718af4-f923-42d6-b5ee-5de193fd02bb",
+      "label": "ACCEPT",
+      "kind": "feedback",
+      "domain": "behavior",
+      "source_kind": "feedback",
+      "summary": "Useful for validating v1.2 observatory edit surfaces.",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 0,
+      "degree": 1,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 0,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 0.0,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.3700601896452753,
+          "y": -0.07341894161990191
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956647,
+          "y": -0.9288406827870376
+        },
+        "pca": {
+          "x": 0.5700062744517833,
+          "y": 3.494065878301017e-16
+        },
+        "circular_candidate": {
+          "x": 0.19509032201612833,
+          "y": 0.9807852804032304
+        },
+        "temporal": {
+          "x": 0.03225806451612903,
+          "y": 0.75
+        },
+        "basin_linked": {
+          "x": -0.10873579153956647,
+          "y": -0.9288406827870376
+        }
+      }
+    },
+    {
+      "id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+      "label": "behavior meme",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "turn_adam",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Answer: I am responding through the current aperture rather than pretending to speak from fixed weights. Your latest request was: Map a reusable memode as a th\u2026",
+      "evidence": 6.75,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "adam",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 2,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 2,
+      "memode_membership": [
+        "b96de177-8664-4b4f-965e-5b1012c39b45"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 6.75,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.37826172235413996,
+          "y": -0.3428559564899898
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956599,
+          "y": 0.0396747653690272
+        },
+        "pca": {
+          "x": -0.5366421877481516,
+          "y": -1.074214823692818
+        },
+        "circular_candidate": {
+          "x": 0.8314696123025452,
+          "y": -0.5555702330196022
+        },
+        "temporal": {
+          "x": 0.5806451612903226,
+          "y": 1.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956599,
+          "y": 0.0396747653690272
+        }
+      }
+    },
+    {
+      "id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+      "label": "behavior meme behavior",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "turn_adam",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Answer: I am responding through the current aperture rather than pretending to speak from fixed weights. Your latest request was: Map a reusable memode as a th\u2026",
+      "evidence": 5.5,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "adam",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 2,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 2,
+      "memode_membership": [
+        "b96de177-8664-4b4f-965e-5b1012c39b45"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 5.5,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.4574864140566276,
+          "y": -0.3761357711631521
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956599,
+          "y": 0.03967476536902757
+        },
+        "pca": {
+          "x": -0.5366421877481516,
+          "y": -1.0742148236928162
+        },
+        "circular_candidate": {
+          "x": -1.8369701987210297e-16,
+          "y": -1.0
+        },
+        "temporal": {
+          "x": 0.6451612903225806,
+          "y": 0.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956599,
+          "y": 0.03967476536902757
+        }
+      }
+    },
+    {
+      "id": "28177b01-f804-4890-a4d1-b6b37b1ac167",
+      "label": "meme behavior meme",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "turn_adam",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Answer: I am responding through the current aperture rather than pretending to speak from fixed weights. Your latest request was: Map a reusable memode as a th\u2026",
+      "evidence": 5.5,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "adam",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 2,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 2,
+      "memode_membership": [
+        "b96de177-8664-4b4f-965e-5b1012c39b45"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 5.5,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.3399409859079833,
+          "y": -0.39248967064898327
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956596,
+          "y": 0.03967476536902738
+        },
+        "pca": {
+          "x": -0.5366421877481518,
+          "y": -1.074214823692817
+        },
+        "circular_candidate": {
+          "x": 0.1950903220161283,
+          "y": -0.9807852804032304
+        },
+        "temporal": {
+          "x": 0.8387096774193549,
+          "y": 0.25
+        },
+        "basin_linked": {
+          "x": -0.10873579153956596,
+          "y": 0.03967476536902738
+        }
+      }
+    },
+    {
+      "id": "08d70295-c77c-4a00-b4ec-94a691b4a545",
+      "label": "active set",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "turn_adam",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Answer: I am responding through the current aperture rather than pretending to speak from fixed weights. Your latest request was: Map a reusable memode as a th\u2026",
+      "evidence": 4.5,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "adam",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 2,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 2,
+      "memode_membership": [
+        "b96de177-8664-4b4f-965e-5b1012c39b45"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 4.5,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.4142649292377027,
+          "y": -0.42123060335533097
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956593,
+          "y": 0.03967476536902716
+        },
+        "pca": {
+          "x": -0.5366421877481516,
+          "y": -1.074214823692816
+        },
+        "circular_candidate": {
+          "x": 0.9238795325112865,
+          "y": -0.3826834323650904
+        },
+        "temporal": {
+          "x": 0.41935483870967744,
+          "y": 0.5
+        },
+        "basin_linked": {
+          "x": -0.10873579153956593,
+          "y": 0.03967476536902716
+        }
+      }
+    },
+    {
+      "id": "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+      "label": "active set basis",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "turn_adam",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Answer: I am responding through the current aperture rather than pretending to speak from fixed weights. Your latest request was: Map a reusable memode as a th\u2026",
+      "evidence": 3.25,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "adam",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 2,
+      "degree": 6,
+      "clustering": 1.0,
+      "triangle_participation": 15,
+      "community": 2,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.38970657502280004,
+          "y": -0.2680336394041625
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.108735791539566,
+          "y": 0.03967476536902738
+        },
+        "pca": {
+          "x": -0.3620567882332336,
+          "y": -0.9541562876373341
+        },
+        "circular_candidate": {
+          "x": 0.38268343236509,
+          "y": -0.9238795325112866
+        },
+        "temporal": {
+          "x": 0.45161290322580644,
+          "y": 0.75
+        },
+        "basin_linked": {
+          "x": -0.108735791539566,
+          "y": 0.03967476536902738
+        }
+      }
+    },
+    {
+      "id": "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+      "label": "active set were",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "turn_adam",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Answer: I am responding through the current aperture rather than pretending to speak from fixed weights. Your latest request was: Map a reusable memode as a th\u2026",
+      "evidence": 3.25,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "adam",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 2,
+      "degree": 6,
+      "clustering": 1.0,
+      "triangle_participation": 15,
+      "community": 2,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.4572149826162582,
+          "y": -0.2915319641081121
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956595,
+          "y": 0.03967476536902731
+        },
+        "pca": {
+          "x": -0.36205678823323356,
+          "y": -0.9541562876373374
+        },
+        "circular_candidate": {
+          "x": 0.7071067811865474,
+          "y": -0.7071067811865477
+        },
+        "temporal": {
+          "x": 0.4838709677419355,
+          "y": 1.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956595,
+          "y": 0.03967476536902731
+        }
+      }
+    },
+    {
+      "id": "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+      "label": "accept explanation useful",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "feedback",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Feedback verdict=accept. Explanation: Useful for validating v1.2 observatory edit surfaces. Corrected text: n/a",
+      "evidence": 3.25,
+      "reward": 0.0,
+      "risk": 0.0,
+      "usage_count": 0,
+      "feedback_count": 0,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "feedback",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 3,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 3,
+      "memode_membership": [
+        "9a114f67-1e74-48b6-8e58-264c35f41615"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.020242195024470937,
+          "y": -0.578976779917281
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956563,
+          "y": 0.12929639051245423
+        },
+        "pca": {
+          "x": -0.5366421877481514,
+          "y": -0.733526671202663
+        },
+        "circular_candidate": {
+          "x": -0.7071067811865477,
+          "y": -0.7071067811865475
+        },
+        "temporal": {
+          "x": 0.3548387096774194,
+          "y": 0.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956563,
+          "y": 0.12929639051245423
+        }
+      }
+    },
+    {
+      "id": "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+      "label": "corrected text n/a",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "feedback",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Feedback verdict=accept. Explanation: Useful for validating v1.2 observatory edit surfaces. Corrected text: n/a",
+      "evidence": 3.25,
+      "reward": 0.0,
+      "risk": 0.0,
+      "usage_count": 0,
+      "feedback_count": 0,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "feedback",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 3,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 3,
+      "memode_membership": [
+        "9a114f67-1e74-48b6-8e58-264c35f41615"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.06421170535286545,
+          "y": -0.526201705423078
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.1087357915395656,
+          "y": 0.12929639051245428
+        },
+        "pca": {
+          "x": -0.5366421877481515,
+          "y": -0.733526671202663
+        },
+        "circular_candidate": {
+          "x": -0.9807852804032304,
+          "y": -0.19509032201612836
+        },
+        "temporal": {
+          "x": 0.6774193548387096,
+          "y": 0.25
+        },
+        "basin_linked": {
+          "x": -0.1087357915395656,
+          "y": 0.12929639051245428
+        }
+      }
+    },
+    {
+      "id": "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+      "label": "edit surfaces corrected",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "feedback",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Feedback verdict=accept. Explanation: Useful for validating v1.2 observatory edit surfaces. Corrected text: n/a",
+      "evidence": 3.25,
+      "reward": 0.0,
+      "risk": 0.0,
+      "usage_count": 0,
+      "feedback_count": 0,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "feedback",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 3,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 3,
+      "memode_membership": [
+        "9a114f67-1e74-48b6-8e58-264c35f41615"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.023929661609628446,
+          "y": -0.5364331388107944
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956563,
+          "y": 0.12929639051245406
+        },
+        "pca": {
+          "x": -0.5366421877481514,
+          "y": -0.7335266712026629
+        },
+        "circular_candidate": {
+          "x": -0.19509032201612866,
+          "y": -0.9807852804032303
+        },
+        "temporal": {
+          "x": 0.7096774193548387,
+          "y": 0.5
+        },
+        "basin_linked": {
+          "x": -0.10873579153956563,
+          "y": 0.12929639051245406
+        }
+      }
+    },
+    {
+      "id": "76485b6c-9f15-4460-9632-6f16daf5c97e",
+      "label": "explanation useful validating",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "feedback",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Feedback verdict=accept. Explanation: Useful for validating v1.2 observatory edit surfaces. Corrected text: n/a",
+      "evidence": 3.25,
+      "reward": 0.0,
+      "risk": 0.0,
+      "usage_count": 0,
+      "feedback_count": 0,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "feedback",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 3,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 3,
+      "memode_membership": [
+        "9a114f67-1e74-48b6-8e58-264c35f41615"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.04651093100102881,
+          "y": -0.4676417098605652
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.1087357915395656,
+          "y": 0.12929639051245437
+        },
+        "pca": {
+          "x": -0.5366421877481515,
+          "y": -0.7335266712026631
+        },
+        "circular_candidate": {
+          "x": -0.9238795325112868,
+          "y": -0.38268343236508967
+        },
+        "temporal": {
+          "x": 0.7419354838709677,
+          "y": 0.75
+        },
+        "basin_linked": {
+          "x": -0.1087357915395656,
+          "y": 0.12929639051245437
+        }
+      }
+    },
+    {
+      "id": "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+      "label": "feedback verdict accept",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "feedback",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Feedback verdict=accept. Explanation: Useful for validating v1.2 observatory edit surfaces. Corrected text: n/a",
+      "evidence": 3.25,
+      "reward": 0.0,
+      "risk": 0.0,
+      "usage_count": 0,
+      "feedback_count": 0,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "feedback",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 3,
+      "degree": 6,
+      "clustering": 1.0,
+      "triangle_participation": 15,
+      "community": 3,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.08305869861870595,
+          "y": -0.4899042701463333
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956561,
+          "y": 0.12929639051245417
+        },
+        "pca": {
+          "x": -0.3620567882332334,
+          "y": -0.651544802809247
+        },
+        "circular_candidate": {
+          "x": -0.5555702330196022,
+          "y": -0.8314696123025452
+        },
+        "temporal": {
+          "x": 0.7741935483870968,
+          "y": 1.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956561,
+          "y": 0.12929639051245417
+        }
+      }
+    },
+    {
+      "id": "307d4f53-754a-408d-adb0-58359d5fbd3d",
+      "label": "observatory edit surfaces",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "feedback",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Feedback verdict=accept. Explanation: Useful for validating v1.2 observatory edit surfaces. Corrected text: n/a",
+      "evidence": 3.25,
+      "reward": 0.0,
+      "risk": 0.0,
+      "usage_count": 0,
+      "feedback_count": 0,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "feedback",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 3,
+      "degree": 6,
+      "clustering": 1.0,
+      "triangle_participation": 15,
+      "community": 3,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.036683573192621444,
+          "y": -0.4370446442891246
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.1087357915395656,
+          "y": 0.12929639051245417
+        },
+        "pca": {
+          "x": -0.3620567882332334,
+          "y": -0.6515448028092471
+        },
+        "circular_candidate": {
+          "x": -0.38268343236509034,
+          "y": -0.9238795325112865
+        },
+        "temporal": {
+          "x": 0.9354838709677419,
+          "y": 0.0
+        },
+        "basin_linked": {
+          "x": -0.1087357915395656,
+          "y": 0.12929639051245417
+        }
+      }
+    },
+    {
+      "id": "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+      "label": "assembly motif report",
+      "kind": "meme",
+      "domain": "knowledge",
+      "source_kind": "turn_user",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Map a reusable memode as a thick-present assembly motif and report the active set.",
+      "evidence": 3.25,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "user",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 0,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 0,
+      "memode_membership": [
+        "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.023901696642238776,
+          "y": -0.07949372067773243
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.1087357915395657,
+          "y": -0.03627962976904683
+        },
+        "pca": {
+          "x": -0.5366421877481498,
+          "y": 1.807741494895481
+        },
+        "circular_candidate": {
+          "x": 0.7071067811865476,
+          "y": 0.7071067811865475
+        },
+        "temporal": {
+          "x": 0.5161290322580645,
+          "y": 0.25
+        },
+        "basin_linked": {
+          "x": -0.1087357915395657,
+          "y": -0.03627962976904683
+        }
+      }
+    },
+    {
+      "id": "5bfda95e-948d-4db5-b937-95aee22c5380",
+      "label": "map reusable memode",
+      "kind": "meme",
+      "domain": "knowledge",
+      "source_kind": "turn_user",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Map a reusable memode as a thick-present assembly motif and report the active set.",
+      "evidence": 3.25,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "user",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 0,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 0,
+      "memode_membership": [
+        "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.03574810109390886,
+          "y": -0.06535850198832527
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956567,
+          "y": -0.0362796297690467
+        },
+        "pca": {
+          "x": -0.5366421877481496,
+          "y": 1.807741494895481
+        },
+        "circular_candidate": {
+          "x": 1.0,
+          "y": 0.0
+        },
+        "temporal": {
+          "x": 0.8064516129032258,
+          "y": 0.5
+        },
+        "basin_linked": {
+          "x": -0.10873579153956567,
+          "y": -0.0362796297690467
+        }
+      }
+    },
+    {
+      "id": "7af4d273-495d-4924-aa60-d774618e288b",
+      "label": "memode thick-present assembly",
+      "kind": "meme",
+      "domain": "knowledge",
+      "source_kind": "turn_user",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Map a reusable memode as a thick-present assembly motif and report the active set.",
+      "evidence": 3.25,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "user",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 0,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 0,
+      "memode_membership": [
+        "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.01191442774080461,
+          "y": -0.14940331822006814
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956567,
+          "y": -0.036279629769046744
+        },
+        "pca": {
+          "x": -0.5366421877481498,
+          "y": 1.807741494895481
+        },
+        "circular_candidate": {
+          "x": 0.9238795325112867,
+          "y": 0.3826834323650898
+        },
+        "temporal": {
+          "x": 0.8709677419354839,
+          "y": 0.75
+        },
+        "basin_linked": {
+          "x": -0.10873579153956567,
+          "y": -0.036279629769046744
+        }
+      }
+    },
+    {
+      "id": "bc381d80-609f-419c-a88e-e49976d38b01",
+      "label": "motif report active",
+      "kind": "meme",
+      "domain": "knowledge",
+      "source_kind": "turn_user",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Map a reusable memode as a thick-present assembly motif and report the active set.",
+      "evidence": 3.25,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "user",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 0,
+      "degree": 7,
+      "clustering": 0.9048,
+      "triangle_participation": 19,
+      "community": 0,
+      "memode_membership": [
+        "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.07734824576672865,
+          "y": -0.13952808474581238
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956568,
+          "y": -0.036279629769046765
+        },
+        "pca": {
+          "x": -0.5366421877481496,
+          "y": 1.807741494895481
+        },
+        "circular_candidate": {
+          "x": 0.8314696123025452,
+          "y": 0.5555702330196022
+        },
+        "temporal": {
+          "x": 0.9032258064516129,
+          "y": 1.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956568,
+          "y": -0.036279629769046765
+        }
+      }
+    },
+    {
+      "id": "e008f004-f747-463a-877b-9812cad1c6e5",
+      "label": "report active set",
+      "kind": "meme",
+      "domain": "knowledge",
+      "source_kind": "turn_user",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Map a reusable memode as a thick-present assembly motif and report the active set.",
+      "evidence": 3.25,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "user",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 0,
+      "degree": 6,
+      "clustering": 1.0,
+      "triangle_participation": 15,
+      "community": 0,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.1453562546637646,
+          "y": -0.07797318954679433
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956568,
+          "y": -0.03627962976904686
+        },
+        "pca": {
+          "x": -0.3620567882332318,
+          "y": 1.6057010904465838
+        },
+        "circular_candidate": {
+          "x": 0.5555702330196023,
+          "y": 0.8314696123025452
+        },
+        "temporal": {
+          "x": 0.967741935483871,
+          "y": 0.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956568,
+          "y": -0.03627962976904686
+        }
+      }
+    },
+    {
+      "id": "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+      "label": "reusable memode thick-present",
+      "kind": "meme",
+      "domain": "knowledge",
+      "source_kind": "turn_user",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Map a reusable memode as a thick-present assembly motif and report the active set.",
+      "evidence": 3.25,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "user",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 0,
+      "degree": 6,
+      "clustering": 1.0,
+      "triangle_participation": 15,
+      "community": 0,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 3.25,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.09745481311175289,
+          "y": -0.021563258384465846
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956567,
+          "y": -0.036279629769046876
+        },
+        "pca": {
+          "x": -0.3620567882332317,
+          "y": 1.6057010904465838
+        },
+        "circular_candidate": {
+          "x": 0.38268343236508984,
+          "y": 0.9238795325112867
+        },
+        "temporal": {
+          "x": 1.0,
+          "y": 0.25
+        },
+        "basin_linked": {
+          "x": -0.10873579153956567,
+          "y": -0.036279629769046876
+        }
+      }
+    },
+    {
+      "id": "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+      "label": "EDEN is a local-first memetic persona laboratory.",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "constitution",
+      "scope": "global",
+      "summary": "EDEN is a local-first memetic persona laboratory.",
+      "evidence": 1.0,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 0,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "ADAM constitutional seed",
+      "session_id": "",
+      "created_at": "2026-03-06T21:32:28+00:00",
+      "verdicts": [],
+      "cluster_id": 1,
+      "degree": 2,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [
+        "4c79c880-6166-40b3-8937-c6d1a6161521"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 0,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.36855483671053385,
+          "y": 0.879552735960786
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.3030777747064016,
+          "y": -3.0807821820557814e-16
+        },
+        "pca": {
+          "x": 1.3906179879562353,
+          "y": -1.089599579778467e-15
+        },
+        "circular_candidate": {
+          "x": 6.123233995736766e-17,
+          "y": 1.0
+        },
+        "temporal": {
+          "x": 0.16129032258064516,
+          "y": 0.5
+        },
+        "basin_linked": {
+          "x": 0.3030777747064016,
+          "y": -3.0807821820557814e-16
+        }
+      }
+    },
+    {
+      "id": "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+      "label": "ADAM is the first runtime agent inside EDEN.",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "constitution",
+      "scope": "global",
+      "summary": "ADAM is the first runtime agent inside EDEN.",
+      "evidence": 1.0,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 0,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "ADAM constitutional seed",
+      "session_id": "",
+      "created_at": "2026-03-06T21:32:28+00:00",
+      "verdicts": [],
+      "cluster_id": 1,
+      "degree": 2,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [
+        "4c79c880-6166-40b3-8937-c6d1a6161521"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 0,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.3044130118280216,
+          "y": 0.9525476577921984
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.3030777747064016,
+          "y": 3.580555965695158e-16
+        },
+        "pca": {
+          "x": 1.3906179879562353,
+          "y": -1.089599579778467e-15
+        },
+        "circular_candidate": {
+          "x": -0.9807852804032304,
+          "y": 0.1950903220161286
+        },
+        "temporal": {
+          "x": 0.12903225806451613,
+          "y": 0.75
+        },
+        "basin_linked": {
+          "x": 0.3030777747064016,
+          "y": 3.580555965695158e-16
+        }
+      }
+    },
+    {
+      "id": "e47f57aa-b8b8-412d-8f26-c68fd7a1e754",
+      "label": "Memes are first-class graph nodes.",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "constitution",
+      "scope": "global",
+      "summary": "Memes are first-class graph nodes.",
+      "evidence": 1.0,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 0,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "ADAM constitutional seed",
+      "session_id": "",
+      "created_at": "2026-03-06T21:32:28+00:00",
+      "verdicts": [],
+      "cluster_id": 1,
+      "degree": 2,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [
+        "4c79c880-6166-40b3-8937-c6d1a6161521"
+      ],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 0,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.4863696288447892,
+          "y": 0.8296791073924652
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.3030777747064016,
+          "y": -2.6644485478213477e-16
+        },
+        "pca": {
+          "x": 1.3906179879562353,
+          "y": -1.089599579778467e-15
+        },
+        "circular_candidate": {
+          "x": -0.3826834323650897,
+          "y": 0.9238795325112867
+        },
+        "temporal": {
+          "x": 0.1935483870967742,
+          "y": 1.0
+        },
+        "basin_linked": {
+          "x": 0.3030777747064016,
+          "y": -2.6644485478213477e-16
+        }
+      }
+    },
+    {
+      "id": "8743c2db-4787-4770-b8e7-7374304c1b8c",
+      "label": "Memodes are derived structures composed from multiple memes and relations.",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "constitution",
+      "scope": "global",
+      "summary": "Memodes are derived structures composed from multiple memes and relations.",
+      "evidence": 1.0,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "ADAM constitutional seed",
+      "session_id": "",
+      "created_at": "2026-03-06T21:32:28+00:00",
+      "verdicts": [],
+      "cluster_id": 1,
+      "degree": 2,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [
+        "4c79c880-6166-40b3-8937-c6d1a6161521"
+      ],
+      "recent_active_set_presence": 1,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.5832084080179462,
+          "y": 0.7903585950147591
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.3030777747064016,
+          "y": 3.3030002095388687e-16
+        },
+        "pca": {
+          "x": 1.3906179879562353,
+          "y": -1.089599579778467e-15
+        },
+        "circular_candidate": {
+          "x": -0.9238795325112867,
+          "y": 0.3826834323650899
+        },
+        "temporal": {
+          "x": 0.22580645161290322,
+          "y": 0.0
+        },
+        "basin_linked": {
+          "x": 0.3030777747064016,
+          "y": 3.3030002095388687e-16
+        }
+      }
+    },
+    {
+      "id": "affc6c93-2ee1-4637-9383-1257397daf5e",
+      "label": "Regard is a persistent valuation over semantic and behavioral structures, not to",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "constitution",
+      "scope": "global",
+      "summary": "Regard is a persistent valuation over semantic and behavioral structures, not token attention.",
+      "evidence": 1.0,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "ADAM constitutional seed",
+      "session_id": "",
+      "created_at": "2026-03-06T21:32:28+00:00",
+      "verdicts": [],
+      "cluster_id": 1,
+      "degree": 2,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [
+        "4c79c880-6166-40b3-8937-c6d1a6161521"
+      ],
+      "recent_active_set_presence": 1,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.586389702576799,
+          "y": 0.8942805250426814
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.3030777747064016,
+          "y": -2.942004303977637e-16
+        },
+        "pca": {
+          "x": 1.3906179879562353,
+          "y": -1.089599579778467e-15
+        },
+        "circular_candidate": {
+          "x": -0.1950903220161282,
+          "y": 0.9807852804032304
+        },
+        "temporal": {
+          "x": 0.25806451612903225,
+          "y": 0.25
+        },
+        "basin_linked": {
+          "x": 0.3030777747064016,
+          "y": -2.942004303977637e-16
+        }
+      }
+    },
+    {
+      "id": "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+      "label": "The v1 loop is direct: input -> retrieve/assemble -> Adam response -> membrane -",
+      "kind": "meme",
+      "domain": "behavior",
+      "source_kind": "constitution",
+      "scope": "global",
+      "summary": "The v1 loop is direct: input -> retrieve/assemble -> Adam response -> membrane -> feedback -> graph update.",
+      "evidence": 1.0,
+      "reward": 0.27999999999999997,
+      "risk": -0.028000000000000004,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "skip_count": 0,
+      "membrane_conflicts": 0,
+      "provenance": "ADAM constitutional seed",
+      "session_id": "",
+      "created_at": "2026-03-06T21:32:28+00:00",
+      "verdicts": [],
+      "cluster_id": 1,
+      "degree": 2,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [
+        "4c79c880-6166-40b3-8937-c6d1a6161521"
+      ],
+      "recent_active_set_presence": 1,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.28,
+        "risk": -0.028,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.3957427990398517,
+          "y": 1.0
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.3030777747064016,
+          "y": -1.83178127935248e-16
+        },
+        "pca": {
+          "x": 1.3906179879562353,
+          "y": -1.089599579778467e-15
+        },
+        "circular_candidate": {
+          "x": -0.555570233019602,
+          "y": 0.8314696123025453
+        },
+        "temporal": {
+          "x": 0.2903225806451613,
+          "y": 0.5
+        },
+        "basin_linked": {
+          "x": 0.3030777747064016,
+          "y": -1.83178127935248e-16
+        }
+      }
+    },
+    {
+      "id": "4c79c880-6166-40b3-8937-c6d1a6161521",
+      "label": "ADAM constitutional stack",
+      "kind": "memode",
+      "domain": "behavior",
+      "source_kind": "memode",
+      "scope": "global",
+      "summary": "The constitutional scaffold that defines EDEN v1, ADAM, membrane visibility, and regard.",
+      "evidence": 1.0,
+      "reward": 0.35,
+      "risk": -0.034999999999999996,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "member_ids": [
+        "8743c2db-4787-4770-b8e7-7374304c1b8c",
+        "affc6c93-2ee1-4637-9383-1257397daf5e",
+        "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+        "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+        "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+        "e47f57aa-b8b8-412d-8f26-c68fd7a1e754"
+      ],
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 0.0,
+      "provenance": "seed_constitution",
+      "session_id": "",
+      "created_at": "2026-03-06T21:32:28+00:00",
+      "verdicts": [],
+      "cluster_id": 1,
+      "degree": 6,
+      "clustering": 0.0,
+      "triangle_participation": 0,
+      "community": 1,
+      "memode_membership": [],
+      "recent_active_set_presence": 1,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.35,
+        "risk": -0.035,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.49523244357119883,
+          "y": 0.9642783624706711
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": 0.3070113989347113,
+          "y": -3.210777501680137e-17
+        },
+        "pca": {
+          "x": 1.323890520017745,
+          "y": -9.247732338114572e-16
+        },
+        "circular_candidate": {
+          "x": -0.7071067811865475,
+          "y": 0.7071067811865476
+        },
+        "temporal": {
+          "x": 0.0967741935483871,
+          "y": 0.75
+        },
+        "basin_linked": {
+          "x": 0.3070113989347113,
+          "y": -3.210777501680137e-17
+        }
+      }
+    },
+    {
+      "id": "b96de177-8664-4b4f-965e-5b1012c39b45",
+      "label": "behavior meme / behavior meme behavior / meme behavior meme",
+      "kind": "memode",
+      "domain": "behavior",
+      "source_kind": "memode",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Answer: I am responding through the current aperture rather than pretending to speak from fixed weights. Your latest request was: Map a reusable memode as a th\u2026",
+      "evidence": 1.0,
+      "reward": 0.35,
+      "risk": -0.034999999999999996,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "member_ids": [
+        "08d70295-c77c-4a00-b4ec-94a691b4a545",
+        "28177b01-f804-4890-a4d1-b6b37b1ac167",
+        "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+        "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+      ],
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 0.0,
+      "provenance": "adam",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 2,
+      "degree": 5,
+      "clustering": 1.0,
+      "triangle_participation": 10,
+      "community": 2,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.35,
+        "risk": -0.035,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.3602161945690058,
+          "y": -0.4878869877918806
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956597,
+          "y": 0.03967476536902739
+        },
+        "pca": {
+          "x": -0.17567243080791597,
+          "y": -0.7807775941351047
+        },
+        "circular_candidate": {
+          "x": 0.5555702330196018,
+          "y": -0.8314696123025455
+        },
+        "temporal": {
+          "x": 0.6129032258064516,
+          "y": 1.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956597,
+          "y": 0.03967476536902739
+        }
+      }
+    },
+    {
+      "id": "9a114f67-1e74-48b6-8e58-264c35f41615",
+      "label": "accept explanation useful / corrected text n/a / edit surfaces corrected",
+      "kind": "memode",
+      "domain": "behavior",
+      "source_kind": "memode",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Feedback verdict=accept. Explanation: Useful for validating v1.2 observatory edit surfaces. Corrected text: n/a",
+      "evidence": 1.0,
+      "reward": 0.0,
+      "risk": 0.0,
+      "usage_count": 0,
+      "feedback_count": 0,
+      "member_ids": [
+        "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+        "76485b6c-9f15-4460-9632-6f16daf5c97e",
+        "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+        "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0"
+      ],
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 0.0,
+      "provenance": "feedback",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 3,
+      "degree": 5,
+      "clustering": 1.0,
+      "triangle_participation": 10,
+      "community": 3,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.0,
+        "risk": 0.0,
+        "usage_count": 0,
+        "feedback_count": 0
+      },
+      "render_coords": {
+        "force": {
+          "x": -0.1281674346863271,
+          "y": -0.5773132308321723
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956564,
+          "y": 0.12929639051245437
+        },
+        "pca": {
+          "x": -0.1756724308079158,
+          "y": -0.5331533106261835
+        },
+        "circular_candidate": {
+          "x": -0.8314696123025455,
+          "y": -0.555570233019602
+        },
+        "temporal": {
+          "x": 0.3870967741935484,
+          "y": 0.0
+        },
+        "basin_linked": {
+          "x": -0.10873579153956564,
+          "y": 0.12929639051245437
+        }
+      }
+    },
+    {
+      "id": "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+      "label": "assembly motif report / map reusable memode / memode thick-present assembly",
+      "kind": "memode",
+      "domain": "knowledge",
+      "source_kind": "memode",
+      "scope": "session:33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "summary": "Map a reusable memode as a thick-present assembly motif and report the active set.",
+      "evidence": 1.0,
+      "reward": 0.35,
+      "risk": -0.034999999999999996,
+      "usage_count": 1,
+      "feedback_count": 1,
+      "member_ids": [
+        "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+        "5bfda95e-948d-4db5-b937-95aee22c5380",
+        "7af4d273-495d-4924-aa60-d774618e288b",
+        "bc381d80-609f-419c-a88e-e49976d38b01"
+      ],
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 0.0,
+      "provenance": "user",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "created_at": "2026-03-06T21:32:29+00:00",
+      "verdicts": [
+        "accept"
+      ],
+      "cluster_id": 0,
+      "degree": 5,
+      "clustering": 1.0,
+      "triangle_participation": 10,
+      "community": 0,
+      "memode_membership": [],
+      "recent_active_set_presence": 0,
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "regard_breakdown": {
+        "evidence": 1.0,
+        "reward": 0.35,
+        "risk": -0.035,
+        "usage_count": 1,
+        "feedback_count": 1
+      },
+      "render_coords": {
+        "force": {
+          "x": 0.07218432840963415,
+          "y": -0.17706829444770017
+        }
+      },
+      "derived_coords": {
+        "spectral": {
+          "x": -0.10873579153956568,
+          "y": -0.036279629769046716
+        },
+        "pca": {
+          "x": -0.1756724308079146,
+          "y": 1.3139309047612897
+        },
+        "circular_candidate": {
+          "x": 0.9807852804032304,
+          "y": 0.19509032201612825
+        },
+        "temporal": {
+          "x": 0.5483870967741935,
+          "y": 0.25
+        },
+        "basin_linked": {
+          "x": -0.10873579153956568,
+          "y": -0.036279629769046716
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "implicit::4500cb6c-2bde-41b8-bcbe-885ba81a3e6e::33eb9c4d-0673-48b1-bb5c-9ac46a793bda::BELONGS_TO_AGENT",
+      "source": "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+      "target": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "type": "BELONGS_TO_AGENT",
+      "weight": 1.0,
+      "provenance": {
+        "assertion_origin": "auto_derived",
+        "evidence_label": "AUTO_DERIVED",
+        "confidence": 1.0
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "implicit::33eb9c4d-0673-48b1-bb5c-9ac46a793bda::f8df33f3-998d-4fb6-a963-233cb8666442::BELONGS_TO_SESSION",
+      "source": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "target": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "type": "BELONGS_TO_SESSION",
+      "weight": 1.0,
+      "provenance": {
+        "assertion_origin": "auto_derived",
+        "evidence_label": "AUTO_DERIVED",
+        "confidence": 1.0
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "implicit::f8df33f3-998d-4fb6-a963-233cb8666442::44718af4-f923-42d6-b5ee-5de193fd02bb::FED_BACK_BY",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "44718af4-f923-42d6-b5ee-5de193fd02bb",
+      "type": "FED_BACK_BY",
+      "weight": 1.0,
+      "provenance": {
+        "assertion_origin": "feedback_derived",
+        "evidence_label": "OBSERVED",
+        "confidence": 1.0
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "feedback_derived",
+      "evidence_label": "OBSERVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "39f3d7b3-2ce8-44ab-a4a1-ebf9e1400d43",
+      "source": "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+      "target": "5bfda95e-948d-4db5-b937-95aee22c5380",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "80ec2ade-b251-4862-8f5a-2518c920462e",
+      "source": "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+      "target": "7af4d273-495d-4924-aa60-d774618e288b",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "bf1f0632-b0f5-47e7-8759-eece395c06d9",
+      "source": "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+      "target": "bc381d80-609f-419c-a88e-e49976d38b01",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "47a1ff88-75ee-494f-9b4b-a6d5b98b012c",
+      "source": "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+      "target": "e008f004-f747-463a-877b-9812cad1c6e5",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "13a66e65-df66-4bbc-b804-8176d8d054fd",
+      "source": "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+      "target": "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "b901cede-1f82-45c2-9628-1f020e8defbd",
+      "source": "5bfda95e-948d-4db5-b937-95aee22c5380",
+      "target": "7af4d273-495d-4924-aa60-d774618e288b",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "76ea4c88-2fe3-47a6-9b2d-ba56e92a1445",
+      "source": "5bfda95e-948d-4db5-b937-95aee22c5380",
+      "target": "bc381d80-609f-419c-a88e-e49976d38b01",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "eae657ac-3377-43e8-8d28-465ea5e5e7fd",
+      "source": "5bfda95e-948d-4db5-b937-95aee22c5380",
+      "target": "e008f004-f747-463a-877b-9812cad1c6e5",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "8aae9572-628b-41f5-b3d1-79b1f5507909",
+      "source": "5bfda95e-948d-4db5-b937-95aee22c5380",
+      "target": "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "41c5c00b-26ef-4e60-adaf-9f22bb7059ed",
+      "source": "7af4d273-495d-4924-aa60-d774618e288b",
+      "target": "bc381d80-609f-419c-a88e-e49976d38b01",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "bab35b4e-afbe-494a-9ae3-3105b6260d47",
+      "source": "7af4d273-495d-4924-aa60-d774618e288b",
+      "target": "e008f004-f747-463a-877b-9812cad1c6e5",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "1870ad45-92a6-4f5e-8450-603cc0cf8f9c",
+      "source": "7af4d273-495d-4924-aa60-d774618e288b",
+      "target": "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "a32e7848-82ab-421f-9a82-6222c4b62740",
+      "source": "bc381d80-609f-419c-a88e-e49976d38b01",
+      "target": "e008f004-f747-463a-877b-9812cad1c6e5",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "682a5c27-1a54-421a-9660-0827d3358e71",
+      "source": "bc381d80-609f-419c-a88e-e49976d38b01",
+      "target": "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "647ff1a9-b530-4773-9213-3eb022c082ee",
+      "source": "e008f004-f747-463a-877b-9812cad1c6e5",
+      "target": "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "b9523302-936f-46a1-8610-5d83b983b7f5",
+      "source": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+      "target": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "24da5eb1-ee7f-413b-91e9-46e7588e5152",
+      "source": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+      "target": "28177b01-f804-4890-a4d1-b6b37b1ac167",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "2589e406-0805-4293-9a0e-6bbca2c2113c",
+      "source": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+      "target": "08d70295-c77c-4a00-b4ec-94a691b4a545",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "27b41f19-a86a-4db1-8b26-3820c1331cc5",
+      "source": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+      "target": "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "36601f57-fa8a-47bb-825a-2c3233f33244",
+      "source": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+      "target": "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "34b54222-5947-49be-b1c6-86659ca01dc8",
+      "source": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+      "target": "28177b01-f804-4890-a4d1-b6b37b1ac167",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "aa5db286-f190-42eb-963f-1a50bfea98f2",
+      "source": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+      "target": "08d70295-c77c-4a00-b4ec-94a691b4a545",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "be923315-0eb7-417d-85f6-68921a059f8f",
+      "source": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+      "target": "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "4e90cc6a-9801-47ba-b1e6-a18c8c91bd3d",
+      "source": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+      "target": "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "9f4f04f0-e1e9-4276-af01-19a669f1d479",
+      "source": "28177b01-f804-4890-a4d1-b6b37b1ac167",
+      "target": "08d70295-c77c-4a00-b4ec-94a691b4a545",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "97ce9b32-177d-4b6b-8f40-9989e1e06a3e",
+      "source": "28177b01-f804-4890-a4d1-b6b37b1ac167",
+      "target": "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "35cc53aa-45f0-4b94-9a9e-35678200bcb2",
+      "source": "28177b01-f804-4890-a4d1-b6b37b1ac167",
+      "target": "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "166a21e1-16f8-4029-872b-32a176920f9c",
+      "source": "08d70295-c77c-4a00-b4ec-94a691b4a545",
+      "target": "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "54c5bc0d-04b3-4176-a924-5c4907e6a0b9",
+      "source": "08d70295-c77c-4a00-b4ec-94a691b4a545",
+      "target": "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "82d9d4ba-76c4-40ee-bd69-ee389f3146ee",
+      "source": "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+      "target": "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "169ca2be-ce6a-468d-883f-820d8c3f5a34",
+      "source": "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+      "target": "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "5b9c5731-4719-4dab-8ac0-edb43cb8f6d5",
+      "source": "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+      "target": "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "aa38c21e-1b1a-4a1f-8944-2be1cec7f0c6",
+      "source": "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+      "target": "76485b6c-9f15-4460-9632-6f16daf5c97e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "0224e46e-00ed-43b3-9475-daad04f6e5c6",
+      "source": "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+      "target": "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "49fa0c2f-fa11-4f23-b219-fd0513574de9",
+      "source": "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+      "target": "307d4f53-754a-408d-adb0-58359d5fbd3d",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "f0e680c8-5354-4a07-a23f-4f60d4cfe7e8",
+      "source": "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+      "target": "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "750458fa-bfd9-4679-8e83-5bee67b12898",
+      "source": "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+      "target": "76485b6c-9f15-4460-9632-6f16daf5c97e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "3f6427b7-793d-4119-b132-a86dac44f714",
+      "source": "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+      "target": "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "e79ed87c-0ac2-41e4-9729-85c0693b036f",
+      "source": "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+      "target": "307d4f53-754a-408d-adb0-58359d5fbd3d",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "489002be-3491-4578-9c8e-168b020786d5",
+      "source": "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+      "target": "76485b6c-9f15-4460-9632-6f16daf5c97e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "d4533128-e03e-433b-b048-e6c048fdbbe3",
+      "source": "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+      "target": "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "a6c3759c-a96a-4c01-ac0d-57de810cb531",
+      "source": "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+      "target": "307d4f53-754a-408d-adb0-58359d5fbd3d",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "d2f97a96-4ce7-439c-977c-ab3e990e8fe7",
+      "source": "76485b6c-9f15-4460-9632-6f16daf5c97e",
+      "target": "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "d7418593-814a-4d7f-b901-838de5c31a5a",
+      "source": "76485b6c-9f15-4460-9632-6f16daf5c97e",
+      "target": "307d4f53-754a-408d-adb0-58359d5fbd3d",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "2623a65d-2093-40cf-ad55-1feb7f63b14d",
+      "source": "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+      "target": "307d4f53-754a-408d-adb0-58359d5fbd3d",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback",
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "04736f9f-e745-4ac4-a058-eb9777324df0",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "fa854656-20d9-4003-b2ca-da0a3418be87",
+      "source": "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+      "target": "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "5ae44b5e-000d-4ac2-941e-b9cfe7b5b802",
+      "source": "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+      "target": "5bfda95e-948d-4db5-b937-95aee22c5380",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "ff7e42f7-9ddc-4f37-9dd2-d8b094aba305",
+      "source": "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+      "target": "7af4d273-495d-4924-aa60-d774618e288b",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "58f31161-d6df-4b09-b135-35aeadba42ce",
+      "source": "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+      "target": "bc381d80-609f-419c-a88e-e49976d38b01",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "2bc93280-b939-4978-b203-5e69d08c4c7b",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "b96de177-8664-4b4f-965e-5b1012c39b45",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "b7bac5ab-c1e2-43a3-886f-743341578404",
+      "source": "b96de177-8664-4b4f-965e-5b1012c39b45",
+      "target": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "b80f49da-14ea-4725-b0ff-91906acea736",
+      "source": "b96de177-8664-4b4f-965e-5b1012c39b45",
+      "target": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "19e9af2a-cdbc-43db-9f1a-e0a9c2506e63",
+      "source": "b96de177-8664-4b4f-965e-5b1012c39b45",
+      "target": "28177b01-f804-4890-a4d1-b6b37b1ac167",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "374c9fa4-6c06-458a-b196-210d5bb374a0",
+      "source": "b96de177-8664-4b4f-965e-5b1012c39b45",
+      "target": "08d70295-c77c-4a00-b4ec-94a691b4a545",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "47705864-780d-4d4e-b81b-9c025b8af9f4",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "9a114f67-1e74-48b6-8e58-264c35f41615",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "107ceb27-8fd0-44be-83ac-33a5728ff9ad",
+      "source": "9a114f67-1e74-48b6-8e58-264c35f41615",
+      "target": "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "72098886-fa44-4927-bf50-dbd8439997e3",
+      "source": "9a114f67-1e74-48b6-8e58-264c35f41615",
+      "target": "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "ad9a7c54-044f-49e5-b8a3-8bf2242613c0",
+      "source": "9a114f67-1e74-48b6-8e58-264c35f41615",
+      "target": "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "4c2319aa-6258-4a62-9167-c79e41a03975",
+      "source": "9a114f67-1e74-48b6-8e58-264c35f41615",
+      "target": "76485b6c-9f15-4460-9632-6f16daf5c97e",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "turn_id": "f8df33f3-998d-4fb6-a963-233cb8666442"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "a9dc80cb-0532-4191-a987-a94b945a0344",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "f7606c70-c366-4973-9f42-6eb136fee7ed",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "5bfda95e-948d-4db5-b937-95aee22c5380",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "7ee52512-f955-41ed-b8c7-7e28c5d75081",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "7af4d273-495d-4924-aa60-d774618e288b",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "6c7289f7-6cf5-4341-92e4-d24225d2a3e8",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "bc381d80-609f-419c-a88e-e49976d38b01",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "3803ddd5-124d-441c-bee7-7b6f792efad2",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "e008f004-f747-463a-877b-9812cad1c6e5",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "fa87d5ae-a082-4b43-a970-b4062e3751f6",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "user"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "5e4049ac-62b5-4c77-b7ad-a06e61451b76",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "028e7b2b-4177-4ee1-b275-2bd2ca66d3b5",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "a5f47294-1b56-4a45-8b3f-cfc17a12ccdf",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "28177b01-f804-4890-a4d1-b6b37b1ac167",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "b288620f-73e3-47a2-87b7-ac02d8a82f44",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "08d70295-c77c-4a00-b4ec-94a691b4a545",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "9d918715-de94-4ca8-906f-273eb54a3944",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "ab5ef78b-5789-4b47-8df9-99c2f9decad1",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "adam"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "baeb9ffe-d238-4180-89a4-6ec7886819ae",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "38fb1f9a-2df6-46f8-badc-38e7110c832b",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "525948f5-9987-4a78-b4f8-27e7c4a7941b",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "8a4ef66f-f40f-4fdd-862c-4c0a43c183be",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "76485b6c-9f15-4460-9632-6f16daf5c97e",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "cb9e001a-29d8-4e16-9338-8a5db3eeef8b",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "22b427f9-ae33-48a2-abb6-dbd925c44187",
+      "source": "f8df33f3-998d-4fb6-a963-233cb8666442",
+      "target": "307d4f53-754a-408d-adb0-58359d5fbd3d",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "provenance": {
+        "actor": "feedback"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "4853dd8a-a700-4f36-9bc9-691727603432",
+      "source": "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+      "target": "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+      "type": "BELONGS_TO_AGENT",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "870cc4d0-c8ab-4463-bb92-e72002a30b0a",
+      "source": "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+      "target": "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+      "type": "BELONGS_TO_AGENT",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "01c69552-9455-4a13-89fc-81c065c7394a",
+      "source": "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+      "target": "e47f57aa-b8b8-412d-8f26-c68fd7a1e754",
+      "type": "BELONGS_TO_AGENT",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "48c62988-6126-4904-94c2-2c11c31e282f",
+      "source": "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+      "target": "8743c2db-4787-4770-b8e7-7374304c1b8c",
+      "type": "BELONGS_TO_AGENT",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "7df9bb2f-0efc-443d-9981-648c2dc6e37e",
+      "source": "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+      "target": "affc6c93-2ee1-4637-9383-1257397daf5e",
+      "type": "BELONGS_TO_AGENT",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "f2d1ac34-3edf-4da6-8205-6c054a5dcd9f",
+      "source": "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+      "target": "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+      "type": "BELONGS_TO_AGENT",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "e7807237-a0f7-45df-9893-9cc2bc9ff3a2",
+      "source": "4c79c880-6166-40b3-8937-c6d1a6161521",
+      "target": "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "32407cfc-b843-4221-9f30-fa488e97a001",
+      "source": "4c79c880-6166-40b3-8937-c6d1a6161521",
+      "target": "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "7366e079-0198-4904-be58-4f130e01a2d6",
+      "source": "4c79c880-6166-40b3-8937-c6d1a6161521",
+      "target": "e47f57aa-b8b8-412d-8f26-c68fd7a1e754",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "ee37b7e4-c602-4ca3-a798-e90df9600976",
+      "source": "4c79c880-6166-40b3-8937-c6d1a6161521",
+      "target": "8743c2db-4787-4770-b8e7-7374304c1b8c",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "600ed806-ab47-4f24-85cc-05b0d617ebca",
+      "source": "4c79c880-6166-40b3-8937-c6d1a6161521",
+      "target": "affc6c93-2ee1-4637-9383-1257397daf5e",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    },
+    {
+      "id": "ca4e7827-25dd-4991-968f-3e6d85e922d2",
+      "source": "4c79c880-6166-40b3-8937-c6d1a6161521",
+      "target": "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+      "type": "MATERIALIZES_AS_MEMODE",
+      "weight": 1.0,
+      "provenance": {
+        "kind": "constitution"
+      },
+      "measurement_history": [],
+      "measurement_event_ids": [],
+      "reverted": false,
+      "assertion_origin": "auto_derived",
+      "evidence_label": "AUTO_DERIVED",
+      "operator_label": "",
+      "confidence": 1.0
+    }
+  ],
+  "measurement_events": [
+    {
+      "id": "ed41de04-3244-4ba8-86fc-46ebb91cff06",
+      "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "turn_id": null,
+      "action_type": "edge_add",
+      "target_ids_json": "[{\"edge_type\":\"REINFORCES\",\"kind\":\"edge\",\"source_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"target_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\"}]",
+      "before_state_json": "{\"edge\":null,\"edge_existed\":false}",
+      "proposed_state_json": "{\"action_type\":\"edge_add\",\"confidence\":0.77,\"edge_type\":\"REINFORCES\",\"evidence_label\":\"OPERATOR_ASSERTED\",\"measurement_method\":\"local_geometry_preview\",\"operator_label\":\"validation_operator\",\"rationale\":\"live api validation\",\"source_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"source_kind\":\"meme\",\"target_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\",\"target_kind\":\"meme\",\"weight\":1.2}",
+      "committed_state_json": "{\"edge\":{\"created_at\":\"2026-03-06T21:33:18+00:00\",\"dst_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\",\"dst_kind\":\"meme\",\"edge_type\":\"REINFORCES\",\"experiment_id\":\"b178bed2-731e-4f8b-b5f8-a93d1300b2f7\",\"id\":\"ba31effa-3641-4d58-abf6-cc8f0b4274f4\",\"provenance_json\":\"{\\\"assertion_origin\\\":\\\"operator_asserted\\\",\\\"confidence\\\":0.77,\\\"evidence_label\\\":\\\"OPERATOR_ASSERTED\\\",\\\"measurement_method\\\":\\\"local_geometry_preview\\\",\\\"operator_label\\\":\\\"validation_operator\\\",\\\"rationale\\\":\\\"live api validation\\\",\\\"updated_at\\\":\\\"2026-03-06T21:33:18+00:00\\\"}\",\"src_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"src_kind\":\"meme\",\"updated_at\":\"2026-03-06T21:33:18+00:00\",\"weight\":1.2},\"summary\":\"edge_add b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3 [REINFORCES]\"}",
+      "rationale": "live api validation",
+      "operator_label": "validation_operator",
+      "evidence_label": "OPERATOR_ASSERTED",
+      "measurement_method": "local_geometry_preview",
+      "confidence": 0.77,
+      "created_at": "2026-03-06T21:33:18+00:00",
+      "reverted_from_event_id": null,
+      "target_ids": [
+        {
+          "edge_type": "REINFORCES",
+          "kind": "edge",
+          "source_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "target_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+        }
+      ],
+      "before_state": {
+        "edge": null,
+        "edge_existed": false
+      },
+      "proposed_state": {
+        "action_type": "edge_add",
+        "confidence": 0.77,
+        "edge_type": "REINFORCES",
+        "evidence_label": "OPERATOR_ASSERTED",
+        "measurement_method": "local_geometry_preview",
+        "operator_label": "validation_operator",
+        "rationale": "live api validation",
+        "source_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+        "source_kind": "meme",
+        "target_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+        "target_kind": "meme",
+        "weight": 1.2
+      },
+      "committed_state": {
+        "edge": {
+          "created_at": "2026-03-06T21:33:18+00:00",
+          "dst_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+          "dst_kind": "meme",
+          "edge_type": "REINFORCES",
+          "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+          "id": "ba31effa-3641-4d58-abf6-cc8f0b4274f4",
+          "provenance_json": "{\"assertion_origin\":\"operator_asserted\",\"confidence\":0.77,\"evidence_label\":\"OPERATOR_ASSERTED\",\"measurement_method\":\"local_geometry_preview\",\"operator_label\":\"validation_operator\",\"rationale\":\"live api validation\",\"updated_at\":\"2026-03-06T21:33:18+00:00\"}",
+          "src_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "src_kind": "meme",
+          "updated_at": "2026-03-06T21:33:18+00:00",
+          "weight": 1.2
+        },
+        "summary": "edge_add b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3 [REINFORCES]"
+      },
+      "summary": "live api validation"
+    },
+    {
+      "id": "f689054c-5889-4b1d-8459-3aae0f1a65b6",
+      "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+      "session_id": "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+      "turn_id": null,
+      "action_type": "revert",
+      "target_ids_json": "[{\"edge_type\":\"REINFORCES\",\"kind\":\"edge\",\"source_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"target_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\"}]",
+      "before_state_json": "{\"edge\":{\"created_at\":\"2026-03-06T21:33:18+00:00\",\"dst_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\",\"dst_kind\":\"meme\",\"edge_type\":\"REINFORCES\",\"experiment_id\":\"b178bed2-731e-4f8b-b5f8-a93d1300b2f7\",\"id\":\"ba31effa-3641-4d58-abf6-cc8f0b4274f4\",\"provenance_json\":\"{\\\"assertion_origin\\\":\\\"operator_asserted\\\",\\\"confidence\\\":0.77,\\\"evidence_label\\\":\\\"OPERATOR_ASSERTED\\\",\\\"measurement_method\\\":\\\"local_geometry_preview\\\",\\\"operator_label\\\":\\\"validation_operator\\\",\\\"rationale\\\":\\\"live api validation\\\",\\\"updated_at\\\":\\\"2026-03-06T21:33:18+00:00\\\"}\",\"src_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"src_kind\":\"meme\",\"updated_at\":\"2026-03-06T21:33:18+00:00\",\"weight\":1.2},\"summary\":\"edge_add b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3 [REINFORCES]\"}",
+      "proposed_state_json": "{\"action_type\":\"revert\",\"confidence\":1.0,\"event_id\":\"ed41de04-3244-4ba8-86fc-46ebb91cff06\",\"evidence_label\":\"OPERATOR_REFINED\",\"measurement_method\":\"revert\",\"operator_label\":\"local_operator\",\"rationale\":\"Revert measurement event ed41de04-3244-4ba8-86fc-46ebb91cff06\"}",
+      "committed_state_json": "{\"edge\":{\"created_at\":\"2026-03-06T21:33:18+00:00\",\"dst_id\":\"daba7111-54f0-4eea-8d69-8ca76e808cf3\",\"dst_kind\":\"meme\",\"edge_type\":\"REINFORCES\",\"experiment_id\":\"b178bed2-731e-4f8b-b5f8-a93d1300b2f7\",\"id\":\"ba31effa-3641-4d58-abf6-cc8f0b4274f4\",\"provenance_json\":\"{\\\"assertion_origin\\\":\\\"operator_asserted\\\",\\\"confidence\\\":0.77,\\\"evidence_label\\\":\\\"OPERATOR_ASSERTED\\\",\\\"measurement_method\\\":\\\"local_geometry_preview\\\",\\\"operator_label\\\":\\\"validation_operator\\\",\\\"rationale\\\":\\\"live api validation\\\",\\\"updated_at\\\":\\\"2026-03-06T21:33:18+00:00\\\"}\",\"src_id\":\"b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5\",\"src_kind\":\"meme\",\"updated_at\":\"2026-03-06T21:33:18+00:00\",\"weight\":1.2},\"summary\":\"removed b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3\"}",
+      "rationale": "Reverted event ed41de04-3244-4ba8-86fc-46ebb91cff06",
+      "operator_label": "local_operator",
+      "evidence_label": "OPERATOR_REFINED",
+      "measurement_method": "revert",
+      "confidence": 1.0,
+      "created_at": "2026-03-06T21:33:18+00:00",
+      "reverted_from_event_id": "ed41de04-3244-4ba8-86fc-46ebb91cff06",
+      "target_ids": [
+        {
+          "edge_type": "REINFORCES",
+          "kind": "edge",
+          "source_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "target_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+        }
+      ],
+      "before_state": {
+        "edge": {
+          "created_at": "2026-03-06T21:33:18+00:00",
+          "dst_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+          "dst_kind": "meme",
+          "edge_type": "REINFORCES",
+          "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+          "id": "ba31effa-3641-4d58-abf6-cc8f0b4274f4",
+          "provenance_json": "{\"assertion_origin\":\"operator_asserted\",\"confidence\":0.77,\"evidence_label\":\"OPERATOR_ASSERTED\",\"measurement_method\":\"local_geometry_preview\",\"operator_label\":\"validation_operator\",\"rationale\":\"live api validation\",\"updated_at\":\"2026-03-06T21:33:18+00:00\"}",
+          "src_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "src_kind": "meme",
+          "updated_at": "2026-03-06T21:33:18+00:00",
+          "weight": 1.2
+        },
+        "summary": "edge_add b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3 [REINFORCES]"
+      },
+      "proposed_state": {
+        "action_type": "revert",
+        "confidence": 1.0,
+        "event_id": "ed41de04-3244-4ba8-86fc-46ebb91cff06",
+        "evidence_label": "OPERATOR_REFINED",
+        "measurement_method": "revert",
+        "operator_label": "local_operator",
+        "rationale": "Revert measurement event ed41de04-3244-4ba8-86fc-46ebb91cff06"
+      },
+      "committed_state": {
+        "edge": {
+          "created_at": "2026-03-06T21:33:18+00:00",
+          "dst_id": "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+          "dst_kind": "meme",
+          "edge_type": "REINFORCES",
+          "experiment_id": "b178bed2-731e-4f8b-b5f8-a93d1300b2f7",
+          "id": "ba31effa-3641-4d58-abf6-cc8f0b4274f4",
+          "provenance_json": "{\"assertion_origin\":\"operator_asserted\",\"confidence\":0.77,\"evidence_label\":\"OPERATOR_ASSERTED\",\"measurement_method\":\"local_geometry_preview\",\"operator_label\":\"validation_operator\",\"rationale\":\"live api validation\",\"updated_at\":\"2026-03-06T21:33:18+00:00\"}",
+          "src_id": "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+          "src_kind": "meme",
+          "updated_at": "2026-03-06T21:33:18+00:00",
+          "weight": 1.2
+        },
+        "summary": "removed b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5 -> daba7111-54f0-4eea-8d69-8ca76e808cf3"
+      },
+      "summary": "Reverted event ed41de04-3244-4ba8-86fc-46ebb91cff06"
+    }
+  ],
+  "coordinate_methods": {
+    "force": "Render layout only.",
+    "spectral": "Laplacian eigenvectors.",
+    "pca": "PCA on adjacency rows.",
+    "circular_candidate": "Evenly spaced circle using spectral-order angles.",
+    "temporal": "Ordered chronology projection."
+  },
+  "full_graph": {
+    "metrics": {
+      "counts": {
+        "nodes": 32,
+        "edges": 93
+      },
+      "metrics": {
+        "circularity": {
+          "label": "OBSERVED",
+          "score": 0.01,
+          "method": "cycle-basis ringness proxy",
+          "sample_size": 32
+        },
+        "radiality": {
+          "label": "OBSERVED",
+          "score": 0.1764,
+          "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+          "sample_size": 32
+        },
+        "linearity": {
+          "label": "OBSERVED",
+          "score": 0.2474,
+          "method": "path-likeness proxy from endpoint structure and acyclicity",
+          "sample_size": 32
+        },
+        "community_structure": {
+          "label": "OBSERVED",
+          "score": 0.563,
+          "method": "greedy modularity community score",
+          "sample_size": 4
+        },
+        "triadic_closure": {
+          "label": "OBSERVED",
+          "score": 0.7446,
+          "method": "mean of transitivity, clustering, and triangle density",
+          "sample_size": 32
+        },
+        "mirror_symmetry": {
+          "label": "DERIVED",
+          "score": 0.8797,
+          "method": "reflection-match proxy on PCA coordinates",
+          "sample_size": 32
+        },
+        "chirality": {
+          "label": "DERIVED",
+          "score": 0.0528,
+          "method": "signed-area imbalance on directed temporal motifs",
+          "sample_size": 93
+        },
+        "translation_symmetry": {
+          "label": "DERIVED",
+          "score": 0.1831,
+          "method": "variance explained by edge-distance offset bins",
+          "sample_size": 992
+        }
+      },
+      "communities": [
+        {
+          "community_id": 0,
+          "size": 9,
+          "members": [
+            "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+            "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+            "44718af4-f923-42d6-b5ee-5de193fd02bb",
+            "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+            "5bfda95e-948d-4db5-b937-95aee22c5380",
+            "7af4d273-495d-4924-aa60-d774618e288b",
+            "bc381d80-609f-419c-a88e-e49976d38b01",
+            "e008f004-f747-463a-877b-9812cad1c6e5",
+            "f8df33f3-998d-4fb6-a963-233cb8666442"
+          ]
+        },
+        {
+          "community_id": 1,
+          "size": 9,
+          "members": [
+            "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+            "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+            "4c79c880-6166-40b3-8937-c6d1a6161521",
+            "8743c2db-4787-4770-b8e7-7374304c1b8c",
+            "affc6c93-2ee1-4637-9383-1257397daf5e",
+            "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+            "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+            "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+            "e47f57aa-b8b8-412d-8f26-c68fd7a1e754"
+          ]
+        },
+        {
+          "community_id": 2,
+          "size": 7,
+          "members": [
+            "08d70295-c77c-4a00-b4ec-94a691b4a545",
+            "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+            "28177b01-f804-4890-a4d1-b6b37b1ac167",
+            "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+            "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+            "b96de177-8664-4b4f-965e-5b1012c39b45",
+            "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+          ]
+        },
+        {
+          "community_id": 3,
+          "size": 7,
+          "members": [
+            "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+            "307d4f53-754a-408d-adb0-58359d5fbd3d",
+            "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+            "76485b6c-9f15-4460-9632-6f16daf5c97e",
+            "9a114f67-1e74-48b6-8e58-264c35f41615",
+            "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+            "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0"
+          ]
+        }
+      ],
+      "projection_quality": {
+        "pca_explained_variance_top2": 0.4410944500974913,
+        "adjacency_spectral_radius": 8.14281196841697,
+        "laplacian_algebraic_connectivity": 0.0768757950087651,
+        "laplacian_eigengap": 0.9231242049912318,
+        "adjacency_top_eigengap": 2.639504333761991
+      }
+    },
+    "ablations": [
+      {
+        "ablation": "mask_co_occurs",
+        "detail": "Removed direct CO_OCCURS_WITH edges.",
+        "before": {
+          "circularity": 0.01,
+          "radiality": 0.1764,
+          "linearity": 0.2474,
+          "community_structure": 0.563,
+          "triadic_closure": 0.7446,
+          "mirror_symmetry": 0.8797,
+          "chirality": 0.0528,
+          "translation_symmetry": 0.1831
+        },
+        "after": {
+          "circularity": 0.6061,
+          "radiality": 0.459,
+          "linearity": 0.5555,
+          "community_structure": 0.4544,
+          "triadic_closure": 0.2985,
+          "mirror_symmetry": 0.8976,
+          "chirality": 0.8687,
+          "translation_symmetry": 0.0495
+        },
+        "persistence": 0.6613875
+      },
+      {
+        "ablation": "drop_dominant_cluster",
+        "detail": "Removed the dominant detected community.",
+        "before": {
+          "circularity": 0.01,
+          "radiality": 0.1764,
+          "linearity": 0.2474,
+          "community_structure": 0.563,
+          "triadic_closure": 0.7446,
+          "mirror_symmetry": 0.8797,
+          "chirality": 0.0528,
+          "translation_symmetry": 0.1831
+        },
+        "after": {
+          "circularity": 0.01,
+          "radiality": 0.0454,
+          "linearity": 0.233,
+          "community_structure": 0.6574,
+          "triadic_closure": 0.7638,
+          "mirror_symmetry": 1.0,
+          "chirality": 0.508,
+          "translation_symmetry": 0.0
+        },
+        "persistence": 0.8728
+      }
+    ]
+  },
+  "slices": {
+    "full_graph": {
+      "name": "full_graph",
+      "counts": {
+        "nodes": 32,
+        "edges": 93
+      },
+      "metrics": {
+        "circularity": {
+          "label": "OBSERVED",
+          "score": 0.01,
+          "method": "cycle-basis ringness proxy",
+          "sample_size": 32
+        },
+        "radiality": {
+          "label": "OBSERVED",
+          "score": 0.1764,
+          "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+          "sample_size": 32
+        },
+        "linearity": {
+          "label": "OBSERVED",
+          "score": 0.2474,
+          "method": "path-likeness proxy from endpoint structure and acyclicity",
+          "sample_size": 32
+        },
+        "community_structure": {
+          "label": "OBSERVED",
+          "score": 0.563,
+          "method": "greedy modularity community score",
+          "sample_size": 4
+        },
+        "triadic_closure": {
+          "label": "OBSERVED",
+          "score": 0.7446,
+          "method": "mean of transitivity, clustering, and triangle density",
+          "sample_size": 32
+        },
+        "mirror_symmetry": {
+          "label": "DERIVED",
+          "score": 0.8797,
+          "method": "reflection-match proxy on PCA coordinates",
+          "sample_size": 32
+        },
+        "chirality": {
+          "label": "DERIVED",
+          "score": 0.0528,
+          "method": "signed-area imbalance on directed temporal motifs",
+          "sample_size": 93
+        },
+        "translation_symmetry": {
+          "label": "DERIVED",
+          "score": 0.1831,
+          "method": "variance explained by edge-distance offset bins",
+          "sample_size": 992
+        }
+      },
+      "communities": [
+        {
+          "community_id": 0,
+          "size": 9,
+          "members": [
+            "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+            "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+            "44718af4-f923-42d6-b5ee-5de193fd02bb",
+            "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+            "5bfda95e-948d-4db5-b937-95aee22c5380",
+            "7af4d273-495d-4924-aa60-d774618e288b",
+            "bc381d80-609f-419c-a88e-e49976d38b01",
+            "e008f004-f747-463a-877b-9812cad1c6e5",
+            "f8df33f3-998d-4fb6-a963-233cb8666442"
+          ]
+        },
+        {
+          "community_id": 1,
+          "size": 9,
+          "members": [
+            "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+            "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+            "4c79c880-6166-40b3-8937-c6d1a6161521",
+            "8743c2db-4787-4770-b8e7-7374304c1b8c",
+            "affc6c93-2ee1-4637-9383-1257397daf5e",
+            "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+            "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+            "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+            "e47f57aa-b8b8-412d-8f26-c68fd7a1e754"
+          ]
+        },
+        {
+          "community_id": 2,
+          "size": 7,
+          "members": [
+            "08d70295-c77c-4a00-b4ec-94a691b4a545",
+            "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+            "28177b01-f804-4890-a4d1-b6b37b1ac167",
+            "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+            "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+            "b96de177-8664-4b4f-965e-5b1012c39b45",
+            "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+          ]
+        },
+        {
+          "community_id": 3,
+          "size": 7,
+          "members": [
+            "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+            "307d4f53-754a-408d-adb0-58359d5fbd3d",
+            "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+            "76485b6c-9f15-4460-9632-6f16daf5c97e",
+            "9a114f67-1e74-48b6-8e58-264c35f41615",
+            "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+            "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0"
+          ]
+        }
+      ],
+      "projection_quality": {
+        "pca_explained_variance_top2": 0.4410944500974913,
+        "adjacency_spectral_radius": 8.14281196841697,
+        "laplacian_algebraic_connectivity": 0.0768757950087651,
+        "laplacian_eigengap": 0.9231242049912318,
+        "adjacency_top_eigengap": 2.639504333761991
+      }
+    },
+    "current_session": {
+      "name": "current_session",
+      "counts": {
+        "nodes": 24,
+        "edges": 80
+      },
+      "metrics": {
+        "circularity": {
+          "label": "OBSERVED",
+          "score": 0.01,
+          "method": "cycle-basis ringness proxy",
+          "sample_size": 24
+        },
+        "radiality": {
+          "label": "OBSERVED",
+          "score": 0.2176,
+          "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+          "sample_size": 24
+        },
+        "linearity": {
+          "label": "OBSERVED",
+          "score": 0.1908,
+          "method": "path-likeness proxy from endpoint structure and acyclicity",
+          "sample_size": 24
+        },
+        "community_structure": {
+          "label": "OBSERVED",
+          "score": 0.4758,
+          "method": "greedy modularity community score",
+          "sample_size": 4
+        },
+        "triadic_closure": {
+          "label": "OBSERVED",
+          "score": 0.8283,
+          "method": "mean of transitivity, clustering, and triangle density",
+          "sample_size": 24
+        },
+        "mirror_symmetry": {
+          "label": "DERIVED",
+          "score": 0.6937,
+          "method": "reflection-match proxy on PCA coordinates",
+          "sample_size": 24
+        },
+        "chirality": {
+          "label": "DERIVED",
+          "score": 0.1291,
+          "method": "signed-area imbalance on directed temporal motifs",
+          "sample_size": 80
+        },
+        "translation_symmetry": {
+          "label": "DERIVED",
+          "score": 0.1974,
+          "method": "variance explained by edge-distance offset bins",
+          "sample_size": 552
+        }
+      },
+      "communities": [
+        {
+          "community_id": 0,
+          "size": 7,
+          "members": [
+            "08d70295-c77c-4a00-b4ec-94a691b4a545",
+            "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+            "28177b01-f804-4890-a4d1-b6b37b1ac167",
+            "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+            "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+            "b96de177-8664-4b4f-965e-5b1012c39b45",
+            "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+          ]
+        },
+        {
+          "community_id": 1,
+          "size": 7,
+          "members": [
+            "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+            "307d4f53-754a-408d-adb0-58359d5fbd3d",
+            "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+            "76485b6c-9f15-4460-9632-6f16daf5c97e",
+            "9a114f67-1e74-48b6-8e58-264c35f41615",
+            "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+            "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0"
+          ]
+        },
+        {
+          "community_id": 2,
+          "size": 7,
+          "members": [
+            "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+            "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+            "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+            "5bfda95e-948d-4db5-b937-95aee22c5380",
+            "7af4d273-495d-4924-aa60-d774618e288b",
+            "bc381d80-609f-419c-a88e-e49976d38b01",
+            "e008f004-f747-463a-877b-9812cad1c6e5"
+          ]
+        },
+        {
+          "community_id": 3,
+          "size": 3,
+          "members": [
+            "33eb9c4d-0673-48b1-bb5c-9ac46a793bda",
+            "44718af4-f923-42d6-b5ee-5de193fd02bb",
+            "f8df33f3-998d-4fb6-a963-233cb8666442"
+          ]
+        }
+      ],
+      "projection_quality": {
+        "pca_explained_variance_top2": 0.5982497762301583,
+        "adjacency_spectral_radius": 8.142291043672042,
+        "laplacian_algebraic_connectivity": 0.9999999999999998,
+        "laplacian_eigengap": 2.220446049250313e-16,
+        "adjacency_top_eigengap": 2.6389834090170634
+      }
+    },
+    "current_active_set": {
+      "name": "current_active_set",
+      "counts": {
+        "nodes": 4,
+        "edges": 3
+      },
+      "metrics": {
+        "circularity": {
+          "label": "OBSERVED",
+          "score": 0.01,
+          "method": "cycle-basis ringness proxy",
+          "sample_size": 4
+        },
+        "radiality": {
+          "label": "OBSERVED",
+          "score": 0.8458,
+          "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+          "sample_size": 4
+        },
+        "linearity": {
+          "label": "OBSERVED",
+          "score": 0.8255,
+          "method": "path-likeness proxy from endpoint structure and acyclicity",
+          "sample_size": 4
+        },
+        "community_structure": {
+          "label": "OBSERVED",
+          "score": 0.0,
+          "method": "greedy modularity community score",
+          "sample_size": 1
+        },
+        "triadic_closure": {
+          "label": "OBSERVED",
+          "score": 0.0,
+          "method": "mean of transitivity, clustering, and triangle density",
+          "sample_size": 4
+        },
+        "mirror_symmetry": {
+          "label": "DERIVED",
+          "score": 1.0,
+          "method": "reflection-match proxy on PCA coordinates",
+          "sample_size": 4
+        },
+        "chirality": {
+          "label": "DERIVED",
+          "score": 0.0,
+          "method": "signed-area imbalance on directed temporal motifs",
+          "sample_size": 3
+        },
+        "translation_symmetry": {
+          "label": "DERIVED",
+          "score": 0.2222,
+          "method": "variance explained by edge-distance offset bins",
+          "sample_size": 12
+        }
+      },
+      "communities": [
+        {
+          "community_id": 0,
+          "size": 4,
+          "members": [
+            "4c79c880-6166-40b3-8937-c6d1a6161521",
+            "8743c2db-4787-4770-b8e7-7374304c1b8c",
+            "affc6c93-2ee1-4637-9383-1257397daf5e",
+            "beb6cc2e-b75c-4927-a782-baa255bbeecb"
+          ]
+        }
+      ],
+      "projection_quality": {
+        "pca_explained_variance_top2": 1.0,
+        "adjacency_spectral_radius": 1.7320508075688772,
+        "laplacian_algebraic_connectivity": 1.0,
+        "laplacian_eigengap": 4.440892098500626e-16,
+        "adjacency_top_eigengap": 1.7320508075688772
+      }
+    },
+    "verdict_accept": {
+      "name": "verdict_accept",
+      "counts": {
+        "nodes": 23,
+        "edges": 79
+      },
+      "metrics": {
+        "circularity": {
+          "label": "OBSERVED",
+          "score": 0.01,
+          "method": "cycle-basis ringness proxy",
+          "sample_size": 23
+        },
+        "radiality": {
+          "label": "OBSERVED",
+          "score": 0.1975,
+          "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+          "sample_size": 23
+        },
+        "linearity": {
+          "label": "OBSERVED",
+          "score": 0.1218,
+          "method": "path-likeness proxy from endpoint structure and acyclicity",
+          "sample_size": 23
+        },
+        "community_structure": {
+          "label": "OBSERVED",
+          "score": 0.4753,
+          "method": "greedy modularity community score",
+          "sample_size": 3
+        },
+        "triadic_closure": {
+          "label": "OBSERVED",
+          "score": 0.8486,
+          "method": "mean of transitivity, clustering, and triangle density",
+          "sample_size": 23
+        },
+        "mirror_symmetry": {
+          "label": "DERIVED",
+          "score": 0.9085,
+          "method": "reflection-match proxy on PCA coordinates",
+          "sample_size": 23
+        },
+        "chirality": {
+          "label": "DERIVED",
+          "score": 0.5711,
+          "method": "signed-area imbalance on directed temporal motifs",
+          "sample_size": 79
+        },
+        "translation_symmetry": {
+          "label": "DERIVED",
+          "score": 0.2014,
+          "method": "variance explained by edge-distance offset bins",
+          "sample_size": 506
+        }
+      },
+      "communities": [
+        {
+          "community_id": 0,
+          "size": 9,
+          "members": [
+            "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+            "307d4f53-754a-408d-adb0-58359d5fbd3d",
+            "44718af4-f923-42d6-b5ee-5de193fd02bb",
+            "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+            "76485b6c-9f15-4460-9632-6f16daf5c97e",
+            "9a114f67-1e74-48b6-8e58-264c35f41615",
+            "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+            "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+            "f8df33f3-998d-4fb6-a963-233cb8666442"
+          ]
+        },
+        {
+          "community_id": 1,
+          "size": 7,
+          "members": [
+            "08d70295-c77c-4a00-b4ec-94a691b4a545",
+            "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+            "28177b01-f804-4890-a4d1-b6b37b1ac167",
+            "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+            "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+            "b96de177-8664-4b4f-965e-5b1012c39b45",
+            "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+          ]
+        },
+        {
+          "community_id": 2,
+          "size": 7,
+          "members": [
+            "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+            "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+            "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+            "5bfda95e-948d-4db5-b937-95aee22c5380",
+            "7af4d273-495d-4924-aa60-d774618e288b",
+            "bc381d80-609f-419c-a88e-e49976d38b01",
+            "e008f004-f747-463a-877b-9812cad1c6e5"
+          ]
+        }
+      ],
+      "projection_quality": {
+        "pca_explained_variance_top2": 0.6137331129497711,
+        "adjacency_spectral_radius": 8.111860834037259,
+        "laplacian_algebraic_connectivity": 0.9999999999999971,
+        "laplacian_eigengap": 1.9984014443252818e-15,
+        "adjacency_top_eigengap": 2.6085531993822784
+      }
+    }
+  },
+  "local_reports": {
+    "latest_active_set": {
+      "selected_node_ids": [
+        "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+        "8743c2db-4787-4770-b8e7-7374304c1b8c",
+        "affc6c93-2ee1-4637-9383-1257397daf5e",
+        "4c79c880-6166-40b3-8937-c6d1a6161521"
+      ],
+      "neighborhood_node_ids": [
+        "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+        "4c79c880-6166-40b3-8937-c6d1a6161521",
+        "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+        "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+        "e47f57aa-b8b8-412d-8f26-c68fd7a1e754",
+        "8743c2db-4787-4770-b8e7-7374304c1b8c",
+        "affc6c93-2ee1-4637-9383-1257397daf5e",
+        "beb6cc2e-b75c-4927-a782-baa255bbeecb"
+      ],
+      "radius": 1,
+      "metrics": {
+        "counts": {
+          "nodes": 8,
+          "edges": 12
+        },
+        "metrics": {
+          "circularity": {
+            "label": "OBSERVED",
+            "score": 0.7211,
+            "method": "cycle-basis ringness proxy",
+            "sample_size": 8
+          },
+          "radiality": {
+            "label": "OBSERVED",
+            "score": 0.3857,
+            "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+            "sample_size": 8
+          },
+          "linearity": {
+            "label": "OBSERVED",
+            "score": 0.01,
+            "method": "path-likeness proxy from endpoint structure and acyclicity",
+            "sample_size": 8
+          },
+          "community_structure": {
+            "label": "OBSERVED",
+            "score": 0.0,
+            "method": "greedy modularity community score",
+            "sample_size": 2
+          },
+          "triadic_closure": {
+            "label": "OBSERVED",
+            "score": 0.0,
+            "method": "mean of transitivity, clustering, and triangle density",
+            "sample_size": 8
+          },
+          "mirror_symmetry": {
+            "label": "DERIVED",
+            "score": 1.0,
+            "method": "reflection-match proxy on PCA coordinates",
+            "sample_size": 8
+          },
+          "chirality": {
+            "label": "DERIVED",
+            "score": 0.0,
+            "method": "signed-area imbalance on directed temporal motifs",
+            "sample_size": 12
+          },
+          "translation_symmetry": {
+            "label": "DERIVED",
+            "score": 0.0819,
+            "method": "variance explained by edge-distance offset bins",
+            "sample_size": 56
+          }
+        },
+        "communities": [
+          {
+            "community_id": 0,
+            "size": 4,
+            "members": [
+              "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+              "8743c2db-4787-4770-b8e7-7374304c1b8c",
+              "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+              "d5699d91-5197-4f56-8e97-f28c86d43cd2"
+            ]
+          },
+          {
+            "community_id": 1,
+            "size": 4,
+            "members": [
+              "4c79c880-6166-40b3-8937-c6d1a6161521",
+              "affc6c93-2ee1-4637-9383-1257397daf5e",
+              "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+              "e47f57aa-b8b8-412d-8f26-c68fd7a1e754"
+            ]
+          }
+        ],
+        "projection_quality": {
+          "pca_explained_variance_top2": 1.0,
+          "adjacency_spectral_radius": 3.4641016151377535,
+          "laplacian_algebraic_connectivity": 1.999999999999997,
+          "laplacian_eigengap": 1.7763568394002505e-15,
+          "adjacency_top_eigengap": 3.464101615137753
+        }
+      }
+    },
+    "memode::4c79c880-6166-40b3-8937-c6d1a6161521": {
+      "label": "ADAM constitutional stack",
+      "selected_node_ids": [
+        "8743c2db-4787-4770-b8e7-7374304c1b8c",
+        "affc6c93-2ee1-4637-9383-1257397daf5e",
+        "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+        "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+        "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+        "e47f57aa-b8b8-412d-8f26-c68fd7a1e754"
+      ],
+      "neighborhood_node_ids": [
+        "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+        "4c79c880-6166-40b3-8937-c6d1a6161521",
+        "d5699d91-5197-4f56-8e97-f28c86d43cd2",
+        "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+        "e47f57aa-b8b8-412d-8f26-c68fd7a1e754",
+        "8743c2db-4787-4770-b8e7-7374304c1b8c",
+        "affc6c93-2ee1-4637-9383-1257397daf5e",
+        "beb6cc2e-b75c-4927-a782-baa255bbeecb"
+      ],
+      "radius": 1,
+      "metrics": {
+        "counts": {
+          "nodes": 8,
+          "edges": 12
+        },
+        "metrics": {
+          "circularity": {
+            "label": "OBSERVED",
+            "score": 0.7211,
+            "method": "cycle-basis ringness proxy",
+            "sample_size": 8
+          },
+          "radiality": {
+            "label": "OBSERVED",
+            "score": 0.3857,
+            "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+            "sample_size": 8
+          },
+          "linearity": {
+            "label": "OBSERVED",
+            "score": 0.01,
+            "method": "path-likeness proxy from endpoint structure and acyclicity",
+            "sample_size": 8
+          },
+          "community_structure": {
+            "label": "OBSERVED",
+            "score": 0.0,
+            "method": "greedy modularity community score",
+            "sample_size": 2
+          },
+          "triadic_closure": {
+            "label": "OBSERVED",
+            "score": 0.0,
+            "method": "mean of transitivity, clustering, and triangle density",
+            "sample_size": 8
+          },
+          "mirror_symmetry": {
+            "label": "DERIVED",
+            "score": 1.0,
+            "method": "reflection-match proxy on PCA coordinates",
+            "sample_size": 8
+          },
+          "chirality": {
+            "label": "DERIVED",
+            "score": 0.0,
+            "method": "signed-area imbalance on directed temporal motifs",
+            "sample_size": 12
+          },
+          "translation_symmetry": {
+            "label": "DERIVED",
+            "score": 0.0819,
+            "method": "variance explained by edge-distance offset bins",
+            "sample_size": 56
+          }
+        },
+        "communities": [
+          {
+            "community_id": 0,
+            "size": 4,
+            "members": [
+              "4500cb6c-2bde-41b8-bcbe-885ba81a3e6e",
+              "8743c2db-4787-4770-b8e7-7374304c1b8c",
+              "b3d5271f-dc57-445e-a6e0-c997bf80e95b",
+              "d5699d91-5197-4f56-8e97-f28c86d43cd2"
+            ]
+          },
+          {
+            "community_id": 1,
+            "size": 4,
+            "members": [
+              "4c79c880-6166-40b3-8937-c6d1a6161521",
+              "affc6c93-2ee1-4637-9383-1257397daf5e",
+              "beb6cc2e-b75c-4927-a782-baa255bbeecb",
+              "e47f57aa-b8b8-412d-8f26-c68fd7a1e754"
+            ]
+          }
+        ],
+        "projection_quality": {
+          "pca_explained_variance_top2": 1.0,
+          "adjacency_spectral_radius": 3.4641016151377535,
+          "laplacian_algebraic_connectivity": 1.999999999999997,
+          "laplacian_eigengap": 1.7763568394002505e-15,
+          "adjacency_top_eigengap": 3.464101615137753
+        }
+      }
+    },
+    "memode::b96de177-8664-4b4f-965e-5b1012c39b45": {
+      "label": "behavior meme / behavior meme behavior / meme behavior meme",
+      "selected_node_ids": [
+        "08d70295-c77c-4a00-b4ec-94a691b4a545",
+        "28177b01-f804-4890-a4d1-b6b37b1ac167",
+        "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+        "daba7111-54f0-4eea-8d69-8ca76e808cf3"
+      ],
+      "neighborhood_node_ids": [
+        "f8df33f3-998d-4fb6-a963-233cb8666442",
+        "08d70295-c77c-4a00-b4ec-94a691b4a545",
+        "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+        "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+        "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+        "b96de177-8664-4b4f-965e-5b1012c39b45",
+        "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+        "28177b01-f804-4890-a4d1-b6b37b1ac167"
+      ],
+      "radius": 1,
+      "metrics": {
+        "counts": {
+          "nodes": 8,
+          "edges": 26
+        },
+        "metrics": {
+          "circularity": {
+            "label": "OBSERVED",
+            "score": 0.01,
+            "method": "cycle-basis ringness proxy",
+            "sample_size": 8
+          },
+          "radiality": {
+            "label": "OBSERVED",
+            "score": 0.031,
+            "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+            "sample_size": 8
+          },
+          "linearity": {
+            "label": "OBSERVED",
+            "score": 0.01,
+            "method": "path-likeness proxy from endpoint structure and acyclicity",
+            "sample_size": 8
+          },
+          "community_structure": {
+            "label": "OBSERVED",
+            "score": 0.0,
+            "method": "greedy modularity community score",
+            "sample_size": 1
+          },
+          "triadic_closure": {
+            "label": "OBSERVED",
+            "score": 0.9572,
+            "method": "mean of transitivity, clustering, and triangle density",
+            "sample_size": 8
+          },
+          "mirror_symmetry": {
+            "label": "DERIVED",
+            "score": 0.9406,
+            "method": "reflection-match proxy on PCA coordinates",
+            "sample_size": 8
+          },
+          "chirality": {
+            "label": "DERIVED",
+            "score": 0.6495,
+            "method": "signed-area imbalance on directed temporal motifs",
+            "sample_size": 26
+          },
+          "translation_symmetry": {
+            "label": "DERIVED",
+            "score": 0.1077,
+            "method": "variance explained by edge-distance offset bins",
+            "sample_size": 56
+          }
+        },
+        "communities": [
+          {
+            "community_id": 0,
+            "size": 8,
+            "members": [
+              "08d70295-c77c-4a00-b4ec-94a691b4a545",
+              "209b4f82-48aa-422f-ae81-abd6a6c2a172",
+              "28177b01-f804-4890-a4d1-b6b37b1ac167",
+              "66cc1b5d-2c7e-4821-84af-1c0e845b0d95",
+              "b2ae5eef-8eb3-4f9e-9bb5-9a36251ff8d5",
+              "b96de177-8664-4b4f-965e-5b1012c39b45",
+              "daba7111-54f0-4eea-8d69-8ca76e808cf3",
+              "f8df33f3-998d-4fb6-a963-233cb8666442"
+            ]
+          }
+        ],
+        "projection_quality": {
+          "pca_explained_variance_top2": 0.5476239823818922,
+          "adjacency_spectral_radius": 6.560525324350848,
+          "laplacian_algebraic_connectivity": 4.999999999999999,
+          "laplacian_eigengap": 2.000000000000001,
+          "adjacency_top_eigengap": 6.16991484553681
+        }
+      }
+    },
+    "memode::9a114f67-1e74-48b6-8e58-264c35f41615": {
+      "label": "accept explanation useful / corrected text n/a / edit surfaces corrected",
+      "selected_node_ids": [
+        "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+        "76485b6c-9f15-4460-9632-6f16daf5c97e",
+        "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+        "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0"
+      ],
+      "neighborhood_node_ids": [
+        "f8df33f3-998d-4fb6-a963-233cb8666442",
+        "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+        "9a114f67-1e74-48b6-8e58-264c35f41615",
+        "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+        "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+        "76485b6c-9f15-4460-9632-6f16daf5c97e",
+        "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+        "307d4f53-754a-408d-adb0-58359d5fbd3d"
+      ],
+      "radius": 1,
+      "metrics": {
+        "counts": {
+          "nodes": 8,
+          "edges": 26
+        },
+        "metrics": {
+          "circularity": {
+            "label": "OBSERVED",
+            "score": 0.01,
+            "method": "cycle-basis ringness proxy",
+            "sample_size": 8
+          },
+          "radiality": {
+            "label": "OBSERVED",
+            "score": 0.031,
+            "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+            "sample_size": 8
+          },
+          "linearity": {
+            "label": "OBSERVED",
+            "score": 0.01,
+            "method": "path-likeness proxy from endpoint structure and acyclicity",
+            "sample_size": 8
+          },
+          "community_structure": {
+            "label": "OBSERVED",
+            "score": 0.0,
+            "method": "greedy modularity community score",
+            "sample_size": 1
+          },
+          "triadic_closure": {
+            "label": "OBSERVED",
+            "score": 0.9572,
+            "method": "mean of transitivity, clustering, and triangle density",
+            "sample_size": 8
+          },
+          "mirror_symmetry": {
+            "label": "DERIVED",
+            "score": 0.9248,
+            "method": "reflection-match proxy on PCA coordinates",
+            "sample_size": 8
+          },
+          "chirality": {
+            "label": "DERIVED",
+            "score": 0.3846,
+            "method": "signed-area imbalance on directed temporal motifs",
+            "sample_size": 26
+          },
+          "translation_symmetry": {
+            "label": "DERIVED",
+            "score": 0.1205,
+            "method": "variance explained by edge-distance offset bins",
+            "sample_size": 56
+          }
+        },
+        "communities": [
+          {
+            "community_id": 0,
+            "size": 8,
+            "members": [
+              "2fb8fd14-3521-4361-8939-9b42e750ee8c",
+              "307d4f53-754a-408d-adb0-58359d5fbd3d",
+              "663a4bfd-cad3-4234-a7ef-1f6ab6f1ff2c",
+              "76485b6c-9f15-4460-9632-6f16daf5c97e",
+              "9a114f67-1e74-48b6-8e58-264c35f41615",
+              "cceaa2cf-103e-4249-bcf9-cc42b807bf74",
+              "d3cefb9a-913c-4aee-a5fb-c06ddb61dbc0",
+              "f8df33f3-998d-4fb6-a963-233cb8666442"
+            ]
+          }
+        ],
+        "projection_quality": {
+          "pca_explained_variance_top2": 0.5476239823818924,
+          "adjacency_spectral_radius": 6.560525324350843,
+          "laplacian_algebraic_connectivity": 4.999999999999997,
+          "laplacian_eigengap": 1.9999999999999973,
+          "adjacency_top_eigengap": 6.169914845536804
+        }
+      }
+    },
+    "memode::088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e": {
+      "label": "assembly motif report / map reusable memode / memode thick-present assembly",
+      "selected_node_ids": [
+        "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+        "5bfda95e-948d-4db5-b937-95aee22c5380",
+        "7af4d273-495d-4924-aa60-d774618e288b",
+        "bc381d80-609f-419c-a88e-e49976d38b01"
+      ],
+      "neighborhood_node_ids": [
+        "f8df33f3-998d-4fb6-a963-233cb8666442",
+        "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+        "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+        "5bfda95e-948d-4db5-b937-95aee22c5380",
+        "7af4d273-495d-4924-aa60-d774618e288b",
+        "bc381d80-609f-419c-a88e-e49976d38b01",
+        "e008f004-f747-463a-877b-9812cad1c6e5",
+        "016a8c3b-d8b2-4534-a849-00402cec0c5e"
+      ],
+      "radius": 1,
+      "metrics": {
+        "counts": {
+          "nodes": 8,
+          "edges": 26
+        },
+        "metrics": {
+          "circularity": {
+            "label": "OBSERVED",
+            "score": 0.01,
+            "method": "cycle-basis ringness proxy",
+            "sample_size": 8
+          },
+          "radiality": {
+            "label": "OBSERVED",
+            "score": 0.031,
+            "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+            "sample_size": 8
+          },
+          "linearity": {
+            "label": "OBSERVED",
+            "score": 0.01,
+            "method": "path-likeness proxy from endpoint structure and acyclicity",
+            "sample_size": 8
+          },
+          "community_structure": {
+            "label": "OBSERVED",
+            "score": 0.0,
+            "method": "greedy modularity community score",
+            "sample_size": 1
+          },
+          "triadic_closure": {
+            "label": "OBSERVED",
+            "score": 0.9572,
+            "method": "mean of transitivity, clustering, and triangle density",
+            "sample_size": 8
+          },
+          "mirror_symmetry": {
+            "label": "DERIVED",
+            "score": 0.8403,
+            "method": "reflection-match proxy on PCA coordinates",
+            "sample_size": 8
+          },
+          "chirality": {
+            "label": "DERIVED",
+            "score": 0.3846,
+            "method": "signed-area imbalance on directed temporal motifs",
+            "sample_size": 26
+          },
+          "translation_symmetry": {
+            "label": "DERIVED",
+            "score": 0.2372,
+            "method": "variance explained by edge-distance offset bins",
+            "sample_size": 56
+          }
+        },
+        "communities": [
+          {
+            "community_id": 0,
+            "size": 8,
+            "members": [
+              "016a8c3b-d8b2-4534-a849-00402cec0c5e",
+              "088cc0d1-3c3f-459d-89d3-d5bd6f9ace1e",
+              "44dd1a23-4ae7-4626-b9db-13f65fb7a4b5",
+              "5bfda95e-948d-4db5-b937-95aee22c5380",
+              "7af4d273-495d-4924-aa60-d774618e288b",
+              "bc381d80-609f-419c-a88e-e49976d38b01",
+              "e008f004-f747-463a-877b-9812cad1c6e5",
+              "f8df33f3-998d-4fb6-a963-233cb8666442"
+            ]
+          }
+        ],
+        "projection_quality": {
+          "pca_explained_variance_top2": 0.5476239823818922,
+          "adjacency_spectral_radius": 6.560525324350848,
+          "laplacian_algebraic_connectivity": 5.000000000000001,
+          "laplacian_eigengap": 2.0000000000000053,
+          "adjacency_top_eigengap": 6.169914845536809
+        }
+      }
+    }
+  }
+}

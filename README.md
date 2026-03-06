@@ -1,17 +1,17 @@
-# EDEN / ADAM v1.1
+# EDEN / ADAM v1.2
 
-EDEN is a local-first experimental memetic persona runtime. ADAM is the first agent/persona instance inside it. v1.1 preserves the working amber fixed-pane TUI and graph-conditioned chat loop, then adds robust observatory lifecycle handling, session-start inference profiles, live prompt-budget visibility, per-turn inference-circumstance persistence, and a geometry-aware browser observatory.
+EDEN is a local-first experimental memetic persona runtime. ADAM is the first agent/persona instance inside it. v1.2 preserves the working amber fixed-pane TUI and the v1.1 observatory server/budget/profile upgrades, then turns the observatory into a bidirectional measurement instrument: observation can preview a topology change, commit it with provenance, revert it, and immediately refresh graph and geometry artifacts.
 
-## v1.1 additions
+## v1.2 additions
 
-- Robust observatory server lifecycle with host/port flags, free-port fallback, same-root reuse, and actual URL reporting
-- Session-start inference profile flow for `manual`, `runtime_auto`, and `adam_auto`
-- Multiline `TextArea` composer with materially larger input surface
-- Live `Inference Circumstances / Budget` panel in the TUI
-- Per-turn stored inference profile and budget metadata
-- New `geometry_diagnostics.json`, `geometry_lab.html`, and `observatory_index.html`
-- Geometry metrics with evidence labels: `OBSERVED`, `DERIVED`, `SPECULATIVE`
-- Synthetic geometry tests and observatory server robustness tests
+- Live local observatory API layered onto the existing export server
+- Measurement-first graph editing with preview, commit, and revert semantics
+- Persistent `measurement_events` ledger for edits, measurements, annotations, ablations, and reverts
+- Known memode assertion and membership-refinement workflows
+- Local selection geometry diagnostics and before/after metric deltas
+- Stronger neo-cyber illumination grammar for the browser observatory
+- Measurement ledger export family and observatory index upgrade
+- Synthetic persistence + local geometry + API tests
 
 ## Environment
 
@@ -45,7 +45,7 @@ Launch the TUI with MLX:
 .venv/bin/python -m eden app --backend mlx --model-path /absolute/path/to/Qwen3.5-35B-A3B-4bit-MLX
 ```
 
-Run a one-turn demo and emit graph, basin, geometry, and index exports:
+Run a one-turn demo and emit graph, basin, geometry, measurement, and index exports:
 
 ```bash
 .venv/bin/python -m eden demo --backend mock --mode blank --prompt 'Map the graph-conditioned persistence surfaces and geometry evidence.' --feedback accept --feedback-explanation 'Useful for observatory validation.'
@@ -86,8 +86,11 @@ Useful flags:
 5. Watch the `Inference Circumstances / Budget` panel update as you type and after retrieval preview refreshes.
 6. Inspect the `Aperture / Active Set` and `Cogitation / Decision Trace` panes.
 7. Apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
-8. Use `Export` to write graph, basin, geometry, and index artifacts.
-9. Use `Observatory` to ensure the local server is running and open the current experiment’s index page.
+8. Use `Export` to write graph, basin, geometry, measurement, and index artifacts.
+9. Use `Observatory` to ensure the local server is running and open the current experiment's index page.
+10. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
+11. Preview a change first, then commit it if the before/after metrics support the edit.
+12. Revert recent observatory-originated mutations from the measurement ledger when needed.
 
 ## Inference notes
 
@@ -105,10 +108,31 @@ Per experiment under `exports/<experiment_id>/`:
 - `graph_knowledge_base.html`
 - `behavioral_attractor_basin.html`
 - `geometry_lab.html`
+- `measurement_ledger.html`
 - `observatory_index.html`
 - matching `.json` and manifest files
 
-The graph surface separates `render_coords` from `derived_coords`. The geometry lab reports topology, symmetry proxies, projection diagnostics, and ablation persistence without claiming that layout aesthetics are evidence.
+The graph surface separates `render_coords` from `derived_coords`. The geometry lab reports topology, symmetry proxies, projection diagnostics, local selection metrics, and ablation persistence without claiming that layout aesthetics are evidence. The live observatory layer adds JSON endpoints for preview, commit, revert, and measurement-event inspection while preserving static export compatibility.
+
+## Live observatory editing
+
+- `INSPECT`: hover, pin, inspect provenance, regard, neighborhood, and measurement history
+- `MEASURE`: select nodes and compute local geometry without mutating topology
+- `EDIT`: add or update edges, assert known memodes, and refine memode membership with provenance
+- `ABLATE`: mask a relation class for comparison without silently rewriting the graph
+- `COMPARE`: inspect baseline vs modified slices and coordinate-method differences
+
+Every observatory-originated mutation is stored as a measurement-bearing event with:
+
+- action type
+- target ids
+- before / proposed / committed state
+- operator label
+- evidence label
+- rationale
+- measurement method
+- confidence
+- revert linkage when applicable
 
 ## Tests
 
@@ -118,20 +142,22 @@ The graph surface separates `render_coords` from `derived_coords`. The geometry 
 
 Validated in this patch:
 
-- `19 passed`
+- `24 passed`
 - observatory CLI fallback from an occupied requested port to the next free port with actual URL reporting
-- mock demo export generated graph, basin, geometry, and index artifacts
-- observatory index and geometry lab opened in a real browser session via Playwright
-- TUI smoke path exercised the new session-start modal and multiline composer
+- live API preview / commit / revert cycle executed against a real experiment
+- mock demo export generated graph, basin, geometry, measurement, and index artifacts
+- observatory graph instrument and geometry lab opened in a real browser session via Playwright
+- TUI smoke path from v1.1 remained green
 
 ## Evidence
 
-Fresh v1.1 demo artifacts from this patch cycle:
+Fresh v1.2 demo artifacts from this patch cycle:
 
-- `exports/ab9ae646-c756-4044-9e5c-6fbb0919b994/observatory_index.html`
-- `exports/ab9ae646-c756-4044-9e5c-6fbb0919b994/graph_knowledge_base.html`
-- `exports/ab9ae646-c756-4044-9e5c-6fbb0919b994/behavioral_attractor_basin.html`
-- `exports/ab9ae646-c756-4044-9e5c-6fbb0919b994/geometry_lab.html`
+- `exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/observatory_index.html`
+- `exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/graph_knowledge_base.html`
+- `exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/behavioral_attractor_basin.html`
+- `exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/geometry_lab.html`
+- `exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_ledger.html`
 
 Runtime artifacts:
 
@@ -145,6 +171,9 @@ Runtime artifacts:
 - `docs/OBSERVATORY_SPEC.md`
 - `docs/OBSERVATORY_GEOMETRY_SPEC.md`
 - `docs/GEOMETRY_EVIDENCE_POLICY.md`
+- `docs/OBSERVATORY_INTERACTION_SPEC.md`
+- `docs/MEASUREMENT_EVENT_MODEL.md`
+- `docs/PATCH_MANIFEST_V1_2.md`
 - `docs/PATCH_MANIFEST_V1_1.md`
 - `docs/IMPLEMENTATION_TRUTH_TABLE.md`
 - `docs/KNOWN_LIMITATIONS.md`

@@ -1,0 +1,12 @@
+{
+  "artifact_type": "behavioral_attractor_basin",
+  "generated_at": "2026-03-06T21:33:18+00:00",
+  "json_path": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/behavioral_attractor_basin.json",
+  "html_path": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/behavioral_attractor_basin.html",
+  "turn_count": 1,
+  "session_count": 1,
+  "projection": {
+    "method": "svd_on_turn_features",
+    "explained_variance_top2": 0.0
+  }
+}

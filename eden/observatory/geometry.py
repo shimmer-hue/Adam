@@ -176,6 +176,58 @@ def compute_ablation_report(
     return reports
 
 
+def compute_selection_geometry(
+    graph: nx.Graph,
+    directed_graph: nx.DiGraph,
+    *,
+    selected_node_ids: list[str],
+    radius: int = 1,
+    node_order: list[str] | None = None,
+) -> dict[str, Any]:
+    selected = [node_id for node_id in selected_node_ids if node_id in graph]
+    if not selected:
+        return {
+            "selected_node_ids": [],
+            "neighborhood_node_ids": [],
+            "radius": radius,
+            "metrics": {
+                "counts": {"nodes": 0, "edges": 0},
+                "metrics": {},
+                "communities": [],
+                "projection_quality": {},
+            },
+        }
+    neighborhood = set(selected)
+    frontier = set(selected)
+    for _ in range(max(0, radius)):
+        expanded: set[str] = set()
+        for node_id in frontier:
+            expanded.update(graph.neighbors(node_id))
+        frontier = expanded - neighborhood
+        neighborhood.update(expanded)
+    ordered_ids = _ordered_subset(node_order or list(graph.nodes()), neighborhood)
+    subgraph = graph.subgraph(ordered_ids).copy()
+    directed_subgraph = directed_graph.subgraph(ordered_ids).copy()
+    coords = compute_coordinate_sets(subgraph, node_order=ordered_ids)
+    metrics = compute_geometry_metrics(subgraph, directed_subgraph, coords=coords, node_order=ordered_ids)
+    return {
+        "selected_node_ids": selected,
+        "neighborhood_node_ids": ordered_ids,
+        "radius": radius,
+        "metrics": metrics,
+    }
+
+
+def metric_deltas(before: dict[str, Any], after: dict[str, Any]) -> dict[str, float]:
+    before_scores = _metric_scores(before)
+    after_scores = _metric_scores(after)
+    keys = sorted(set(before_scores) | set(after_scores))
+    return {
+        key: round(float(after_scores.get(key, 0.0) - before_scores.get(key, 0.0)), 4)
+        for key in keys
+    }
+
+
 def _metric_scores(report: dict[str, Any]) -> dict[str, float]:
     return {name: float(metric["score"]) for name, metric in report["metrics"].items()}
 
@@ -196,6 +248,13 @@ def _metric(label: str, score: float, method: str, *, sample_size: int) -> dict[
         "method": method,
         "sample_size": sample_size,
     }
+
+
+def _ordered_subset(node_order: list[str], selected_ids: set[str]) -> list[str]:
+    ordered = [node_id for node_id in node_order if node_id in selected_ids]
+    if ordered:
+        return ordered
+    return sorted(selected_ids)
 
 
 def _coord_map(nodes: list[str], coords: dict[str, Any]) -> dict[str, dict[str, float]]:

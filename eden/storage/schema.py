@@ -193,6 +193,25 @@ CREATE TABLE IF NOT EXISTS export_artifacts (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS measurement_events (
+    id TEXT PRIMARY KEY,
+    experiment_id TEXT NOT NULL REFERENCES experiments(id) ON DELETE CASCADE,
+    session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+    turn_id TEXT REFERENCES turns(id) ON DELETE SET NULL,
+    action_type TEXT NOT NULL,
+    target_ids_json TEXT NOT NULL DEFAULT '[]',
+    before_state_json TEXT NOT NULL DEFAULT '{}',
+    proposed_state_json TEXT NOT NULL DEFAULT '{}',
+    committed_state_json TEXT NOT NULL DEFAULT '{}',
+    rationale TEXT NOT NULL DEFAULT '',
+    operator_label TEXT NOT NULL DEFAULT '',
+    evidence_label TEXT NOT NULL DEFAULT 'SPECULATIVE',
+    measurement_method TEXT NOT NULL DEFAULT '',
+    confidence REAL NOT NULL DEFAULT 0.0,
+    created_at TEXT NOT NULL,
+    reverted_from_event_id TEXT REFERENCES measurement_events(id) ON DELETE SET NULL
+);
+
 CREATE TABLE IF NOT EXISTS config_store (
     key TEXT PRIMARY KEY,
     value_json TEXT NOT NULL
@@ -230,4 +249,6 @@ CREATE INDEX IF NOT EXISTS idx_memes_experiment ON memes(experiment_id, domain);
 CREATE INDEX IF NOT EXISTS idx_memodes_experiment ON memodes(experiment_id, domain);
 CREATE INDEX IF NOT EXISTS idx_edges_experiment ON edges(experiment_id, edge_type);
 CREATE INDEX IF NOT EXISTS idx_trace_experiment ON trace_events(experiment_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_measurement_events_experiment ON measurement_events(experiment_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_measurement_events_reverted_from ON measurement_events(reverted_from_event_id);
 """

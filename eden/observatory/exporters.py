@@ -9,7 +9,7 @@ import networkx as nx
 import numpy as np
 
 from ..utils import now_utc, safe_excerpt
-from .geometry import compute_ablation_report, compute_coordinate_sets, compute_geometry_metrics
+from .geometry import compute_ablation_report, compute_coordinate_sets, compute_geometry_metrics, compute_selection_geometry
 
 
 class ObservatoryExporter:
@@ -40,17 +40,25 @@ class ObservatoryExporter:
             out_dir=out_dir,
             graph_model=graph_model,
         )
+        measurement_paths, measurement_payload = self.export_measurement_ledger(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            out_dir=out_dir,
+            snapshot=snapshot,
+        )
         index_paths = self.export_observatory_index(
             experiment_id=experiment_id,
             session_id=session_id,
             out_dir=out_dir,
             graph_payload=graph_payload,
             basin_payload=basin_payload,
+            measurement_payload=measurement_payload,
             graph_paths=graph_paths,
             basin_paths=basin_paths,
             geometry_paths=geometry_paths,
+            measurement_paths=measurement_paths,
         )
-        return {**graph_paths, **basin_paths, **geometry_paths, **index_paths}
+        return {**graph_paths, **basin_paths, **geometry_paths, **measurement_paths, **index_paths}
 
     def export_graph_knowledge_base(
         self,
@@ -69,6 +77,23 @@ class ObservatoryExporter:
             "counts": self.store.graph_counts(experiment_id),
             "nodes": graph_model["nodes"],
             "edges": graph_model["edges"],
+            "measurement_events": graph_model["measurement_events"],
+            "latest_active_ids": graph_model["latest_active_ids"],
+            "evidence_legend": {
+                "OBSERVED": "Directly computed from graph topology or explicit recurrence counts.",
+                "DERIVED": "Computed from transforms and projections.",
+                "SPECULATIVE": "Visual or operator hypothesis only.",
+                "OPERATOR_ASSERTED": "Manual graph assertion with provenance.",
+                "OPERATOR_REFINED": "Manual refinement of an existing graph fact.",
+                "AUTO_DERIVED": "Graph fact produced by EDEN-side derivation or ingest.",
+            },
+            "interaction_modes": ["INSPECT", "MEASURE", "EDIT", "ABLATE", "COMPARE"],
+            "live_api": {
+                "preview": f"/api/experiments/{experiment_id}/preview",
+                "commit": f"/api/experiments/{experiment_id}/commit",
+                "revert": f"/api/experiments/{experiment_id}/revert",
+                "measurements": f"/api/experiments/{experiment_id}/measurement-events",
+            },
             "view_modes": {
                 "force": "render_coords.force",
                 "spectral": "derived_coords.spectral",
@@ -98,7 +123,7 @@ class ObservatoryExporter:
             ),
             encoding="utf-8",
         )
-        html_path.write_text(self._graph_html(payload), encoding="utf-8")
+        html_path.write_text(self._graph_html_v12(payload), encoding="utf-8")
         self.store.record_export_artifact(experiment_id=experiment_id, session_id=session_id, artifact_type="graph_knowledge_base_html", path=html_path)
         self.store.record_export_artifact(experiment_id=experiment_id, session_id=session_id, artifact_type="graph_knowledge_base_json", path=json_path)
         self.runtime_log.emit("INFO", "export_graph", "Generated graph knowledge-base export.", experiment_id=experiment_id, path=str(html_path))
@@ -340,6 +365,7 @@ class ObservatoryExporter:
             },
             "nodes": graph_model["nodes"],
             "edges": graph_model["edges"],
+            "measurement_events": graph_model["measurement_events"],
             "coordinate_methods": {
                 "force": "Render layout only.",
                 "spectral": "Laplacian eigenvectors.",
@@ -352,6 +378,7 @@ class ObservatoryExporter:
                 "ablations": ablations,
             },
             "slices": slices,
+            "local_reports": self._local_geometry_reports(graph_model, session_id=session_id),
         }
         json_path = out_dir / "geometry_diagnostics.json"
         html_path = out_dir / "geometry_lab.html"
@@ -371,7 +398,7 @@ class ObservatoryExporter:
             ),
             encoding="utf-8",
         )
-        html_path.write_text(self._geometry_html(payload), encoding="utf-8")
+        html_path.write_text(self._geometry_html_v12(payload), encoding="utf-8")
         self.store.record_export_artifact(experiment_id=experiment_id, session_id=session_id, artifact_type="geometry_lab_html", path=html_path)
         self.store.record_export_artifact(experiment_id=experiment_id, session_id=session_id, artifact_type="geometry_diagnostics_json", path=json_path)
         self.runtime_log.emit("INFO", "export_geometry", "Generated geometry diagnostics export.", experiment_id=experiment_id, path=str(html_path))
@@ -381,6 +408,58 @@ class ObservatoryExporter:
             "geometry_manifest": str(manifest_path),
         }
 
+    def export_measurement_ledger(
+        self,
+        *,
+        experiment_id: str,
+        session_id: str | None,
+        out_dir: Path,
+        snapshot: dict[str, Any],
+    ) -> tuple[dict[str, str], dict[str, Any]]:
+        rows = [self._measurement_event_payload(item) for item in snapshot.get("measurement_events", [])]
+        if session_id:
+            rows = [item for item in rows if item.get("session_id") in {session_id, None, ""}]
+        payload = {
+            "generated_at": now_utc(),
+            "experiment_id": experiment_id,
+            "session_id": session_id,
+            "counts": {
+                "events": len(rows),
+                "action_types": dict(Counter(item["action_type"] for item in rows)),
+                "evidence_labels": dict(Counter(item["evidence_label"] for item in rows)),
+            },
+            "events": rows,
+        }
+        json_path = out_dir / "measurement_events.json"
+        html_path = out_dir / "measurement_ledger.html"
+        manifest_path = out_dir / "measurement_events.manifest.json"
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "artifact_type": "measurement_ledger",
+                    "generated_at": payload["generated_at"],
+                    "json_path": str(json_path),
+                    "html_path": str(html_path),
+                    "event_count": payload["counts"]["events"],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        html_path.write_text(self._measurement_html(payload), encoding="utf-8")
+        self.store.record_export_artifact(experiment_id=experiment_id, session_id=session_id, artifact_type="measurement_ledger_html", path=html_path)
+        self.store.record_export_artifact(experiment_id=experiment_id, session_id=session_id, artifact_type="measurement_events_json", path=json_path)
+        self.runtime_log.emit("INFO", "export_measurements", "Generated measurement ledger export.", experiment_id=experiment_id, path=str(html_path))
+        return (
+            {
+                "measurement_html": str(html_path),
+                "measurement_json": str(json_path),
+                "measurement_manifest": str(manifest_path),
+            },
+            payload,
+        )
+
     def export_observatory_index(
         self,
         *,
@@ -389,9 +468,11 @@ class ObservatoryExporter:
         out_dir: Path,
         graph_payload: dict[str, Any],
         basin_payload: dict[str, Any],
+        measurement_payload: dict[str, Any],
         graph_paths: dict[str, str],
         basin_paths: dict[str, str],
         geometry_paths: dict[str, str],
+        measurement_paths: dict[str, str],
     ) -> dict[str, str]:
         payload = {
             "generated_at": now_utc(),
@@ -401,18 +482,20 @@ class ObservatoryExporter:
                 "graph": graph_paths,
                 "basin": basin_paths,
                 "geometry": geometry_paths,
+                "measurement": measurement_paths,
             },
             "summary": {
                 "nodes": len(graph_payload["nodes"]),
                 "edges": len(graph_payload["edges"]),
                 "turns": basin_payload["turn_count"],
                 "sessions": basin_payload["session_count"],
+                "measurement_events": measurement_payload["counts"]["events"],
             },
         }
         html_path = out_dir / "observatory_index.html"
         json_path = out_dir / "observatory_index.json"
         json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        html_path.write_text(self._index_html(payload), encoding="utf-8")
+        html_path.write_text(self._index_html_v12(payload), encoding="utf-8")
         self.store.record_export_artifact(experiment_id=experiment_id, session_id=session_id, artifact_type="observatory_index_html", path=html_path)
         return {
             "observatory_index_html": str(html_path),
@@ -431,6 +514,7 @@ class ObservatoryExporter:
         session_meta = {item["id"]: json.loads(item["metadata_json"] or "{}") for item in snapshot["sessions"]}
         turn_meta = {item["id"]: json.loads(item.get("metadata_json") or "{}") for item in snapshot["turns"]}
         document_ids = {item["id"] for item in snapshot["documents"]}
+        measurement_events = [self._measurement_event_payload(item) for item in snapshot.get("measurement_events", [])]
         for feedback in snapshot["feedback"]:
             feedback_by_turn[feedback["turn_id"]].append(feedback)
 
@@ -456,9 +540,10 @@ class ObservatoryExporter:
                 requested_mode=meta.get("requested_mode", ""),
                 verdicts=[],
             )
-            graph.add_edge(session["agent_id"], session["id"], weight=1.0)
-            directed.add_edge(session["agent_id"], session["id"], weight=1.0)
-            edges.append({"source": session["agent_id"], "target": session["id"], "type": "BELONGS_TO_AGENT", "weight": 1.0})
+            implicit_provenance = {"assertion_origin": "auto_derived", "evidence_label": "AUTO_DERIVED", "confidence": 1.0}
+            graph.add_edge(session["agent_id"], session["id"], weight=1.0, edge_type="BELONGS_TO_AGENT", provenance=implicit_provenance)
+            directed.add_edge(session["agent_id"], session["id"], weight=1.0, edge_type="BELONGS_TO_AGENT", provenance=implicit_provenance)
+            edges.append({"id": f"implicit::{session['agent_id']}::{session['id']}::BELONGS_TO_AGENT", "source": session["agent_id"], "target": session["id"], "type": "BELONGS_TO_AGENT", "weight": 1.0, "provenance": implicit_provenance})
             edge_types[(session["agent_id"], session["id"])] = "BELONGS_TO_AGENT"
         for document in snapshot["documents"]:
             metadata = json.loads(document["metadata_json"] or "{}")
@@ -495,9 +580,10 @@ class ObservatoryExporter:
                 verdicts=verdicts,
                 time_order=turn["turn_index"],
             )
-            graph.add_edge(turn["session_id"], turn["id"], weight=1.0)
-            directed.add_edge(turn["session_id"], turn["id"], weight=1.0)
-            edges.append({"source": turn["session_id"], "target": turn["id"], "type": "BELONGS_TO_SESSION", "weight": 1.0})
+            implicit_provenance = {"assertion_origin": "auto_derived", "evidence_label": "AUTO_DERIVED", "confidence": 1.0}
+            graph.add_edge(turn["session_id"], turn["id"], weight=1.0, edge_type="BELONGS_TO_SESSION", provenance=implicit_provenance)
+            directed.add_edge(turn["session_id"], turn["id"], weight=1.0, edge_type="BELONGS_TO_SESSION", provenance=implicit_provenance)
+            edges.append({"id": f"implicit::{turn['session_id']}::{turn['id']}::BELONGS_TO_SESSION", "source": turn["session_id"], "target": turn["id"], "type": "BELONGS_TO_SESSION", "weight": 1.0, "provenance": implicit_provenance})
             edge_types[(turn["session_id"], turn["id"])] = "BELONGS_TO_SESSION"
         for feedback in snapshot["feedback"]:
             add_node(
@@ -511,9 +597,10 @@ class ObservatoryExporter:
                 created_at=feedback["created_at"],
                 verdicts=[feedback["verdict"]],
             )
-            graph.add_edge(feedback["turn_id"], feedback["id"], weight=1.0)
-            directed.add_edge(feedback["turn_id"], feedback["id"], weight=1.0)
-            edges.append({"source": feedback["turn_id"], "target": feedback["id"], "type": "FED_BACK_BY", "weight": 1.0})
+            implicit_provenance = {"assertion_origin": "feedback_derived", "evidence_label": "OBSERVED", "confidence": 1.0}
+            graph.add_edge(feedback["turn_id"], feedback["id"], weight=1.0, edge_type="FED_BACK_BY", provenance=implicit_provenance)
+            directed.add_edge(feedback["turn_id"], feedback["id"], weight=1.0, edge_type="FED_BACK_BY", provenance=implicit_provenance)
+            edges.append({"id": f"implicit::{feedback['turn_id']}::{feedback['id']}::FED_BACK_BY", "source": feedback["turn_id"], "target": feedback["id"], "type": "FED_BACK_BY", "weight": 1.0, "provenance": implicit_provenance})
             edge_types[(feedback["turn_id"], feedback["id"])] = "FED_BACK_BY"
         for meme in snapshot["memes"]:
             metadata = json.loads(meme["metadata_json"] or "{}")
@@ -529,6 +616,10 @@ class ObservatoryExporter:
                 evidence=float(meme["evidence_n"]),
                 reward=float(meme["reward_ema"]),
                 risk=float(meme["risk_ema"]),
+                usage_count=int(meme["usage_count"]),
+                feedback_count=int(meme["feedback_count"]),
+                skip_count=int(meme["skip_count"]),
+                membrane_conflicts=int(meme["membrane_conflicts"]),
                 provenance=metadata.get("title") or metadata.get("source_path") or metadata.get("origin", ""),
                 session_id=metadata.get("session_id", ""),
                 created_at=meme["created_at"],
@@ -548,6 +639,12 @@ class ObservatoryExporter:
                 evidence=float(memode["evidence_n"]),
                 reward=float(memode["reward_ema"]),
                 risk=float(memode["risk_ema"]),
+                usage_count=int(memode["usage_count"]),
+                feedback_count=int(memode["feedback_count"]),
+                member_ids=metadata.get("member_ids", []),
+                evidence_label=metadata.get("evidence_label", metadata.get("assertion_origin", "AUTO_DERIVED")),
+                operator_label=metadata.get("operator_label", ""),
+                confidence=float(metadata.get("confidence", 0.0) or 0.0),
                 provenance=metadata.get("title") or metadata.get("origin", ""),
                 session_id=metadata.get("session_id", ""),
                 created_at=memode["created_at"],
@@ -556,13 +653,16 @@ class ObservatoryExporter:
         for edge in snapshot["edges"]:
             if edge["src_id"] not in graph or edge["dst_id"] not in graph:
                 continue
-            graph.add_edge(edge["src_id"], edge["dst_id"], weight=float(edge["weight"]))
-            directed.add_edge(edge["src_id"], edge["dst_id"], weight=float(edge["weight"]))
+            provenance = json.loads(edge["provenance_json"] or "{}")
+            graph.add_edge(edge["src_id"], edge["dst_id"], weight=float(edge["weight"]), edge_type=edge["edge_type"], provenance=provenance)
+            directed.add_edge(edge["src_id"], edge["dst_id"], weight=float(edge["weight"]), edge_type=edge["edge_type"], provenance=provenance)
             edge_payload = {
+                "id": edge["id"],
                 "source": edge["src_id"],
                 "target": edge["dst_id"],
                 "type": edge["edge_type"],
                 "weight": float(edge["weight"]),
+                "provenance": provenance,
             }
             edges.append(edge_payload)
             edge_types[(edge["src_id"], edge["dst_id"])] = edge["edge_type"]
@@ -586,8 +686,51 @@ class ObservatoryExporter:
         for item in geometry["communities"]:
             for member in item["members"]:
                 community_lookup[member] = item["community_id"]
+        clustering = nx.clustering(graph)
+        triangles = nx.triangles(graph)
+        active_set_counts: Counter[str] = Counter()
+        for turn in snapshot["turns"]:
+            for item in json.loads(turn["active_set_json"] or "[]"):
+                if item.get("node_id"):
+                    active_set_counts[item["node_id"]] += 1
+        memode_memberships: dict[str, list[str]] = defaultdict(list)
+        for memode in snapshot["memodes"]:
+            metadata = json.loads(memode["metadata_json"] or "{}")
+            for member_id in metadata.get("member_ids", []):
+                memode_memberships[member_id].append(memode["id"])
+        node_measurements: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        edge_measurements: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
+        reverted_event_ids = {
+            item["reverted_from_event_id"]
+            for item in measurement_events
+            if item.get("reverted_from_event_id")
+        }
+        for event in measurement_events:
+            for target in event["target_ids"]:
+                if target.get("kind") == "edge":
+                    key = (str(target.get("source_id")), str(target.get("target_id")), str(target.get("edge_type")))
+                    edge_measurements[key].append(event)
+                elif target.get("kind") == "memode" and target.get("memode_id"):
+                    node_measurements[str(target["memode_id"])].append(event)
+                    for member_id in target.get("member_ids", []):
+                        node_measurements[str(member_id)].append(event)
         for node in nodes:
             node["cluster_id"] = community_lookup.get(node["id"], -1)
+            node["degree"] = int(graph.degree(node["id"]))
+            node["clustering"] = round(float(clustering.get(node["id"], 0.0)), 4)
+            node["triangle_participation"] = int(triangles.get(node["id"], 0))
+            node["community"] = node["cluster_id"]
+            node["memode_membership"] = sorted(memode_memberships.get(node["id"], []))
+            node["recent_active_set_presence"] = int(active_set_counts.get(node["id"], 0))
+            node["measurement_history"] = node_measurements.get(node["id"], [])
+            node["measurement_event_ids"] = [item["id"] for item in node["measurement_history"]]
+            node["regard_breakdown"] = {
+                "evidence": round(float(node.get("evidence", 0.0) or 0.0), 4),
+                "reward": round(float(node.get("reward", 0.0) or 0.0), 4),
+                "risk": round(float(node.get("risk", 0.0) or 0.0), 4),
+                "usage_count": int(node.get("usage_count", 0) or 0),
+                "feedback_count": int(node.get("feedback_count", 0) or 0),
+            }
             node["render_coords"] = {"force": coords["force"].get(node["id"], {"x": 0.0, "y": 0.0})}
             node["derived_coords"] = {
                 "spectral": coords["spectral"].get(node["id"], {"x": 0.0, "y": 0.0}),
@@ -596,12 +739,23 @@ class ObservatoryExporter:
                 "temporal": coords["temporal"].get(node["id"], {"x": 0.0, "y": 0.0}),
                 "basin_linked": basin_coords.get(node["id"], coords["spectral"].get(node["id"], {"x": 0.0, "y": 0.0})),
             }
+        for edge in edges:
+            history = edge_measurements.get((edge["source"], edge["target"], edge["type"]), [])
+            edge["measurement_history"] = history
+            edge["measurement_event_ids"] = [item["id"] for item in history]
+            edge["reverted"] = any(item["id"] in reverted_event_ids for item in history)
+            provenance = edge.get("provenance", {})
+            edge["assertion_origin"] = provenance.get("assertion_origin", "auto_derived")
+            edge["evidence_label"] = provenance.get("evidence_label", "AUTO_DERIVED")
+            edge["operator_label"] = provenance.get("operator_label", "")
+            edge["confidence"] = float(provenance.get("confidence", 1.0 if edge["assertion_origin"] == "auto_derived" else 0.6) or 0.0)
         filters = {
             "sessions": sorted({node.get("session_id", "") for node in nodes if node.get("session_id")}),
             "kinds": sorted({node["kind"] for node in nodes}),
             "domains": sorted({node.get("domain", "") for node in nodes if node.get("domain")}),
             "sources": sorted({node.get("source_kind", "") for node in nodes if node.get("source_kind")}),
             "verdicts": sorted({verdict for node in nodes for verdict in node.get("verdicts", [])}),
+            "evidence_labels": sorted({node.get("evidence_label", "") for node in nodes if node.get("evidence_label")}),
         }
         latest_active_ids: list[str] = []
         if session_id:
@@ -619,6 +773,7 @@ class ObservatoryExporter:
             "node_order": node_order,
             "filters": filters,
             "latest_active_ids": latest_active_ids,
+            "measurement_events": measurement_events,
         }
 
     def _geometry_slices(self, graph_model: dict[str, Any], *, session_id: str | None) -> dict[str, Any]:
@@ -639,6 +794,37 @@ class ObservatoryExporter:
             if len(verdict_nodes) >= 2:
                 slices[f"verdict_{verdict}"] = self._slice_payload(f"verdict_{verdict}", *self._subgraphs(graph, directed, verdict_nodes))
         return slices
+
+    def _local_geometry_reports(self, graph_model: dict[str, Any], *, session_id: str | None) -> dict[str, Any]:
+        graph = graph_model["graph"]
+        directed = graph_model["directed_graph"]
+        reports: dict[str, Any] = {}
+        active_ids = [node_id for node_id in graph_model["latest_active_ids"] if node_id in graph]
+        if len(active_ids) >= 2:
+            reports["latest_active_set"] = compute_selection_geometry(
+                graph,
+                directed,
+                selected_node_ids=active_ids,
+                radius=1,
+                node_order=graph_model["node_order"],
+            )
+        for node in graph_model["nodes"]:
+            if node["kind"] != "memode":
+                continue
+            member_ids = [member_id for member_id in node.get("member_ids", []) if member_id in graph]
+            if len(member_ids) < 2:
+                continue
+            reports[f"memode::{node['id']}"] = {
+                "label": node["label"],
+                **compute_selection_geometry(
+                    graph,
+                    directed,
+                    selected_node_ids=member_ids,
+                    radius=1,
+                    node_order=graph_model["node_order"],
+                ),
+            }
+        return reports
 
     def _slice_payload(
         self,
@@ -664,6 +850,20 @@ class ObservatoryExporter:
         order = [node for node in graph.nodes() if node in node_ids]
         coords = compute_coordinate_sets(subgraph, node_order=order)
         return subgraph, subdirected, coords, order
+
+    def _measurement_event_payload(self, row: dict[str, Any]) -> dict[str, Any]:
+        payload = dict(row)
+        payload["target_ids"] = json.loads(row.get("target_ids_json") or "[]")
+        payload["before_state"] = json.loads(row.get("before_state_json") or "{}")
+        payload["proposed_state"] = json.loads(row.get("proposed_state_json") or "{}")
+        payload["committed_state"] = json.loads(row.get("committed_state_json") or "{}")
+        payload["summary"] = safe_excerpt(
+            payload.get("rationale")
+            or payload["committed_state"].get("summary")
+            or payload["proposed_state"].get("action_type", ""),
+            limit=160,
+        )
+        return payload
 
     def _graph_html(self, payload: dict[str, Any]) -> str:
         data = json.dumps(payload, ensure_ascii=True)
@@ -961,6 +1161,971 @@ class ObservatoryExporter:
     canvas.addEventListener("click", event => {{ state.pinned = nearest(event); draw(); }});
     draw();
   </script>
+</body>
+</html>"""
+
+    def _graph_html_v12(self, payload: dict[str, Any]) -> str:
+        data = json.dumps(payload, ensure_ascii=True)
+        template = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EDEN Graph Knowledge Base</title>
+  <style>
+    :root {
+      --bg: #070401;
+      --panel: rgba(22, 12, 3, 0.9);
+      --panel-strong: rgba(30, 15, 4, 0.96);
+      --amber-dim: #b27a34;
+      --amber: #ffbf66;
+      --amber-hot: #ffd989;
+      --gold: #fff0c0;
+      --bronze: #6e4419;
+      --cyan: #8fe8ff;
+      --green: #9dffb0;
+      --red: #ff8f78;
+      --text: #ffe7bd;
+      --muted: #c4924d;
+      --grid: rgba(255, 191, 102, 0.08);
+      --shadow: 0 0 18px rgba(255, 191, 102, 0.12), 0 0 42px rgba(0, 0, 0, 0.45);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Menlo, SFMono-Regular, monospace;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 18%, rgba(255, 191, 102, 0.14), transparent 24%),
+        radial-gradient(circle at 82% 16%, rgba(255, 214, 138, 0.12), transparent 22%),
+        linear-gradient(180deg, #050301 0%, #090603 46%, #120803 100%);
+    }
+    header {
+      padding: 18px 22px 10px;
+      border-bottom: 1px solid rgba(255, 191, 102, 0.22);
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      box-shadow: inset 0 -1px 0 rgba(255, 191, 102, 0.08);
+    }
+    .title {
+      font-size: 28px;
+      letter-spacing: 0.16em;
+      color: var(--amber-hot);
+      text-shadow: 0 0 10px rgba(255, 191, 102, 0.3);
+    }
+    .subtle { color: var(--muted); }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 191, 102, 0.22);
+      background: rgba(255, 191, 102, 0.08);
+      color: var(--gold);
+      box-shadow: 0 0 8px rgba(255, 191, 102, 0.08);
+      font-size: 12px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 318px 1fr 360px;
+      gap: 14px;
+      padding: 14px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255, 191, 102, 0.24);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 22%);
+      pointer-events: none;
+    }
+    .panel h2, .panel h3 {
+      margin: 0;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 191, 102, 0.16);
+      font-size: 13px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--amber-hot);
+      background: rgba(255, 191, 102, 0.04);
+      text-shadow: 0 0 8px rgba(255, 191, 102, 0.18);
+    }
+    .body { padding: 12px 14px; }
+    .stack { display: grid; gap: 12px; }
+    .toolbar, .modebar { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, select, input, textarea {
+      width: 100%;
+      background: rgba(17, 9, 3, 0.96);
+      color: var(--text);
+      border: 1px solid rgba(255, 191, 102, 0.24);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font: inherit;
+      box-shadow: inset 0 0 18px rgba(255, 191, 102, 0.03);
+    }
+    textarea { min-height: 74px; resize: vertical; }
+    button {
+      width: auto;
+      cursor: pointer;
+      transition: 120ms ease;
+    }
+    button:hover, .modebar button.active {
+      border-color: rgba(255, 217, 137, 0.5);
+      color: var(--gold);
+      box-shadow: 0 0 14px rgba(255, 191, 102, 0.16), inset 0 0 14px rgba(255, 191, 102, 0.06);
+    }
+    button.primary {
+      background: linear-gradient(180deg, rgba(255, 191, 102, 0.16), rgba(255, 191, 102, 0.08));
+    }
+    .modebar button { min-width: 90px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .graph-shell { position: relative; }
+    canvas {
+      width: 100%;
+      height: 74vh;
+      display: block;
+      background:
+        radial-gradient(circle at center, rgba(255, 191, 102, 0.05), transparent 44%),
+        linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0));
+    }
+    .footer-note {
+      padding: 10px 14px 14px;
+      border-top: 1px solid rgba(255, 191, 102, 0.12);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .card {
+      background: rgba(255, 191, 102, 0.05);
+      border: 1px solid rgba(255, 191, 102, 0.14);
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: inset 0 0 22px rgba(255, 191, 102, 0.025);
+    }
+    .metric-grid { display: grid; gap: 8px; }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 191, 102, 0.1);
+    }
+    .metric:last-child { border-bottom: none; }
+    .good { color: var(--green); }
+    .warn { color: var(--red); }
+    .cyan { color: var(--cyan); }
+    .history-list {
+      display: grid;
+      gap: 8px;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .history-item {
+      padding: 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 191, 102, 0.14);
+      background: rgba(255, 191, 102, 0.035);
+    }
+    .tiny { font-size: 11px; color: var(--muted); }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      font-family: inherit;
+      line-height: 1.45;
+    }
+    @media (max-width: 1260px) {
+      main { grid-template-columns: 1fr; }
+      canvas { height: 54vh; }
+    }
+  </style>
+</head>
+<body>
+  <script>let payload = __DATA__;</script>
+  <header>
+    <div>
+      <div class="title">EDEN / GRAPH INSTRUMENT</div>
+      <div class="subtle">Observation is measurement-bearing here. Preview first, mutate second, revert explicitly.</div>
+    </div>
+    <div class="chips">
+      <span class="chip">modes: inspect / measure / edit / ablate / compare</span>
+      <span class="chip">layout != evidence</span>
+      <span class="chip" id="liveStatus">live api: probing</span>
+    </div>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Left Rail Filters</h2>
+      <div class="body stack">
+        <div class="modebar" id="modebar"></div>
+        <input id="search" placeholder="search label / summary / provenance" />
+        <select id="viewMode"></select>
+        <select id="sessionFilter"></select>
+        <select id="kindFilter"></select>
+        <select id="domainFilter"></select>
+        <select id="sourceFilter"></select>
+        <select id="verdictFilter"></select>
+        <select id="evidenceFilter"></select>
+        <input id="timeFilter" placeholder="created_at contains (e.g. 2026-03-06)" />
+      </div>
+      <h2>Health Cards</h2>
+      <div class="body cards" id="healthCards"></div>
+      <h2>Selection</h2>
+      <div class="body">
+        <pre id="selectionSummary">No active selection.</pre>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Graph Surface</h2>
+      <div class="body graph-shell">
+        <div class="toolbar">
+          <button class="primary" id="previewBtn">Preview</button>
+          <button class="primary" id="commitBtn">Commit</button>
+          <button id="clearSelectionBtn">Clear Selection</button>
+        </div>
+        <canvas id="canvas" width="1400" height="900"></canvas>
+      </div>
+      <div class="footer-note">Coordinate mode only changes the rendered surface. Measurement overlays and committed graph edits are stored separately and visibly.</div>
+    </section>
+    <section class="panel">
+      <h2>Precision Drawer</h2>
+      <div class="body stack">
+        <div class="row2">
+          <input id="edgeTypeInput" value="CO_OCCURS_WITH" placeholder="edge type" />
+          <input id="weightInput" value="1.0" placeholder="edge weight" />
+        </div>
+        <div class="row2">
+          <input id="confidenceInput" value="0.7" placeholder="confidence" />
+          <select id="evidenceLabelSelect"></select>
+        </div>
+        <input id="operatorLabelInput" value="local_operator" placeholder="operator label" />
+        <input id="memodeIdInput" placeholder="memode id (for membership refinement)" />
+        <input id="memodeLabelInput" placeholder="known memode label" />
+        <input id="memodeDomainInput" value="behavior" placeholder="memode domain" />
+        <textarea id="memodeSummaryInput" placeholder="known memode summary / annotation"></textarea>
+        <textarea id="rationaleInput" placeholder="rationale / note"></textarea>
+        <select id="editActionSelect"></select>
+        <select id="ablationRelationSelect"></select>
+        <h3>Inspector</h3>
+        <pre id="inspector">Hover a node or edge to inspect precise provenance and measurement history.</pre>
+        <h3>Preview Diff</h3>
+        <pre id="previewPanel">No preview yet.</pre>
+        <h3>Measurement Ledger</h3>
+        <div class="history-list" id="eventLedger"></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const state = {
+      mode: "INSPECT",
+      hoverNode: null,
+      hoverEdge: null,
+      pinnedNode: null,
+      pinnedEdge: null,
+      selectedIds: new Set(),
+      preview: null,
+      live: false,
+      compareView: "spectral",
+    };
+    const modeBar = document.getElementById("modebar");
+    const viewMode = document.getElementById("viewMode");
+    const search = document.getElementById("search");
+    const sessionFilter = document.getElementById("sessionFilter");
+    const kindFilter = document.getElementById("kindFilter");
+    const domainFilter = document.getElementById("domainFilter");
+    const sourceFilter = document.getElementById("sourceFilter");
+    const verdictFilter = document.getElementById("verdictFilter");
+    const evidenceFilter = document.getElementById("evidenceFilter");
+    const timeFilter = document.getElementById("timeFilter");
+    const healthCards = document.getElementById("healthCards");
+    const selectionSummary = document.getElementById("selectionSummary");
+    const inspector = document.getElementById("inspector");
+    const previewPanel = document.getElementById("previewPanel");
+    const eventLedger = document.getElementById("eventLedger");
+    const liveStatus = document.getElementById("liveStatus");
+    const editActionSelect = document.getElementById("editActionSelect");
+    const ablationRelationSelect = document.getElementById("ablationRelationSelect");
+    const evidenceLabelSelect = document.getElementById("evidenceLabelSelect");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const modeOptions = payload.interaction_modes || ["INSPECT", "MEASURE", "EDIT", "ABLATE", "COMPARE"];
+    const evidenceLabels = Object.keys(payload.evidence_legend || {});
+
+    function optionize(element, label, values) {
+      element.innerHTML = `<option value="">${label}</option>` + values.map(v => `<option value="${v}">${v}</option>`).join("");
+    }
+    function literalOptionize(element, values, selected) {
+      element.innerHTML = values.map(v => `<option value="${v}" ${selected === v ? "selected" : ""}>${v}</option>`).join("");
+    }
+    function refreshModeBar() {
+      modeBar.innerHTML = "";
+      modeOptions.forEach(mode => {
+        const button = document.createElement("button");
+        button.textContent = mode;
+        if (state.mode === mode) button.classList.add("active");
+        button.addEventListener("click", () => {
+          state.mode = mode;
+          state.preview = null;
+          refreshModeBar();
+          draw();
+          renderInspector();
+        });
+        modeBar.appendChild(button);
+      });
+    }
+    refreshModeBar();
+    optionize(viewMode, "coord mode", Object.keys(payload.view_modes || {}));
+    viewMode.value = "force";
+    optionize(sessionFilter, "all sessions", payload.filters.sessions || []);
+    optionize(kindFilter, "all kinds", payload.filters.kinds || []);
+    optionize(domainFilter, "all domains", payload.filters.domains || []);
+    optionize(sourceFilter, "all sources", payload.filters.sources || []);
+    optionize(verdictFilter, "all verdicts", payload.filters.verdicts || []);
+    optionize(evidenceFilter, "all evidence", payload.filters.evidence_labels || evidenceLabels);
+    literalOptionize(editActionSelect, ["edge_add", "edge_update", "edge_remove", "memode_assert", "memode_update_membership", "geometry_measurement_run", "motif_annotation"], "edge_add");
+    literalOptionize(ablationRelationSelect, ["CO_OCCURS_WITH", "MATERIALIZES_AS_MEMODE", "FED_BACK_BY"], "CO_OCCURS_WITH");
+    literalOptionize(evidenceLabelSelect, evidenceLabels, "OPERATOR_ASSERTED");
+
+    function renderHealth() {
+      const counts = payload.counts || {};
+      const metrics = payload.health_metrics || {};
+      const cards = [
+        ["nodes", payload.nodes.length],
+        ["edges", payload.edges.length],
+        ["triadic closure", (metrics.triadic_closure || 0).toFixed(3)],
+        ["memode coverage", (metrics.memode_coverage || 0).toFixed(3)],
+        ["measurement events", counts.measurement_events || (payload.measurement_events || []).length],
+        ["dyad ratio", (metrics.dyad_ratio || 0).toFixed(3)],
+      ];
+      healthCards.innerHTML = cards.map(([label, value]) => `<div class="card"><div class="tiny">${label}</div><div>${value}</div></div>`).join("");
+    }
+    renderHealth();
+
+    function filteredNodes() {
+      const text = search.value.trim().toLowerCase();
+      return (payload.nodes || []).filter(node => {
+        if (sessionFilter.value && node.session_id !== sessionFilter.value) return false;
+        if (kindFilter.value && node.kind !== kindFilter.value) return false;
+        if (domainFilter.value && node.domain !== domainFilter.value) return false;
+        if (sourceFilter.value && node.source_kind !== sourceFilter.value) return false;
+        if (verdictFilter.value && !(node.verdicts || []).includes(verdictFilter.value)) return false;
+        if (evidenceFilter.value && (node.evidence_label || "") !== evidenceFilter.value) return false;
+        if (timeFilter.value && !(node.created_at || "").includes(timeFilter.value.trim())) return false;
+        if (!text) return true;
+        const hay = [node.label, node.summary, node.provenance, node.operator_label].join(" ").toLowerCase();
+        return hay.includes(text);
+      });
+    }
+    function coordsFor(node) {
+      const mode = viewMode.value || "force";
+      if (mode === "force") return node.render_coords.force;
+      return (node.derived_coords && node.derived_coords[mode]) || node.render_coords.force;
+    }
+    function scale(points) {
+      const xs = points.map(p => p.x), ys = points.map(p => p.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      return point => ({
+        x: 70 + ((point.x - minX) / Math.max(1e-9, maxX - minX)) * (canvas.width - 140),
+        y: 70 + ((point.y - minY) / Math.max(1e-9, maxY - minY)) * (canvas.height - 140),
+      });
+    }
+    function visibleEdges(visibleIds) {
+      return (payload.edges || []).filter(edge => visibleIds.has(edge.source) && visibleIds.has(edge.target));
+    }
+    function nodeColor(node) {
+      if ((payload.latest_active_ids || []).includes(node.id)) return "#fff0c0";
+      if (node.kind === "memode") return "#8fe8ff";
+      if (node.kind === "feedback") return "#ff8f78";
+      if (node.kind === "turn") return "#ffe18d";
+      if (node.kind === "document") return "#9dffb0";
+      return "#ffbf66";
+    }
+    function edgeStroke(edge) {
+      if (edge.assertion_origin === "operator_asserted" || edge.assertion_origin === "operator_refined") return "rgba(255, 220, 146, 0.75)";
+      if (edge.evidence_label === "OBSERVED") return "rgba(157, 255, 176, 0.48)";
+      return "rgba(255, 191, 102, 0.18)";
+    }
+    function draw() {
+      const visibleNodes = filteredNodes();
+      const visibleIds = new Set(visibleNodes.map(node => node.id));
+      const mapped = visibleNodes.map(node => ({ node, raw: coordsFor(node) || { x: 0, y: 0 } }));
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!mapped.length) {
+        inspector.textContent = "No nodes match the current filters.";
+        eventLedger.innerHTML = "";
+        return;
+      }
+      const projector = scale(mapped.map(item => item.raw));
+      mapped.forEach(item => item.screen = projector(item.raw));
+      for (let x = 0; x < canvas.width; x += 58) {
+        ctx.fillStyle = "rgba(255, 191, 102, 0.05)";
+        ctx.fillRect(x, 0, 1, canvas.height);
+      }
+      for (let y = 0; y < canvas.height; y += 58) {
+        ctx.fillStyle = "rgba(255, 191, 102, 0.05)";
+        ctx.fillRect(0, y, canvas.width, 1);
+      }
+      const edgeSegments = [];
+      visibleEdges(visibleIds).forEach(edge => {
+        const left = mapped.find(item => item.node.id === edge.source);
+        const right = mapped.find(item => item.node.id === edge.target);
+        if (!left || !right) return;
+        edgeSegments.push({ edge, left: left.screen, right: right.screen });
+        ctx.save();
+        ctx.strokeStyle = edgeStroke(edge);
+        ctx.lineWidth = Math.max(0.8, Math.min(3.4, Number(edge.weight || 1)));
+        ctx.shadowBlur = edge.assertion_origin === "operator_asserted" ? 12 : 5;
+        ctx.shadowColor = edge.assertion_origin === "operator_asserted" ? "rgba(255, 220, 146, 0.55)" : "rgba(255, 191, 102, 0.15)";
+        ctx.beginPath();
+        ctx.moveTo(left.screen.x, left.screen.y);
+        ctx.lineTo(right.screen.x, right.screen.y);
+        ctx.stroke();
+        ctx.restore();
+      });
+      mapped.forEach(item => {
+        const selected = state.selectedIds.has(item.node.id);
+        const pinned = state.pinnedNode && state.pinnedNode.id === item.node.id;
+        const activeGlow = (item.node.recent_active_set_presence || 0) > 0;
+        const radius = pinned ? 10 : selected ? 8 : 5.8;
+        ctx.save();
+        ctx.fillStyle = nodeColor(item.node);
+        ctx.shadowBlur = selected || pinned ? 20 : activeGlow ? 12 : 6;
+        ctx.shadowColor = selected || pinned ? "rgba(255, 217, 137, 0.62)" : "rgba(255, 191, 102, 0.22)";
+        ctx.beginPath();
+        ctx.arc(item.screen.x, item.screen.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        if (selected || pinned) {
+          ctx.strokeStyle = "rgba(255, 240, 192, 0.9)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(item.screen.x, item.screen.y, radius + 6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+      canvas._mapped = mapped;
+      canvas._edgeSegments = edgeSegments;
+      renderInspector();
+      renderSelection();
+      renderLedger();
+    }
+    function nearestNode(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+      let best = null, bestDist = 999999;
+      (canvas._mapped || []).forEach(item => {
+        const dist = Math.hypot(item.screen.x - x, item.screen.y - y);
+        if (dist < bestDist && dist < 14) {
+          bestDist = dist;
+          best = item.node;
+        }
+      });
+      return best;
+    }
+    function pointToSegmentDistance(px, py, ax, ay, bx, by) {
+      const dx = bx - ax, dy = by - ay;
+      const length2 = dx * dx + dy * dy;
+      const t = length2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / length2));
+      const x = ax + t * dx, y = ay + t * dy;
+      return Math.hypot(px - x, py - y);
+    }
+    function nearestEdge(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+      let best = null, bestDist = 999999;
+      (canvas._edgeSegments || []).forEach(segment => {
+        const dist = pointToSegmentDistance(x, y, segment.left.x, segment.left.y, segment.right.x, segment.right.y);
+        if (dist < bestDist && dist < 8) {
+          bestDist = dist;
+          best = segment.edge;
+        }
+      });
+      return best;
+    }
+    function renderInspector() {
+      const focus = state.pinnedEdge || state.pinnedNode || state.hoverEdge || state.hoverNode;
+      if (!focus) {
+        inspector.textContent = "Hover a node or edge to inspect precise provenance and measurement history.";
+        return;
+      }
+      inspector.textContent = JSON.stringify(focus, null, 2);
+    }
+    function renderSelection() {
+      const selected = [...state.selectedIds].map(id => (payload.nodes || []).find(node => node.id === id)).filter(Boolean);
+      selectionSummary.textContent = selected.length
+        ? JSON.stringify(selected.map(node => ({ id: node.id, kind: node.kind, label: node.label, community: node.community })), null, 2)
+        : "No active selection.";
+    }
+    function renderPreview() {
+      if (!state.preview) {
+        previewPanel.textContent = "No preview yet.";
+        return;
+      }
+      const delta = state.preview.global_metrics?.delta || {};
+      const local = state.preview.local_metrics?.delta || {};
+      previewPanel.textContent = JSON.stringify({
+        action_type: state.preview.action_type,
+        measurement_only: state.preview.measurement_only,
+        topology_change: state.preview.topology_change,
+        global_delta: delta,
+        local_delta: local,
+      }, null, 2);
+    }
+    function renderLedger() {
+      const rows = [...(payload.measurement_events || [])].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 12);
+      eventLedger.innerHTML = rows.map(row => `
+        <div class="history-item">
+          <div><strong>${row.action_type}</strong> <span class="tiny">${row.evidence_label} · ${row.created_at}</span></div>
+          <div class="tiny">${row.summary || ""}</div>
+          <div class="toolbar" style="margin-top:8px;">
+            ${state.live ? `<button data-revert="${row.id}">revert</button>` : ``}
+          </div>
+        </div>
+      `).join("");
+      [...eventLedger.querySelectorAll("[data-revert]")].forEach(button => {
+        button.addEventListener("click", async () => {
+          if (!state.live) return;
+          const res = await fetch(payload.live_api.revert, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ event_id: button.dataset.revert, session_id: payload.session_id }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            previewPanel.textContent = JSON.stringify(data, null, 2);
+            return;
+          }
+          payload = data.payload.graph;
+          payload.measurement_events = data.payload.measurements.events;
+          renderHealth();
+          state.preview = data;
+          renderPreview();
+          draw();
+        });
+      });
+    }
+    function buildAction() {
+      const ids = [...state.selectedIds];
+      const actionType = state.mode === "MEASURE" ? "geometry_measurement_run"
+        : state.mode === "ABLATE" ? "ablation_measurement_run"
+        : state.mode === "COMPARE" ? "geometry_measurement_run"
+        : editActionSelect.value;
+        const action = {
+          action_type: actionType,
+          selected_node_ids: ids,
+          source_id: state.pinnedEdge ? state.pinnedEdge.source : (ids[0] || null),
+          target_id: state.pinnedEdge ? state.pinnedEdge.target : (ids[1] || null),
+          current_edge_type: state.pinnedEdge ? state.pinnedEdge.type : document.getElementById("edgeTypeInput").value.trim(),
+          edge_type: document.getElementById("edgeTypeInput").value.trim(),
+          weight: Number(document.getElementById("weightInput").value || "1"),
+        confidence: Number(document.getElementById("confidenceInput").value || "0.7"),
+        operator_label: document.getElementById("operatorLabelInput").value.trim() || "local_operator",
+        evidence_label: evidenceLabelSelect.value || "OPERATOR_ASSERTED",
+        measurement_method: state.mode === "ABLATE" ? "local_ablation_preview" : "local_geometry_preview",
+        rationale: document.getElementById("rationaleInput").value.trim(),
+        label: document.getElementById("memodeLabelInput").value.trim(),
+        summary: document.getElementById("memodeSummaryInput").value.trim(),
+        domain: document.getElementById("memodeDomainInput").value.trim() || "behavior",
+        memode_id: document.getElementById("memodeIdInput").value.trim(),
+        member_ids: ids,
+        mask_relation_type: document.getElementById("ablationRelationSelect").value,
+      };
+      return action;
+    }
+    async function runPreview() {
+      if (!state.live) {
+        previewPanel.textContent = "Live API unavailable. Start the local observatory server to enable preview / commit / revert.";
+        return;
+      }
+      const response = await fetch(payload.live_api.preview, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: payload.session_id, action: buildAction() }),
+      });
+      const data = await response.json();
+      state.preview = data;
+      renderPreview();
+    }
+    async function commitAction() {
+      if (!state.live) {
+        previewPanel.textContent = "Live API unavailable. Commit requires the local observatory server.";
+        return;
+      }
+      const response = await fetch(payload.live_api.commit, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: payload.session_id, action: buildAction() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        previewPanel.textContent = JSON.stringify(data, null, 2);
+        return;
+      }
+      payload = data.payload.graph;
+      payload.measurement_events = data.payload.measurements.events;
+      state.preview = data.preview;
+      renderHealth();
+      renderPreview();
+      draw();
+    }
+    async function detectLive() {
+      try {
+        const response = await fetch("/api/status");
+        const data = await response.json();
+        state.live = Boolean(data.ok && data.status && data.status.capabilities && data.status.capabilities.preview);
+      } catch (_error) {
+        state.live = false;
+      }
+      liveStatus.textContent = state.live ? "live api: online" : "live api: static export mode";
+    }
+    [viewMode, search, sessionFilter, kindFilter, domainFilter, sourceFilter, verdictFilter, evidenceFilter, timeFilter].forEach(el => el.addEventListener("input", draw));
+    document.getElementById("previewBtn").addEventListener("click", runPreview);
+    document.getElementById("commitBtn").addEventListener("click", commitAction);
+    document.getElementById("clearSelectionBtn").addEventListener("click", () => { state.selectedIds = new Set(); state.preview = null; draw(); renderPreview(); });
+    canvas.addEventListener("mousemove", event => {
+      state.hoverNode = nearestNode(event);
+      state.hoverEdge = state.hoverNode ? null : nearestEdge(event);
+      renderInspector();
+    });
+    canvas.addEventListener("mouseleave", () => {
+      state.hoverNode = null;
+      state.hoverEdge = null;
+      renderInspector();
+    });
+    canvas.addEventListener("click", event => {
+      if (state.mode === "INSPECT") {
+        state.pinnedNode = nearestNode(event);
+        state.pinnedEdge = state.pinnedNode ? null : nearestEdge(event);
+      } else {
+        const node = nearestNode(event);
+        if (!node) return;
+        if (!event.shiftKey) {
+          state.selectedIds = new Set(state.selectedIds.has(node.id) && state.selectedIds.size === 1 ? [] : [node.id]);
+        } else {
+          if (state.selectedIds.has(node.id)) state.selectedIds.delete(node.id);
+          else state.selectedIds.add(node.id);
+        }
+      }
+      draw();
+    });
+    detectLive();
+    renderPreview();
+    draw();
+  </script>
+</body>
+</html>""";
+        return template.replace("__DATA__", data)
+
+    def _geometry_html_v12(self, payload: dict[str, Any]) -> str:
+        data = json.dumps(payload, ensure_ascii=True)
+        template = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EDEN Geometry Lab</title>
+  <style>
+    :root {
+      --bg: #060301;
+      --panel: rgba(20, 11, 3, 0.92);
+      --amber: #ffbf66;
+      --amber-hot: #ffe09c;
+      --text: #ffe8c0;
+      --muted: #c5924a;
+      --cyan: #8fe8ff;
+      --green: #9dffb0;
+      --rose: #ffb0c8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Menlo, SFMono-Regular, monospace;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(255,191,102,0.14), transparent 22%),
+        radial-gradient(circle at 80% 20%, rgba(143,232,255,0.12), transparent 20%),
+        linear-gradient(180deg, #040200, #0e0602 54%, #130803 100%);
+      color: var(--text);
+    }
+    header {
+      padding: 18px 22px 12px;
+      border-bottom: 1px solid rgba(255,191,102,0.22);
+    }
+    .title {
+      font-size: 28px;
+      letter-spacing: 0.16em;
+      color: var(--amber-hot);
+      text-shadow: 0 0 10px rgba(255,191,102,0.3);
+    }
+    main {
+      display: grid;
+      grid-template-columns: 320px 1fr 360px;
+      gap: 14px;
+      padding: 14px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255,191,102,0.22);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 0 16px rgba(255,191,102,0.1), 0 0 38px rgba(0,0,0,0.42);
+    }
+    .panel h2 { margin: 0; padding: 12px 14px; border-bottom: 1px solid rgba(255,191,102,0.14); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber-hot); }
+    .body { padding: 12px 14px; }
+    select, textarea, input {
+      width: 100%;
+      padding: 9px 10px;
+      margin-bottom: 10px;
+      background: rgba(15,8,2,0.95);
+      border: 1px solid rgba(255,191,102,0.22);
+      border-radius: 10px;
+      color: var(--text);
+      font: inherit;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+    button {
+      width: auto;
+      padding: 9px 12px;
+      background: rgba(255,191,102,0.08);
+      border: 1px solid rgba(255,191,102,0.22);
+      border-radius: 10px;
+      color: var(--text);
+      cursor: pointer;
+      margin-right: 8px;
+    }
+    .metric { padding: 8px 0; border-bottom: 1px solid rgba(255,191,102,0.1); display: flex; justify-content: space-between; gap: 12px; }
+    .metric:last-child { border-bottom: none; }
+    .obs { color: var(--green); }
+    .drv { color: var(--cyan); }
+    .spc { color: var(--rose); }
+    pre { margin: 0; white-space: pre-wrap; }
+    .tiny { color: var(--muted); font-size: 12px; }
+    @media (max-width: 1200px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <script>let payload = __DATA__;</script>
+  <header>
+    <div class="title">EDEN / GEOMETRY LAB</div>
+    <div class="tiny">OBSERVED metrics come from topology and recurrence counts. DERIVED metrics come from transforms and ordered-structure proxies. SPECULATIVE stays outside scoring.</div>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Controls</h2>
+      <div class="body">
+        <select id="reportSelect"></select>
+        <textarea id="selectionInput" placeholder="optional live measurement selection: comma-separated node ids"></textarea>
+        <button id="measureSelectionBtn">Measure Selection</button>
+        <div class="tiny" id="liveLabel">live api: probing</div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Report</h2>
+      <div class="body">
+        <div id="metrics"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Ablations + Preview</h2>
+      <div class="body">
+        <pre id="ablation"></pre>
+      </div>
+    </section>
+  </main>
+  <script>
+    const metricsEl = document.getElementById("metrics");
+    const ablationEl = document.getElementById("ablation");
+    const reportSelect = document.getElementById("reportSelect");
+    const selectionInput = document.getElementById("selectionInput");
+    const measureSelectionBtn = document.getElementById("measureSelectionBtn");
+    const liveLabel = document.getElementById("liveLabel");
+    const reports = {
+      full_graph: { kind: "full", payload: payload.full_graph },
+      ...Object.fromEntries(Object.entries(payload.slices || {}).map(([key, value]) => [key, { kind: "slice", payload: value }])),
+      ...Object.fromEntries(Object.entries(payload.local_reports || {}).map(([key, value]) => [key, { kind: "local", payload: value }])),
+    };
+    let live = false;
+    reportSelect.innerHTML = Object.keys(reports).map(name => `<option value="${name}">${name}</option>`).join("");
+    function renderReport() {
+      const selected = reports[reportSelect.value] || reports.full_graph;
+      const metrics = selected.kind === "full"
+        ? selected.payload.metrics.metrics
+        : selected.kind === "local"
+          ? selected.payload.metrics.metrics
+          : selected.payload.metrics;
+      metricsEl.innerHTML = Object.entries(metrics || {}).map(([name, metric]) => {
+        const label = metric.label === "OBSERVED" ? "obs" : metric.label === "DERIVED" ? "drv" : "spc";
+        return `<div class="metric"><span>${name} <span class="${label}">${metric.label}</span></span><span>${Number(metric.score || 0).toFixed(4)}</span></div>`;
+      }).join("");
+      const ablations = selected.kind === "full" ? (selected.payload.ablations || []) : [];
+      ablationEl.textContent = JSON.stringify({
+        report: reportSelect.value,
+        counts: selected.payload.counts || selected.payload.metrics?.counts || {},
+        ablations,
+      }, null, 2);
+    }
+    async function detectLive() {
+      try {
+        const response = await fetch("/api/status");
+        const data = await response.json();
+        live = Boolean(data.ok && data.status && data.status.capabilities && data.status.capabilities.preview);
+      } catch (_error) {
+        live = false;
+      }
+      liveLabel.textContent = live ? "live api: online" : "live api: static export mode";
+    }
+    measureSelectionBtn.addEventListener("click", async () => {
+      if (!live) {
+        ablationEl.textContent = "Live API unavailable. Start the observatory server for exact selection measurement.";
+        return;
+      }
+      const selectedIds = selectionInput.value.split(",").map(item => item.trim()).filter(Boolean);
+      const response = await fetch(`/api/experiments/${payload.experiment_id}/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: payload.session_id,
+          action: {
+            action_type: "geometry_measurement_run",
+            selected_node_ids: selectedIds,
+            rationale: "live geometry measurement",
+            evidence_label: "DERIVED",
+            operator_label: "local_operator",
+            confidence: 0.8,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        ablationEl.textContent = JSON.stringify(data, null, 2);
+        return;
+      }
+      ablationEl.textContent = JSON.stringify(data.local_metrics, null, 2);
+    });
+    reportSelect.addEventListener("input", renderReport);
+    detectLive();
+    renderReport();
+  </script>
+</body>
+</html>""";
+        return template.replace("__DATA__", data)
+
+    def _measurement_html(self, payload: dict[str, Any]) -> str:
+        data = json.dumps(payload, ensure_ascii=True)
+        template = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EDEN Measurement Ledger</title>
+  <style>
+    body { margin: 0; min-height: 100vh; font-family: Menlo, SFMono-Regular, monospace; background: linear-gradient(180deg, #050301, #110702); color: #ffe8c0; padding: 18px; }
+    .title { font-size: 28px; letter-spacing: 0.16em; color: #ffe09c; }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; background: rgba(20, 11, 3, 0.9); border: 1px solid rgba(255,191,102,0.2); }
+    th, td { padding: 10px; border-bottom: 1px solid rgba(255,191,102,0.12); text-align: left; vertical-align: top; }
+    th { color: #ffbf66; }
+    .tiny { color: #c5924a; }
+  </style>
+</head>
+<body>
+  <script>const payload = __DATA__;</script>
+  <div class="title">EDEN / MEASUREMENT LEDGER</div>
+  <div class="tiny">Every observatory-originated edit or committed measurement is recorded here with provenance.</div>
+  <table>
+    <thead>
+      <tr><th>created_at</th><th>action</th><th>evidence</th><th>confidence</th><th>summary</th><th>revert</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <script>
+    document.getElementById("rows").innerHTML = (payload.events || []).slice().reverse().map(row => `
+      <tr>
+        <td>${row.created_at}</td>
+        <td>${row.action_type}</td>
+        <td>${row.evidence_label}</td>
+        <td>${Number(row.confidence || 0).toFixed(2)}</td>
+        <td>${row.summary || ""}</td>
+        <td>${row.reverted_from_event_id || ""}</td>
+      </tr>
+    `).join("");
+  </script>
+</body>
+</html>""";
+        return template.replace("__DATA__", data)
+
+    def _index_html_v12(self, payload: dict[str, Any]) -> str:
+        graph_name = Path(payload["artifacts"]["graph"]["graph_html"]).name
+        basin_name = Path(payload["artifacts"]["basin"]["basin_html"]).name
+        geometry_name = Path(payload["artifacts"]["geometry"]["geometry_html"]).name
+        measurement_name = Path(payload["artifacts"]["measurement"]["measurement_html"]).name
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EDEN Observatory Index</title>
+  <style>
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      font-family: Menlo, SFMono-Regular, monospace;
+      color: #ffe8c0;
+      background:
+        radial-gradient(circle at 14% 18%, rgba(255,191,102,0.16), transparent 22%),
+        radial-gradient(circle at 84% 16%, rgba(143,232,255,0.10), transparent 20%),
+        linear-gradient(180deg, #040200, #0f0602 60%, #140903 100%);
+      padding: 18px;
+    }}
+    .title {{ font-size: 28px; letter-spacing: 0.16em; color: #ffe09c; text-shadow: 0 0 10px rgba(255,191,102,0.3); }}
+    .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }}
+    .card {{
+      background: rgba(20, 11, 3, 0.92);
+      border: 1px solid rgba(255,191,102,0.22);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 0 16px rgba(255,191,102,0.08), 0 0 36px rgba(0,0,0,0.38);
+    }}
+    .tiny {{ color: #c5924a; font-size: 12px; }}
+    a {{ color: #8fe8ff; }}
+    @media (max-width: 1200px) {{ .grid {{ grid-template-columns: 1fr; }} }}
+  </style>
+</head>
+<body>
+  <div class="title">EDEN / OBSERVATORY INDEX</div>
+  <div class="tiny">experiment={payload["experiment_id"]} generated_at={payload["generated_at"]} nodes={payload["summary"]["nodes"]} edges={payload["summary"]["edges"]} measurements={payload["summary"]["measurement_events"]}</div>
+  <div class="grid">
+    <div class="card">
+      <h3>Graph Instrument</h3>
+      <div class="tiny">inspect / measure / edit / ablate / compare</div>
+      <p>Live-editable graph surface with provenance-aware selection, preview, commit, and revert flow.</p>
+      <a href="{graph_name}">open graph instrument</a>
+    </div>
+    <div class="card">
+      <h3>Behavioral Basin</h3>
+      <div class="tiny">turns={payload["summary"]["turns"]} sessions={payload["summary"]["sessions"]}</div>
+      <p>Attractor trajectory with inference-circumstance overlays, recurrence, and phase markers.</p>
+      <a href="{basin_name}">open basin artifact</a>
+    </div>
+    <div class="card">
+      <h3>Geometry Lab</h3>
+      <div class="tiny">global, slice, and local motif geometry</div>
+      <p>Observed and derived metrics, ablations, and live exact-selection measurement when the local API is available.</p>
+      <a href="{geometry_name}">open geometry lab</a>
+    </div>
+    <div class="card">
+      <h3>Measurement Ledger</h3>
+      <div class="tiny">all observatory-originated events</div>
+      <p>Measurement-bearing event history for graph edits, memode assertions, ablations, annotations, and reverts.</p>
+      <a href="{measurement_name}">open measurement ledger</a>
+    </div>
+  </div>
 </body>
 </html>"""
 

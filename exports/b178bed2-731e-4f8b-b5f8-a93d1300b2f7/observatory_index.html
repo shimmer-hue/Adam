@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EDEN Observatory Index</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Menlo, SFMono-Regular, monospace;
+      color: #ffe8c0;
+      background:
+        radial-gradient(circle at 14% 18%, rgba(255,191,102,0.16), transparent 22%),
+        radial-gradient(circle at 84% 16%, rgba(143,232,255,0.10), transparent 20%),
+        linear-gradient(180deg, #040200, #0f0602 60%, #140903 100%);
+      padding: 18px;
+    }
+    .title { font-size: 28px; letter-spacing: 0.16em; color: #ffe09c; text-shadow: 0 0 10px rgba(255,191,102,0.3); }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+    .card {
+      background: rgba(20, 11, 3, 0.92);
+      border: 1px solid rgba(255,191,102,0.22);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 0 16px rgba(255,191,102,0.08), 0 0 36px rgba(0,0,0,0.38);
+    }
+    .tiny { color: #c5924a; font-size: 12px; }
+    a { color: #8fe8ff; }
+    @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="title">EDEN / OBSERVATORY INDEX</div>
+  <div class="tiny">experiment=b178bed2-731e-4f8b-b5f8-a93d1300b2f7 generated_at=2026-03-06T21:33:18+00:00 nodes=32 edges=93 measurements=2</div>
+  <div class="grid">
+    <div class="card">
+      <h3>Graph Instrument</h3>
+      <div class="tiny">inspect / measure / edit / ablate / compare</div>
+      <p>Live-editable graph surface with provenance-aware selection, preview, commit, and revert flow.</p>
+      <a href="graph_knowledge_base.html">open graph instrument</a>
+    </div>
+    <div class="card">
+      <h3>Behavioral Basin</h3>
+      <div class="tiny">turns=1 sessions=1</div>
+      <p>Attractor trajectory with inference-circumstance overlays, recurrence, and phase markers.</p>
+      <a href="behavioral_attractor_basin.html">open basin artifact</a>
+    </div>
+    <div class="card">
+      <h3>Geometry Lab</h3>
+      <div class="tiny">global, slice, and local motif geometry</div>
+      <p>Observed and derived metrics, ablations, and live exact-selection measurement when the local API is available.</p>
+      <a href="geometry_lab.html">open geometry lab</a>
+    </div>
+    <div class="card">
+      <h3>Measurement Ledger</h3>
+      <div class="tiny">all observatory-originated events</div>
+      <p>Measurement-bearing event history for graph edits, memode assertions, ablations, annotations, and reverts.</p>
+      <a href="measurement_ledger.html">open measurement ledger</a>
+    </div>
+  </div>
+</body>
+</html>

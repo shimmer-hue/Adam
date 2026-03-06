@@ -22,11 +22,20 @@
 | Graph knowledge-base export | Implemented | generated and browser-opened |
 | Behavioral attractor basin export | Implemented | upgraded with inference-circumstance overlays |
 | Geometry lab export | Implemented | `geometry_lab.html` + `geometry_diagnostics.json` |
+| Measurement ledger export | Implemented | `measurement_ledger.html` + `measurement_events.json` |
 | Observatory index page | Implemented | `observatory_index.html` |
 | Robust observatory server lifecycle | Implemented | host/port args, reuse, free-port fallback, tests |
 | Geometry diagnostics | Implemented | ringness, radiality, linearity, communities, triadic closure, spectral summaries, mirror/chirality/translation proxies |
 | Geometry ablation probes | Implemented | `CO_OCCURS_WITH` masking and dominant-cluster removal |
 | Browser observatory filtering | Implemented | graph and basin filters / geometry slice selection |
+| Browser observatory interaction modes | Implemented | `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, `COMPARE` |
+| Preview before commit | Implemented | local geometry + global delta preview via live API |
+| Edge add/update/remove with provenance | Implemented | observatory precision drawer + measurement events |
+| Known memode assertion | Implemented | operator can materialize a memode from a node selection |
+| Memode membership refinement | Implemented | persisted and revertible via measurement ledger |
+| Revert observatory-originated mutation | Implemented | explicit `revert` action stored as its own event |
+| Local selection geometry | Implemented | geometry lab + graph preview support selection-local metrics |
+| TUI trace of observatory edits | Implemented | runtime log and trace events emitted on commit / revert |
 | Full selected Qwen/Qwen3.5-35B-A3B model load on this machine | Instrumented / blocked by missing local model path | adapter ready, model path absent during patch |
 | Weight training / fine-tuning / LoRA | Deferred by design | explicitly out of scope |
 | Governor / hidden planner | Deferred by design | explicitly absent |
@@ -34,7 +43,8 @@
 
 Validated in this patch:
 
-- `.venv/bin/pytest -q` -> `19 passed`
+- `.venv/bin/pytest -q` -> `24 passed`
 - CLI observatory fallback from occupied requested port to actual port `8877`
-- mock demo export wrote graph, basin, geometry, and index artifacts
-- observatory index and geometry lab opened in a real browser session
+- live observatory preview / commit / revert succeeded against a real experiment
+- mock demo export wrote graph, basin, geometry, measurement, and index artifacts
+- observatory graph instrument and geometry lab opened in a real browser session

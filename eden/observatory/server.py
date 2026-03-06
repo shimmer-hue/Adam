@@ -5,15 +5,17 @@ import json
 import socket
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from ..utils import now_utc
 
 
 SERVER_INFO_FILENAME = ".eden_observatory.json"
+API_VERSION = 2
 
 
 class _ThreadingHTTPServer(http.server.ThreadingHTTPServer):
@@ -21,9 +23,123 @@ class _ThreadingHTTPServer(http.server.ThreadingHTTPServer):
     allow_reuse_address = True
 
 
-class _QuietStaticHandler(http.server.SimpleHTTPRequestHandler):
+class _ObservatoryHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(
+        self,
+        *args: Any,
+        directory: str,
+        service: Any | None,
+        status_provider: Callable[[], dict[str, Any]],
+        **kwargs: Any,
+    ) -> None:
+        self._service = service
+        self._status_provider = status_provider
+        super().__init__(*args, directory=directory, **kwargs)
+
     def log_message(self, format: str, *args: Any) -> None:  # pragma: no cover - noisy stdio suppression
         return
+
+    def do_GET(self) -> None:  # noqa: N802
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == f"/{SERVER_INFO_FILENAME}":
+            self._send_json(self._status_provider())
+            return
+        if parsed.path == "/api/status":
+            self._send_json({"ok": True, "status": self._status_provider()})
+            return
+        if parsed.path.startswith("/api/experiments/"):
+            self._handle_api_get(parsed)
+            return
+        super().do_GET()
+
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urllib.parse.urlparse(self.path)
+        if not parsed.path.startswith("/api/experiments/"):
+            self.send_error(404, "Unknown API path.")
+            return
+        if self._service is None:
+            self._send_json({"error": "Live observatory API unavailable."}, status=503)
+            return
+        parts = [part for part in parsed.path.split("/") if part]
+        if len(parts) < 4:
+            self._send_json({"error": "Malformed API path."}, status=404)
+            return
+        _, _, experiment_id, action_name = parts[:4]
+        body = self._read_json_body()
+        try:
+            if action_name == "preview":
+                result = self._service.preview_action(
+                    experiment_id=experiment_id,
+                    session_id=body.get("session_id"),
+                    turn_id=body.get("turn_id"),
+                    action=body.get("action", body),
+                )
+            elif action_name == "commit":
+                result = self._service.commit_action(
+                    experiment_id=experiment_id,
+                    session_id=body.get("session_id"),
+                    turn_id=body.get("turn_id"),
+                    action=body.get("action", body),
+                )
+            elif action_name == "revert":
+                result = self._service.revert_event(
+                    experiment_id=experiment_id,
+                    session_id=body.get("session_id"),
+                    turn_id=body.get("turn_id"),
+                    event_id=str(body.get("event_id", "")).strip(),
+                )
+            else:
+                self._send_json({"error": f"Unknown action '{action_name}'."}, status=404)
+                return
+        except ValueError as exc:
+            self._send_json({"error": str(exc)}, status=400)
+            return
+        except KeyError as exc:
+            self._send_json({"error": str(exc)}, status=404)
+            return
+        except Exception as exc:  # pragma: no cover - defensive API guard
+            self._send_json({"error": f"Unhandled observatory API failure: {exc}"}, status=500)
+            return
+        self._send_json(result)
+
+    def _handle_api_get(self, parsed: urllib.parse.ParseResult) -> None:
+        if self._service is None:
+            self._send_json({"error": "Live observatory API unavailable."}, status=503)
+            return
+        parts = [part for part in parsed.path.split("/") if part]
+        if len(parts) < 4:
+            self._send_json({"error": "Malformed API path."}, status=404)
+            return
+        _, _, experiment_id, action_name = parts[:4]
+        query = urllib.parse.parse_qs(parsed.query)
+        session_id = query.get("session_id", [None])[0]
+        if action_name == "payload":
+            _, payload = self._service.refresh_exports(experiment_id=experiment_id, session_id=session_id)
+            self._send_json(payload)
+            return
+        if action_name == "measurement-events":
+            _, payload = self._service.refresh_exports(experiment_id=experiment_id, session_id=session_id)
+            self._send_json(payload["measurements"])
+            return
+        self._send_json({"error": f"Unknown action '{action_name}'."}, status=404)
+
+    def _read_json_body(self) -> dict[str, Any]:
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        if length <= 0:
+            return {}
+        raw = self.rfile.read(length)
+        if not raw:
+            return {}
+        return json.loads(raw.decode("utf-8"))
+
+    def _send_json(self, payload: dict[str, Any], *, status: int = 200) -> None:
+        encoded = json.dumps(payload, indent=2).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(encoded)
 
 
 @dataclass(slots=True)
@@ -38,14 +154,25 @@ class ObservatoryStatus:
     reused_existing: bool
     owned_by_process: bool
     pid: int
+    api_version: int = API_VERSION
+    capabilities: dict[str, Any] = field(default_factory=dict)
 
 
 class ObservatoryServer:
-    def __init__(self, root: Path, port: int, *, host: str = "127.0.0.1", port_span: int = 24) -> None:
+    def __init__(
+        self,
+        root: Path,
+        port: int,
+        *,
+        host: str = "127.0.0.1",
+        port_span: int = 24,
+        service: Any | None = None,
+    ) -> None:
         self.root = root.resolve()
         self.host = host
         self.port = port
         self.port_span = port_span
+        self.service = service
         self._thread: threading.Thread | None = None
         self._httpd: _ThreadingHTTPServer | None = None
         self._status: ObservatoryStatus | None = None
@@ -96,6 +223,13 @@ class ObservatoryServer:
             reused_existing=False,
             owned_by_process=True,
             pid=self._process_id(),
+            api_version=API_VERSION,
+            capabilities={
+                "preview": self.service is not None,
+                "commit": self.service is not None,
+                "revert": self.service is not None,
+                "measurement_events": self.service is not None,
+            },
         )
         self._write_info_file(self._status)
         return self._status
@@ -127,9 +261,30 @@ class ObservatoryServer:
 
         return os.getpid()
 
+    def _status_payload(self) -> dict[str, Any]:
+        if self._status is None:
+            return {
+                "root": str(self.root),
+                "server_type": "eden_observatory",
+                "api_version": API_VERSION,
+                "capabilities": {
+                    "preview": self.service is not None,
+                    "commit": self.service is not None,
+                    "revert": self.service is not None,
+                    "measurement_events": self.service is not None,
+                },
+            }
+        return asdict(self._status)
+
     def _make_handler(self, root: Path):
         def factory(*args: Any, **kwargs: Any):
-            return _QuietStaticHandler(*args, directory=str(root), **kwargs)
+            return _ObservatoryHandler(
+                *args,
+                directory=str(root),
+                service=self.service,
+                status_provider=self._status_payload,
+                **kwargs,
+            )
 
         return factory
 
@@ -174,6 +329,8 @@ class ObservatoryServer:
         root = Path(str(payload.get("root", ""))).resolve()
         if payload.get("server_type") != "eden_observatory" or root != expected_root.resolve():
             return None
+        if int(payload.get("api_version", 0) or 0) < API_VERSION:
+            return None
         return ObservatoryStatus(
             host=str(payload["host"]),
             port=int(payload["port"]),
@@ -185,6 +342,8 @@ class ObservatoryServer:
             reused_existing=True,
             owned_by_process=False,
             pid=int(payload.get("pid", 0) or 0),
+            api_version=int(payload.get("api_version", API_VERSION) or API_VERSION),
+            capabilities=dict(payload.get("capabilities", {})),
         )
 
     def _write_info_file(self, status: ObservatoryStatus) -> None:

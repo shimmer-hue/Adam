@@ -12,6 +12,7 @@
 - `MembraneEvent`: post-generation event emitted by the output membrane.
 - `ExportArtifact`: emitted graph/basin outputs plus manifests.
 - `Config / Experiment metadata`: run-level settings and identity.
+- `MeasurementEvent`: persistent record of observatory-originated measurement, edit, annotation, ablation, or revert.
 
 ## Derived objects
 
@@ -41,3 +42,18 @@
 - Memodes are semantically derived, though they may be materialized and cached in the store.
 - Regard acts over memes and memodes, not over tokens.
 - Active-set assembly mixes behavior and knowledge but keeps their provenance visible.
+
+## Practical memode ladder for v1.2
+
+- `meme`: local semantic-behavioral part
+- `memode`: reusable selected subassembly or historically stabilized motif
+- `persona`: persistent assembly ecology of memodes
+
+This patch treats a memode as more than a pairwise relation or a UI label. In practical EDEN terms, a memode is an assembly-stabilized, temporally thick causal motif whose identity may be distributed across a structured neighborhood.
+
+## Operator intervention semantics
+
+- observatory measurements can produce new persistent facts with provenance
+- operator assertions and operator refinements remain distinguishable from auto-derived facts
+- a known memode can be asserted from a selected node set and later refined
+- measurement events are the provenance bridge between observation, mutation, and later runtime effects
