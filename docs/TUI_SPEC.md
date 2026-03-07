@@ -2,25 +2,26 @@
 
 The TUI remains the primary EDEN runtime surface in v1.2.
 
-## Startup flow
+## Boot flow
 
-Startup screen:
+Live cockpit boot:
 
-- top startup action menu:
+- EDEN opens directly into a chat session surface
+- if a previous session exists, EDEN resumes the latest persisted session automatically
+- if no session exists yet, EDEN creates a blank experiment/session automatically
+- the top action menu remains available for:
+  - `Review Feedback`
+  - `Adjust Profile`
+  - `New Session`
+  - `Resume Latest`
   - `Blank Eden`
   - `Seeded Eden`
-  - `Resume Latest`
   - `Prepare Qwen`
-  - `Refresh Model`
   - `Open Observatory`
   - `Export Latest`
+  - `Open Deck`
   - `Help`
-- aperture / active-set reference panel
-- Qwen thinking panel populated from the latest visible reasoning artifact
-- animated cockpit panel
-- startup runtime log
-- latest Brian / Adam chat preview
-- default MLX model stored under `models/` in the repo root
+- default MLX model storage remains under `models/` in the repo root
 
 Session-start modal:
 
@@ -50,17 +51,18 @@ Primary split:
 
 - left cockpit bay:
   - aperture / active set
-  - session capsule with regard trace
-  - utility controls: `New Session`, `Observatory`, `Export`, `Deck`, `Profile`, `Help`
+  - visible thinking / reasoning artifact panel
+  - feedback / session-state panel
 - right cockpit bay:
   - upper stack:
+    - animated signal field
     - animated amber cockpit instrumentation
     - forensic structured log
   - lower chat deck:
-    - Brian transmission box
-    - Adam membrane box
+    - latest persisted Brian / Adam transcript boxes
+    - live Brian draft box when the composer is loaded
     - multiline `TextArea` composer for Brian the operator
-    - primary actions: `Send`, `Review`
+    - transmit hint surface; `Ctrl+S` sends
 
 Secondary surfaces:
 
@@ -83,20 +85,19 @@ Secondary surfaces:
 
 - fixed panes, no primary scrolling transcript
 - amber-on-dark operator grammar preserved
-- cockpit-first primary chat surface: aperture and controls left, animated telemetry upper-right, chat deck lower-right
-- startup launcher is fixed to local MLX; runtime/model-path picking is removed from the launcher surface
-- startup launch/export/observatory actions live in a keyboard-executable top menu instead of left-column buttons
+- cockpit-first primary chat surface: aperture/thinking/feedback left, animated telemetry upper-right, chat deck lower-right
+- live-session boot is the default path; the app no longer lands on a launcher before chat opens
+- session and utility actions now live in the keyboard-executable top menu instead of left-column buttons
 - normal entry path is `.venv/bin/python -m eden` or `.venv/bin/python -m eden app`
-- shell flags remain optional overrides, but the TUI launcher itself is locked to local MLX
-- the launcher reports model readiness, shard progress, and repo-local storage instead of asking for a manual MLX path
+- shell flags remain optional overrides; the normal runtime contract is repo-local MLX
+- the action bar reports model readiness, active session, and focus/keyboard hints
 - multiline composition is first-class
 - operator turns are persisted and graph-ingested as `Brian the operator: ...`
-- MLX/Qwen model-emitted thinking is surfaced in Deck instead of leaking into the main Adam response
-- latest startup reasoning preview is surfaced directly on the startup screen
-- the prime surface keeps the aperture visible while the operator types; Deck still carries the detailed trace and budget surfaces
+- MLX/Qwen model-emitted thinking is surfaced as a dedicated panel instead of leaking into the main Adam response
+- the prime surface keeps aperture, thinking, feedback, and transcript visible while the operator types; Deck still carries the detailed trace and budget surfaces
 - budget changes remain visible, but now live in Deck instead of the prime chat pane
-- latest-session resume restores the latest persisted session surface instead of forcing a new session flow
-- keyboard-only navigation is supported through startup menu focus, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the existing function-key bindings
+- latest-session resume restores the latest persisted session surface without forcing a new session flow first
+- keyboard-only navigation is supported through top-menu focus, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the function-key bindings
 
 ## Budget panel contents
 
@@ -124,3 +125,4 @@ Secondary surfaces:
 - `F4`: toggle low-motion in the current session request
 - `F5`: open the new-session inference-profile flow
 - `F6`: open the operator deck
+- `F7`: open the review feedback modal

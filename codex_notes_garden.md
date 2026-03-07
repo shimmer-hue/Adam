@@ -141,3 +141,27 @@ Docs updated:
 `README.md`, `docs/TUI_SPEC.md`, `docs/IMPLEMENTATION_TRUTH_TABLE.md`, and the operational log.
 Remaining uncertainties or follow-ups:
 The keyboard path is covered structurally and by the startup smoke test; the next pass can refine menu phrasing and reasoning-panel density from live screenshots if you want the startup surface even tighter.
+
+## [2026-03-07 10:50:02 EST] PRE-FLIGHT
+Task summary:
+Make the TUI launch into a live MLX chat cockpit, replace preview-only startup behavior with an active session, expand active aperture/thinking/chat/feedback surfaces, and strengthen the amber cybernetic aesthetic.
+Scope of work:
+Boot flow, TUI layout/state wiring, MLX chat path, keyboard navigation, and synchronized docs/tests.
+Likely files/modules:
+eden/tui/app.py, eden/app.py, eden/runtime.py, eden/models/mlx_backend.py, tests/test_tui_smoke.py, README.md, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
+Relevant invariants:
+Repo-local .venv, MLX as real runtime, TUI as primary interface, preserve v1 loop and explicit feedback, use apply_patch, run pytest before handoff.
+Proof path (how success will be verified):
+Run focused smoke coverage for boot/chat behavior, then full ./.venv/bin/pytest -q; verify the app boots into a live session path and keyboard navigation remains intact.
+
+## [2026-03-07 11:18:28 EST] POST-FLIGHT
+Files changed:
+eden/tui/app.py, tests/test_tui_smoke.py, README.md, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
+Behavior implemented or modified:
+TUI now boots directly into a resumed-or-created live session, uses the top action menu for keyboard-first control, exposes active aperture/thinking/feedback panels, shows a bounded live transcript plus composer, and sends real turns through the runtime-backed chat path.
+Evidence (tests / commands run):
+python3 -m py_compile eden/tui/app.py; ./.venv/bin/pytest -q tests/test_tui_smoke.py; ./.venv/bin/pytest -q
+Docs updated:
+README.md, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
+Remaining uncertainties or follow-ups:
+StartupScreen remains in code as a fallback/reference surface but is no longer the default entry path; further visual tuning can iterate on the signal-field animation density and transcript packing.

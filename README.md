@@ -60,9 +60,9 @@ Original module path from the repo root:
 
 `python3 app.py` is also valid, but only after you have already changed into `/Users/brianray/Adam`.
 
-The startup cockpit is now locked to `Adam / Local MLX`, with startup actions exposed through a top keyboardable menu instead of a runtime picker or a left-column button stack. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
+The live cockpit boots directly into a real chat session on the repo-local runtime. The top action menu exposes review, profile, session, export, observatory, and model-prepare actions without dropping you onto a separate launcher. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
 
-Use flags only when you want an explicit shell override. The normal path is the repo-local MLX default. The startup surface can prepare the local Qwen model directly if it is not cached yet.
+Use flags only when you want an explicit shell override. The normal path is the repo-local MLX default. The action menu can prepare the local Qwen model directly if it is not cached yet.
 
 Advanced shell override example:
 
@@ -106,19 +106,21 @@ Useful flags:
 
 1. Change into the repo root with `cd /Users/brianray/Adam`.
 2. Start EDEN with `.venv/bin/python app.py`.
-3. Use the top startup action menu with arrow keys and `Enter`. If the local Qwen model is not cached yet, run `Prepare Qwen` once. EDEN stores it under `models/` in this repo.
-4. Choose `Blank Eden`, `Seeded Eden`, or `Resume Latest`.
-5. In the session-start modal choose the inference profile mode and bounded parameters for that session.
-6. Once chat is up, the left bay shows the aperture, session capsule, and utility controls; the upper-right bay is the animated cockpit and live trace; the lower-right deck is the Brian/Adam exchange plus the composer.
-7. Type into the lower-right chat deck and send with `Ctrl+S`.
-8. Open `Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
-9. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
-10. Use `Profile` for the bounded hyperparameter / inference-mode surface.
-11. Use `Export` to write graph, basin, geometry, measurement, and index artifacts.
-12. Use `Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
-13. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
-14. Preview a change first, then commit it if the before/after metrics support the edit.
-15. Revert recent observatory-originated mutations from the measurement ledger when needed.
+3. EDEN resumes the latest persisted session automatically. If none exists yet, it creates a blank live session automatically.
+4. If the local Qwen model is not cached yet, use the top action menu and run `Prepare Qwen`. EDEN stores it under `models/` in this repo.
+5. The top action menu is keyboard-first: `Tab` / `Shift+Tab` moves focus, arrow keys choose a menu item, and `Enter` executes it.
+6. The left bay shows the aperture, visible reasoning surface, and feedback/session state.
+7. The upper-right bay is the animated cockpit scope, dials, and live trace bus.
+8. The lower-right deck is the live Brian/Adam transcript and composer.
+9. Type into the lower-right chat deck and send with `Ctrl+S`.
+10. Open `Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
+11. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
+12. Use `Adjust Profile` or `New Session` from the action menu when you want a bounded inference-profile change.
+13. Use `Export Latest` to write graph, basin, geometry, measurement, and index artifacts.
+14. Use `Open Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
+15. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
+16. Preview a change first, then commit it if the before/after metrics support the edit.
+17. Revert recent observatory-originated mutations from the measurement ledger when needed.
 
 ## Inference notes
 

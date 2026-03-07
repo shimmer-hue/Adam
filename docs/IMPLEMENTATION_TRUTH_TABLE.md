@@ -5,19 +5,19 @@
 | Blank Eden bootstrap | Implemented | runtime + TUI path; validated in tests and demo |
 | Seeded Eden bootstrap code path | Implemented | ingests `assets/seed_canon/`; heavy-path validation started on real canon files |
 | Fixed-pane amber TUI | Implemented | preserved and refocused around a cockpit-style primary chat surface |
-| Panel-based launcher for startup and runtime surfaces | Implemented | startup cockpit keeps the top action menu, Qwen thinking preview, runtime trace, and preview chat on one screen |
+| Live session cockpit boot | Implemented | app opens directly into a resumed-or-created session with the top action menu, active aperture/thinking/feedback panels, animated telemetry, and a live transcript deck |
 | `python -m eden` default entry path | Implemented | no subcommand required for the normal TUI path; flags remain optional overrides |
 | Repo-root `python3 app.py` launcher | Implemented | root launcher re-execs the repo-local `.venv` interpreter and then dispatches into `eden.app:main` |
 | Local repo-managed MLX model storage | Implemented | default MLX model target is `models/qwen3.5-35b-a3b-mlx-mxfp4` under repo root |
-| Local MLX shard-readiness tracking | Implemented | startup/runtime distinguish metadata-only, partial, and ready model states |
+| Local MLX shard-readiness tracking | Implemented | live cockpit status surfaces distinguish metadata-only, partial, and ready model states |
 | Repo-local Qwen 3.5 MLX backend | Implemented | repo-local 4-shard model completed and real MLX generation succeeded |
 | Multiline composer | Implemented | `TextArea`-based; covered by TUI smoke test |
-| Cockpit chat layout | Implemented | aperture / controls on the left, animated cockpit + trace upper-right, chat deck lower-right |
-| Fixed local-MLX launcher | Implemented | startup TUI no longer exposes backend selection; local MLX is the launcher contract |
+| Cockpit chat layout | Implemented | aperture / thinking / feedback on the left, animated cockpit + trace upper-right, live transcript + composer lower-right |
+| Fixed local-MLX runtime contract | Implemented | the live TUI no longer exposes backend selection on the primary surface; local MLX is the normal runtime contract |
 | Deck + Review secondary surfaces | Implemented | detailed budget / thinking / history remain in `Deck`; explicit feedback remains in `Review` |
 | Dedicated model thinking panel | Implemented | MLX/Qwen reasoning is kept on and surfaced separately from the final answer via Deck |
 | Operator-label turn persistence | Implemented | saved turns and graph-ingested operator text are punctuated as `Brian the operator: ...` |
-| Session-start inference profile flow | Implemented | startup/new-session modal |
+| Session-start inference profile flow | Implemented | new-session and blank/seeded session modal |
 | Manual inference mode | Implemented | persisted in session metadata and surfaced per turn |
 | Runtime auto inference mode | Implemented | deterministic bounded heuristics; tested |
 | Adam auto inference mode | Implemented with bounded fallback | mock path chooses bounded presets; MLX path falls back to `runtime_auto` and logs it |

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import webbrowser
 from dataclasses import dataclass
 from functools import partial
@@ -28,6 +29,24 @@ BG = "#090603"
 PANEL = "#140d05"
 SHADE = "#110b06"
 SHADE_ALT = "#1a1108"
+NEON = "#8df7a8"
+ICE = "#a7d8ff"
+ROSE = "#ff8fb5"
+EMBER = "#ff8d47"
+
+ACTION_MENU_OPTIONS = [
+    ("Review Feedback", "review"),
+    ("Adjust Profile", "profile"),
+    ("New Session", "new_session"),
+    ("Resume Latest", "resume"),
+    ("Blank Eden", "blank"),
+    ("Seeded Eden", "seeded"),
+    ("Prepare Qwen", "prepare_mlx"),
+    ("Open Observatory", "observatory"),
+    ("Export Latest", "export"),
+    ("Open Deck", "deck"),
+    ("Help", "help"),
+]
 
 
 def _observatory_target_url(runtime: EdenRuntime, status: dict[str, Any], experiment_id: str | None) -> str:
@@ -65,10 +84,11 @@ class HelpModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         help_text = Text.from_markup(
             "[bold #ffbf66]EDEN Controls[/]\n\n"
-            "Startup uses a top action menu: arrows choose, Enter executes.\n"
-            "The left bay is the aperture and control stack.\n"
-            "The upper-right bay is the animated cockpit and live trace.\n"
-            "The lower-right deck is the Brian/Adam exchange surface.\n"
+            "EDEN boots directly into a live session cockpit.\n"
+            "The top action menu handles review, profile, launch, export, and observatory actions.\n"
+            "The left bay is aperture, visible thinking, and feedback.\n"
+            "The upper-right bay is the animated cockpit scope, dials, and trace bus.\n"
+            "The lower-right deck is the Brian/Adam transcript and live composer.\n"
             "Open Deck for detailed budget, thinking, history, ingest, and launch utilities.\n"
             "Open Review for explicit accept / edit / reject feedback.\n\n"
             "[bold]F1[/] help overlay\n"
@@ -78,9 +98,10 @@ class HelpModal(ModalScreen[None]):
             "[bold]F4[/] toggle low motion for the current session request\n"
             "[bold]F5[/] open the new-session inference-profile flow\n"
             "[bold]F6[/] open the operator deck\n"
+            "[bold]F7[/] open review feedback\n"
             "[bold]Esc[/] close this overlay\n\n"
-            "When the backend emits explicit reasoning, EDEN surfaces it in Deck > Thinking.\n"
-            "That panel shows model-emitted text, not claimed hidden chain-of-thought.\n\n"
+            "When the backend emits explicit reasoning, EDEN surfaces it as a visible model artifact.\n"
+            "That thinking panel shows model-emitted text, not claimed hidden chain-of-thought.\n\n"
             "Inference modes:\n"
             "- MANUAL: operator-specified bounded parameters\n"
             "- RUNTIME_AUTO: deterministic transparent runtime policy\n"
@@ -497,6 +518,114 @@ class AdamSigil(Static):
         self.update(Panel(text, title="Amber Cockpit", border_style=AMBER))
 
 
+class SignalField(Static):
+    MODES = ("mesh", "radial", "matrix", "lattice")
+
+    def on_mount(self) -> None:
+        self._frame = 0
+        self.set_interval(0.28, self._tick)
+        self._tick()
+
+    def _append_cell(self, line: Text, char: str, style: str) -> None:
+        line.append(char, style=style)
+
+    def _mesh_char(self, x: int, y: int, frame: int, width: int, height: int) -> tuple[str, str]:
+        horizon = int(height * 0.55 + math.sin((frame + y) / 5) * 2)
+        wave = int((math.sin((x + frame) / 4) + 1.0) * 2)
+        if y == horizon:
+            return "_", ICE
+        if y > horizon and ((x + frame) % 4 == 0 or (x - y - frame) % 7 == 0):
+            return "/" if (x + y + frame) % 2 == 0 else "\\", EMBER
+        if y < horizon and (x + y + frame) % 11 == 0:
+            return ".", TEXT
+        if y == horizon - wave and (x + frame) % 9 == 0:
+            return "*", ROSE
+        return " ", TEXT
+
+    def _radial_char(self, x: int, y: int, frame: int, width: int, height: int) -> tuple[str, str]:
+        cx = width * 0.68
+        cy = height * 0.52
+        dx = x - cx
+        dy = y - cy
+        distance = math.sqrt(dx * dx + dy * dy)
+        angle = math.atan2(dy, dx)
+        spoke = abs(math.sin(angle * 6 + frame / 3))
+        pulse = abs(math.sin(frame / 4 + distance / 3))
+        if distance < 1.3:
+            return "*", TEXT
+        if spoke > 0.97 and distance < min(width, height) * 0.42:
+            return "|" if abs(dx) < abs(dy) else "-", ICE
+        if abs(distance - (6 + (frame % 5))) < 0.65:
+            return "o", ROSE
+        if pulse > 0.92 and distance < min(width, height) * 0.46:
+            return ".", AMBER
+        return " ", TEXT
+
+    def _matrix_char(self, x: int, y: int, frame: int, width: int, height: int) -> tuple[str, str]:
+        stream = (x * 11 + frame * 3) % 17
+        if stream < 2:
+            digit = str((x + y + frame) % 10)
+            style = NEON if y < height * 0.75 else AMBER
+            if (y + frame) % 9 == 0:
+                style = TEXT
+            return digit, style
+        if y == height - 3 and (x + frame) % 5 == 0:
+            return "_", EMBER
+        if y > height - 4 and (x + frame) % 3 == 0:
+            return "=", MUTED
+        return " ", TEXT
+
+    def _lattice_char(self, x: int, y: int, frame: int, width: int, height: int) -> tuple[str, str]:
+        offset = (y + frame) % 4
+        if (x + offset) % 6 == 0:
+            return "/", NEON
+        if (x - offset) % 6 == 0:
+            return "\\", NEON
+        if y % 4 == 0 and (x + frame) % 3 == 0:
+            return "_", ICE
+        if (x * 3 + y + frame) % 19 == 0:
+            return ".", ROSE
+        return " ", TEXT
+
+    def _tick(self) -> None:
+        app = self.app
+        if not isinstance(app, EdenTuiApp):
+            return
+        if not app.runtime.settings.low_motion:
+            self._frame = (self._frame + 1) % 10_000
+        mode_index = 0 if app.runtime.settings.low_motion else (self._frame // 8) % len(self.MODES)
+        mode = self.MODES[mode_index]
+        width = max(28, min((self.size.width or 40) - 4, 44))
+        height = max(10, min((self.size.height or 18) - 4, 15))
+        visual = Text()
+        for y in range(height):
+            line = Text()
+            for x in range(width):
+                if mode == "mesh":
+                    char, style = self._mesh_char(x, y, self._frame, width, height)
+                elif mode == "radial":
+                    char, style = self._radial_char(x, y, self._frame, width, height)
+                elif mode == "matrix":
+                    char, style = self._matrix_char(x, y, self._frame, width, height)
+                else:
+                    char, style = self._lattice_char(x, y, self._frame, width, height)
+                self._append_cell(line, char, style)
+            visual.append(line)
+            if y < height - 1:
+                visual.append("\n")
+        active_items = len(list((app.ui_state.preview_active_set or app.ui_state.last_active_set or [])))
+        reasoning = "visible" if app.ui_state.last_reasoning else "quiet"
+        pressure = str((app.ui_state.current_budget or {}).get("pressure_level", "LOW")).upper()
+        legend = Text.from_markup(
+            f"\n\n[bold {AMBER}]mode[/] {mode}  "
+            f"[bold {NEON}]active[/] {active_items}  "
+            f"[bold {ICE}]reasoning[/] {reasoning}  "
+            f"[bold {ROSE}]pressure[/] {pressure}"
+        )
+        border = NEON if mode in {"matrix", "lattice"} else AMBER
+        self.update(Panel(visual + legend, title="Signal Field", border_style=border, style=f"on {SHADE}"))
+
+
 class StartupScreen(Screen):
     def __init__(self) -> None:
         super().__init__()
@@ -817,54 +946,173 @@ class ChatScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        with Horizontal(id="chat_shell"):
-            with Vertical(id="chat_left"):
-                yield Static(id="active_aperture_panel")
-                yield Static(id="session_capsule_panel")
-                with Vertical(id="control_panel"):
-                    yield Static(id="control_summary_panel")
-                    with Horizontal(classes="control_row"):
-                        yield Button("New Session", id="new_session_btn")
-                        yield Button("Observatory", id="observatory_btn")
-                        yield Button("Export", id="export_btn")
-                    with Horizontal(classes="control_row"):
-                        yield Button("Deck", id="deck_btn")
-                        yield Button("Profile", id="profile_btn")
-                        yield Button("Help", id="help_btn")
-            with Vertical(id="chat_right"):
-                with Vertical(id="chat_cockpit_stack"):
-                    yield AdamSigil(id="ritual_panel")
-                    yield RichLog(id="forensic_log", wrap=True, auto_scroll=True, highlight=True)
-                with Vertical(id="chat_deck"):
-                    yield Static(id="chat_exchange_panel")
-                    yield TextArea(
-                        id="composer_input",
-                        soft_wrap=True,
-                        show_line_numbers=False,
-                        placeholder="Brian the operator: direct, question, or correct. Ctrl+S sends.",
-                    )
-                    with Horizontal(id="primary_actions"):
-                        yield Button("Send", id="send_btn", variant="success")
-                        yield Button("Review", id="review_btn")
+        with Vertical(id="runtime_frame"):
+            with Horizontal(id="runtime_topbar"):
+                yield Select(
+                    ACTION_MENU_OPTIONS,
+                    value="review",
+                    allow_blank=False,
+                    id="runtime_action_menu",
+                    prompt="Action menu",
+                )
+                yield Static(id="runtime_status_strip")
+            with Horizontal(id="chat_shell"):
+                with Vertical(id="chat_left"):
+                    yield Static(id="active_aperture_panel")
+                    yield Static(id="thinking_panel")
+                    yield Static(id="feedback_panel")
+                with Vertical(id="chat_right"):
+                    with Horizontal(id="chat_cockpit_row"):
+                        yield SignalField(id="signal_field")
+                        with Vertical(id="chat_telemetry_stack"):
+                            yield AdamSigil(id="ritual_panel")
+                            yield RichLog(id="forensic_log", wrap=True, auto_scroll=True, highlight=True)
+                    with Vertical(id="chat_deck"):
+                        yield Static(id="chat_exchange_panel")
+                        yield TextArea(
+                            id="composer_input",
+                            soft_wrap=True,
+                            show_line_numbers=False,
+                            placeholder="Brian the operator: direct, question, or correction. Ctrl+S sends.",
+                        )
+                        yield Static(id="composer_hint_panel")
         yield Footer()
 
     def on_mount(self) -> None:
         self.set_interval(0.6, self._poll_logs)
         self.set_interval(0.8, self.refresh_panels)
-        self._schedule_preview_refresh()
         self.refresh_panels()
+        self.run_worker(self._bootstrap_live_surface(), exclusive=True, group="bootstrap")
         self.call_after_refresh(lambda: self.query_one("#composer_input", TextArea).focus())
 
     def refresh_panels(self) -> None:
+        self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
         self.query_one("#active_aperture_panel", Static).update(self.main_aperture_panel())
-        self.query_one("#session_capsule_panel", Static).update(self.main_capsule_panel())
-        self.query_one("#control_summary_panel", Static).update(self.main_control_text())
+        self.query_one("#thinking_panel", Static).update(self.main_thinking_panel())
+        self.query_one("#feedback_panel", Static).update(self.main_feedback_panel())
         self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
+        self.query_one("#composer_hint_panel", Static).update(self.main_composer_hint_panel())
 
     def _model_status(self) -> dict[str, Any]:
         app = self.app
         assert isinstance(app, EdenTuiApp)
-        return app.runtime.mlx_model_status()
+        if app.ui_state.model_status:
+            return app.ui_state.model_status
+        backend = app.runtime.settings.model_backend.lower()
+        if backend == "mlx":
+            app.ui_state.model_status = app.runtime.mlx_model_status()
+        else:
+            app.ui_state.model_status = {
+                "label": "Mock Adapter",
+                "local_dir": "mock://runtime",
+                "stage": "ready",
+                "ready": True,
+            }
+        return app.ui_state.model_status
+
+    def _active_backend_label(self) -> str:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        backend = app.runtime.settings.model_backend.lower()
+        return "Adam / Local MLX" if backend == "mlx" else f"Adam / {backend.upper()}"
+
+    def _recent_turns(self, *, limit: int = 2) -> list[dict[str, Any]]:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        if not app.ui_state.session_id:
+            return []
+        return list(reversed(app.runtime.store.list_turns(app.ui_state.session_id, limit=limit)))
+
+    async def _bootstrap_live_surface(self) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        app.ui_state.model_status = await asyncio.to_thread(self._load_model_status_snapshot)
+        model_status = self._model_status()
+        self._write_forensic(
+            f"[INFO] Live cockpit boot :: backend={app.runtime.settings.model_backend} stage={model_status.get('stage', 'n/a')}"
+        )
+        if app.runtime.settings.model_backend.lower() == "mlx" and not model_status.get("ready", False):
+            app.ui_state.last_feedback = "Local MLX cache is not ready. Choose Prepare Qwen or send once to fetch it."
+        latest = await asyncio.to_thread(app.runtime.store.get_latest_experiment)
+        experiment: dict[str, Any] | None = latest
+        if latest is not None:
+            latest_session = await asyncio.to_thread(partial(app.runtime.store.get_latest_session, latest["id"]))
+            if latest_session is not None:
+                snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, latest_session["id"]))
+                app.apply_session_snapshot(snapshot)
+                app.ui_state.last_feedback = f"Resumed {snapshot['session_title']}."
+                self._write_forensic(f"[INFO] Resumed session :: {snapshot['session_title']}")
+                self.refresh_panels()
+                self._schedule_preview_refresh()
+                return
+        if experiment is None:
+            experiment = await asyncio.to_thread(partial(app.runtime.initialize_experiment, "blank", name="Live Eden"))
+            self._write_forensic(f"[INFO] Created experiment :: {experiment['name']}")
+        defaults = app.runtime.default_session_profile_request().to_dict()
+        defaults["title"] = defaults.get("title") or "Live Adam Session"
+        session = await asyncio.to_thread(
+            partial(
+                app.runtime.start_session,
+                experiment["id"],
+                title=defaults["title"],
+                profile_request=defaults,
+            )
+        )
+        snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, session["id"]))
+        app.apply_session_snapshot(snapshot)
+        app.ui_state.last_feedback = "Live cockpit armed. Compose and send with Ctrl+S."
+        self._write_forensic(f"[INFO] Armed session :: {snapshot['session_title']}")
+        self.refresh_panels()
+        self._schedule_preview_refresh()
+
+    def _load_model_status_snapshot(self) -> dict[str, Any]:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        backend = app.runtime.settings.model_backend.lower()
+        if backend == "mlx":
+            return app.runtime.mlx_model_status()
+        return {
+            "label": "Mock Adapter",
+            "local_dir": "mock://runtime",
+            "stage": "ready",
+            "ready": True,
+        }
+
+    async def _ensure_backend_ready(self, *, prepare: bool) -> bool:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        if app.runtime.settings.model_backend.lower() != "mlx":
+            app.ui_state.model_status = self._load_model_status_snapshot()
+            return True
+        status = await asyncio.to_thread(app.runtime.mlx_model_status)
+        app.ui_state.model_status = status
+        if status.get("ready", False):
+            return True
+        if not prepare:
+            self.refresh_panels()
+            return False
+        self._write_forensic(
+            f"[INFO] Preparing local MLX model :: {status['label']} -> models/{Path(status['local_dir']).name}"
+        )
+        app.ui_state.last_feedback = "Preparing local MLX model. This may take a moment."
+        self.refresh_panels()
+        try:
+            status = await asyncio.to_thread(app.runtime.prepare_default_mlx_model)
+        except Exception as exc:
+            app.ui_state.last_feedback = f"MLX prepare failed: {exc}"
+            self._write_forensic(f"[ERROR] MLX prepare failed :: {exc}")
+            self.refresh_panels()
+            return False
+        app.ui_state.model_status = status
+        app.ui_state.last_feedback = f"Local MLX model ready: models/{Path(status['local_dir']).name}"
+        self._write_forensic(
+            f"[INFO] MLX model ready :: models/{Path(status['local_dir']).name} ({status.get('gib_on_disk', 0)} GiB)"
+        )
+        self.refresh_panels()
+        return True
+
+    def _write_forensic(self, line: str) -> None:
+        self.query_one("#forensic_log", RichLog).write(line)
 
     def _health(self) -> dict[str, Any]:
         app = self.app
@@ -913,6 +1161,7 @@ class ChatScreen(Screen):
             active_lines = ["No active set yet. Start a session or type into the chat deck to arm preview."]
         text = Text.from_markup(
             f"[bold {AMBER}]Aperture / Active Set[/]\n"
+            f"session={app.ui_state.session_title or app.ui_state.session_id or 'arming'}\n"
             f"state={'preview' if previewing else 'persisted'} items={len(active_items)} "
             f"memes={meme_count} memodes={memode_count}\n"
             f"behavior={behavior_count} knowledge={knowledge_count}\n"
@@ -920,70 +1169,130 @@ class ChatScreen(Screen):
             "capture > retrieve > scope > trace > prune > prompt > membrane > feedback\n\n"
             + "\n".join(active_lines)
         )
-        return Panel(text, title="Aperture", border_style=AMBER)
+        return Panel(text, title="Aperture", border_style=AMBER, style=f"on {SHADE}")
 
-    def main_capsule_panel(self) -> Panel:
+    def main_action_status_panel(self) -> Panel:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        model_status = self._model_status()
+        selected = str(self.query_one("#runtime_action_menu", Select).value or "review").replace("_", " ")
+        profile = app.ui_state.current_profile or {}
+        focus_id = getattr(self.app.focused, "id", "none") or "none"
+        text = Text.from_markup(
+            f"[bold {AMBER}]Live Contract[/]\n"
+            f"runtime={self._active_backend_label()} stage={model_status.get('stage', 'n/a')} action={selected}\n"
+            f"session={app.ui_state.session_title or app.ui_state.session_id or 'arming'} "
+            f"profile={profile.get('profile_name', 'pending')} focus={focus_id}\n"
+            "keyboard=Tab switch | Enter run action | Ctrl+S send | F6 deck | F7 review"
+        )
+        return Panel(text, title="Action Bus", border_style=AMBER, style=f"on {SHADE_ALT}")
+
+    def main_thinking_panel(self) -> Panel:
         app = self.app
         assert isinstance(app, EdenTuiApp)
         profile = app.ui_state.current_profile or {}
         budget = app.ui_state.current_budget or {}
-        health = self._health()
         trace_lines = [
-            f"{item.get('label', 'untitled')} sel={float(item.get('selection', 0.0)):.2f} "
-            f"sim={float(item.get('semantic_similarity', 0.0)):.2f} reg={float(item.get('regard', 0.0)):.2f}"
+            f">> {item.get('label', 'untitled')} sel={float(item.get('selection', 0.0)):.2f} "
+            f"reg={float(item.get('regard', 0.0)):.2f} act={float(item.get('activation', 0.0)):.2f}"
             for item in self._trace_items()[:4]
         ]
         if not trace_lines:
-            trace_lines = ["No regard trace yet."]
-        text = Text.from_markup(
-            f"[bold {AMBER}]Session Capsule[/]\n"
-            f"experiment={app.ui_state.experiment_name or app.ui_state.experiment_id or 'none'}\n"
-            f"session={app.ui_state.session_title or app.ui_state.session_id or 'none'}\n"
-            f"mode={profile.get('requested_mode', 'pending')} -> {profile.get('effective_mode', 'pending')} "
-            f"profile={profile.get('profile_name', 'pending')}\n"
-            f"pressure={budget.get('pressure_level', 'n/a')} remaining={budget.get('remaining_input_tokens', 'n/a')} "
-            f"response_cap={profile.get('response_char_cap', 'n/a')}\n"
-            f"memes={health['memes']} memodes={health['memodes']} triadic={health['triadic_closure']:.3f} "
-            f"coverage={health['memode_coverage']:.3f}\n"
-            f"observatory={(app.ui_state.observatory_status or {}).get('url', 'offline')}\n\n"
-            f"[bold {AMBER}]Regard Trace[/]\n" + "\n".join(trace_lines)
+            trace_lines = [">> no active consideration trace yet"]
+        state = "draft-armed" if self._composer_text().strip() else "persisted"
+        body = Text.from_markup(
+            f"[bold {AMBER}]Visible reasoning artifact[/]\n"
+            f"state={state} mode={profile.get('requested_mode', 'pending')} -> {profile.get('effective_mode', 'pending')}\n"
+            f"pressure={budget.get('pressure_level', 'n/a')} response_cap={profile.get('response_char_cap', 'n/a')}\n\n"
         )
-        return Panel(text, title="Capsule", border_style=AMBER)
+        if app.ui_state.last_reasoning:
+            body.append(safe_excerpt(app.ui_state.last_reasoning, limit=780), style=TEXT)
+            body.append("\n\n", style=TEXT)
+        else:
+            body.append(
+                "No model-emitted thinking artifact yet. The live trace below shows what the cockpit is weighting before the next turn.\n\n",
+                style=MUTED,
+            )
+        body.append("Consideration trace\n", style=f"bold {NEON}")
+        body.append("\n".join(trace_lines), style=ICE if app.ui_state.last_reasoning else TEXT)
+        return Panel(body, title="Thinking", border_style=NEON if app.ui_state.last_reasoning else AMBER, style=f"on {SHADE}")
 
-    def main_control_text(self) -> Text:
+    def main_feedback_panel(self) -> Panel:
         app = self.app
         assert isinstance(app, EdenTuiApp)
-        model_status = self._model_status()
-        return Text.from_markup(
-            f"[bold {AMBER}]Flight Controls[/]\n"
-            f"runtime=Adam / Local MLX cache={model_status.get('stage', 'n/a')}\n"
-            f"feedback={safe_excerpt(app.ui_state.last_feedback, limit=180)}\n"
-            "left bay=utility controls and observatory wiring\n"
-            "right deck=Brian transmission, Adam membrane, send, review\n"
-            "F1 help  F2 export  F3 observatory  F5 new session  F6 deck"
+        profile = app.ui_state.current_profile or {}
+        health = self._health()
+        recent_feedback = app.runtime.store.recent_feedback(app.ui_state.session_id, limit=3) if app.ui_state.session_id else []
+        feedback_lines = [
+            f"T{item['turn_index']} {str(item['verdict']).upper()} :: {safe_excerpt(item['explanation'] or 'no explanation', limit=78)}"
+            for item in reversed(recent_feedback)
+        ]
+        if not feedback_lines:
+            feedback_lines = ["No feedback events yet. Review the last turn from the action menu or F7."]
+        text = Text.from_markup(
+            f"[bold {AMBER}]Feedback / Session State[/]\n"
+            f"experiment={app.ui_state.experiment_name or app.ui_state.experiment_id or 'live-arming'}\n"
+            f"observatory={(app.ui_state.observatory_status or {}).get('url', 'offline')}\n"
+            f"graph=memes {health['memes']} memodes {health['memodes']} triadic {health['triadic_closure']:.3f}\n"
+            f"profile={profile.get('profile_name', 'pending')} low_motion={app.runtime.settings.low_motion} debug={app.runtime.settings.debug}\n\n"
+            f"last_status={safe_excerpt(app.ui_state.last_feedback, limit=170)}\n\n"
+            "review rules: accept/reject need explanation; edit needs explanation plus corrected text\n"
+            "feedback surfaces update regard, reward, risk, and edit channels\n\n"
+            + "\n".join(feedback_lines)
         )
+        return Panel(text, title="Feedback", border_style=AMBER, style=f"on {SHADE_ALT}")
 
     def main_chat_exchange_panel(self):
+        transcript: list[Panel] = []
+        for turn in self._recent_turns(limit=2):
+            transcript.append(
+                Panel(
+                    Text(safe_excerpt(turn["user_text"], limit=180), style=TEXT),
+                    title=f"Brian / T{turn['turn_index']}",
+                    border_style=MUTED,
+                    style=f"on {SHADE_ALT}",
+                )
+            )
+            transcript.append(
+                Panel(
+                    Text(safe_excerpt(turn["membrane_text"], limit=260), style=TEXT),
+                    title=f"Adam / T{turn['turn_index']}",
+                    border_style=AMBER,
+                    style=f"on {SHADE}",
+                )
+            )
+        operator_live = self._composer_text().strip()
+        if operator_live:
+            transcript.append(
+                Panel(
+                    Text(safe_excerpt(operator_live, limit=220), style=TEXT),
+                    title="Brian / Draft",
+                    border_style=ROSE,
+                    style=f"on {SHADE_ALT}",
+                )
+            )
+        if not transcript:
+            transcript.append(
+                Panel(
+                    Text("Live deck armed. No turns yet. Compose in the lower field and send with Ctrl+S.", style=MUTED),
+                    title="Chat Deck",
+                    border_style=AMBER,
+                    style=f"on {SHADE}",
+                )
+            )
+        return Group(*transcript)
+
+    def main_composer_hint_panel(self) -> Panel:
         app = self.app
         assert isinstance(app, EdenTuiApp)
-        operator_live = self._composer_text().strip()
-        operator_text = safe_excerpt(operator_live or app.ui_state.last_user_text or "Awaiting Brian transmission.", limit=280)
-        response_text = safe_excerpt(app.ui_state.last_response or "Awaiting Adam membrane response.", limit=540)
-        operator_title = "Brian / Transmission Draft" if operator_live else "Brian / Last Transmission"
-        return Group(
-            Panel(
-                Text(operator_text, style=TEXT),
-                title=operator_title,
-                border_style=MUTED,
-                style=f"on {SHADE_ALT}",
-            ),
-            Panel(
-                Text(response_text, style=TEXT),
-                title="Adam / Membrane",
-                border_style=AMBER,
-                style=f"on {SHADE}",
-            ),
+        draft = self._composer_text().strip()
+        state = "draft-loaded" if draft else "idle"
+        text = Text.from_markup(
+            f"[bold {AMBER}]Composer[/]\n"
+            f"state={state} chars={len(draft)} backend={self._active_backend_label()}\n"
+            "Ctrl+S send | Shift+Tab action menu | F6 deck | F7 review"
         )
+        return Panel(text, title="Transmit", border_style=AMBER, style=f"on {SHADE_ALT}")
 
     def deck_summary_panel(self) -> Panel:
         app = self.app
@@ -1153,6 +1462,8 @@ class ChatScreen(Screen):
         text = self._composer_text().strip()
         if not text or not app.ui_state.session_id:
             return
+        if not await self._ensure_backend_ready(prepare=True):
+            return
         outcome = await asyncio.to_thread(partial(app.runtime.chat, session_id=app.ui_state.session_id, user_text=text))
         app.ui_state.last_turn_id = outcome.turn["id"]
         app.ui_state.last_user_text = text
@@ -1165,6 +1476,9 @@ class ChatScreen(Screen):
         app.ui_state.current_budget = outcome.budget
         app.ui_state.current_profile = outcome.profile
         app.ui_state.last_feedback = f"Saved turn T{outcome.turn['turn_index']} from Brian the operator."
+        self._write_forensic(
+            f"[INFO] Turn T{outcome.turn['turn_index']} stored :: active_set={len(outcome.active_set)} pressure={outcome.budget.get('pressure_level', 'n/a')}"
+        )
         self._set_text_area("#composer_input", "")
         self.refresh_panels()
         self._schedule_preview_refresh()
@@ -1194,10 +1508,6 @@ class ChatScreen(Screen):
             self._schedule_preview_refresh()
         self.refresh_panels()
 
-    @on(Button.Pressed, "#send_btn")
-    async def handle_send(self) -> None:
-        await self._send_turn()
-
     async def ingest_path(self, path: str) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -1210,7 +1520,6 @@ class ChatScreen(Screen):
         self.refresh_panels()
         self._schedule_preview_refresh()
 
-    @on(Button.Pressed, "#export_btn")
     async def handle_export(self) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -1221,9 +1530,9 @@ class ChatScreen(Screen):
         )
         names = [Path(paths[key]).name for key in ("graph_html", "basin_html", "geometry_html") if key in paths]
         app.ui_state.last_feedback = f"Exports generated: {', '.join(names)}"
+        self._write_forensic(f"[INFO] Exports generated :: {', '.join(names)}")
         self.refresh_panels()
 
-    @on(Button.Pressed, "#observatory_btn")
     async def handle_observatory(self) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -1234,13 +1543,14 @@ class ChatScreen(Screen):
         app.ui_state.last_feedback = (
             f"Observatory {'reused' if status['reused_existing'] else 'started'} at {target_url}"
         )
+        self._write_forensic(
+            f"[INFO] Observatory {'reused' if status['reused_existing'] else 'started'} :: {target_url}"
+        )
         self.refresh_panels()
 
-    @on(Button.Pressed, "#review_btn")
     async def handle_review(self) -> None:
         await self.app.push_screen(FeedbackModal(self))
 
-    @on(Button.Pressed, "#deck_btn")
     async def handle_deck(self) -> None:
         await self.app.push_screen(DeckModal(self))
 
@@ -1293,10 +1603,6 @@ class ChatScreen(Screen):
     def begin_new_session_flow(self) -> None:
         self.run_worker(self._new_session_worker(), exclusive=True, group="session")
 
-    @on(Button.Pressed, "#new_session_btn")
-    def handle_new_session(self) -> None:
-        self.begin_new_session_flow()
-
     async def _edit_profile_worker(self) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -1340,10 +1646,6 @@ class ChatScreen(Screen):
     def begin_edit_profile_flow(self) -> None:
         self.run_worker(self._edit_profile_worker(), exclusive=True, group="profile")
 
-    @on(Button.Pressed, "#profile_btn")
-    def handle_profile(self) -> None:
-        self.begin_edit_profile_flow()
-
     async def _launch_surface_worker(self, action: str) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -1361,6 +1663,7 @@ class ChatScreen(Screen):
             snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, latest_session["id"]))
             app.apply_session_snapshot(snapshot)
             app.ui_state.last_feedback = f"Resumed {snapshot['session_title']}."
+            self._write_forensic(f"[INFO] Resumed session :: {snapshot['session_title']}")
             self._set_text_area("#composer_input", "")
             self.refresh_panels()
             self._schedule_preview_refresh()
@@ -1401,6 +1704,7 @@ class ChatScreen(Screen):
             }
         )
         app.ui_state.last_feedback = f"Opened a new {action} experiment session."
+        self._write_forensic(f"[INFO] Opened {action} experiment :: {session['title']}")
         self._set_text_area("#composer_input", "")
         self.refresh_panels()
         self._schedule_preview_refresh()
@@ -1440,9 +1744,42 @@ class ChatScreen(Screen):
     async def handle_debug(self) -> None:
         await self.toggle_debug()
 
-    @on(Button.Pressed, "#help_btn")
     async def handle_help(self) -> None:
         await self.app.push_screen(HelpModal())
+
+    def handle_prepare_mlx(self) -> None:
+        self.run_worker(self._ensure_backend_ready(prepare=True), exclusive=True, group="prepare_mlx")
+
+    def _execute_runtime_action(self, action: str) -> None:
+        normalized = (action or "review").strip().lower()
+        if normalized in {"blank", "seeded", "resume"}:
+            self.begin_surface_launch(normalized)
+        elif normalized == "new_session":
+            self.begin_new_session_flow()
+        elif normalized == "profile":
+            self.begin_edit_profile_flow()
+        elif normalized == "review":
+            self.run_worker(self.handle_review(), exclusive=True, group="review")
+        elif normalized == "prepare_mlx":
+            self.handle_prepare_mlx()
+        elif normalized == "observatory":
+            self.run_worker(self.handle_observatory(), exclusive=True, group="observatory")
+        elif normalized == "export":
+            self.run_worker(self.handle_export(), exclusive=True, group="export")
+        elif normalized == "deck":
+            self.run_worker(self.handle_deck(), exclusive=True, group="deck")
+        elif normalized == "help":
+            self.run_worker(self.handle_help(), exclusive=True, group="help")
+
+    @on(Select.Changed, "#runtime_action_menu")
+    def handle_runtime_action_changed(self, _event: Select.Changed) -> None:
+        self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
+
+    def on_key(self, event) -> None:
+        if event.key == "enter" and self.app.focused and getattr(self.app.focused, "id", None) == "runtime_action_menu":
+            action = str(self.query_one("#runtime_action_menu", Select).value or "review")
+            self._execute_runtime_action(action)
+            event.stop()
 
 
 class EdenTuiApp(App):
@@ -1451,19 +1788,29 @@ class EdenTuiApp(App):
         background: {BG};
         color: {TEXT};
     }}
+    #runtime_frame {{
+        height: 1fr;
+    }}
     #startup_frame {{
         height: 1fr;
+    }}
+    #runtime_topbar {{
+        height: 8;
+        padding: 0 1 1 1;
     }}
     #startup_topbar {{
         height: 8;
         padding: 0 1 1 1;
     }}
-    #startup_action_menu {{
+    #runtime_action_menu, #startup_action_menu {{
         width: 32;
         margin-right: 1;
     }}
-    #startup_menu_hint {{
+    #runtime_status_strip, #startup_menu_hint {{
         width: 1fr;
+    }}
+    #startup_action_menu {{
+        width: 32;
     }}
     #startup_shell, #chat_shell {{
         height: 1fr;
@@ -1484,23 +1831,31 @@ class EdenTuiApp(App):
         height: 1fr;
         min-height: 16;
     }}
-    #session_capsule_panel {{
-        height: 13;
-    }}
-    #startup_reasoning_panel {{
+    #thinking_panel {{
         height: 1fr;
-        min-height: 18;
+        min-height: 16;
     }}
-    #control_panel, #chat_deck {{
+    #feedback_panel, #startup_reasoning_panel {{
+        height: 1fr;
+        min-height: 13;
+    }}
+    #chat_cockpit_row, #chat_deck, #startup_cockpit_stack {{
         border: tall {AMBER};
         background: {PANEL};
         padding: 0 1;
     }}
-    #control_panel {{
-        height: 12;
-    }}
-    #startup_cockpit_stack, #chat_cockpit_stack {{
+    #chat_cockpit_row, #startup_cockpit_stack {{
         height: 1fr;
+        min-height: 18;
+    }}
+    #signal_field {{
+        width: 1fr;
+        min-width: 32;
+        margin-right: 1;
+    }}
+    #chat_telemetry_stack {{
+        width: 44%;
+        min-width: 34;
     }}
     #startup_cockpit, #ritual_panel {{
         height: 1fr;
@@ -1513,10 +1868,11 @@ class EdenTuiApp(App):
         height: 18;
     }}
     #chat_deck {{
-        height: 21;
+        height: 1fr;
+        min-height: 22;
     }}
     #chat_exchange_panel {{
-        height: 10;
+        height: 1fr;
         margin-bottom: 1;
     }}
     #composer_input {{
@@ -1524,6 +1880,9 @@ class EdenTuiApp(App):
         background: #060403;
         border: tall {AMBER};
         color: {TEXT};
+    }}
+    #composer_hint_panel {{
+        height: 5;
     }}
     #review_explanation_input, #review_corrected_input {{
         height: 6;
@@ -1533,12 +1892,11 @@ class EdenTuiApp(App):
     }}
     #forensic_log {{
         height: 1fr;
+        border: tall {ICE};
+        color: {ICE};
     }}
     Static, Input, RichLog, Select, TextArea {{
         margin-bottom: 1;
-    }}
-    .control_row Button, #primary_actions Button {{
-        width: 1fr;
     }}
     Input, Select {{
         background: {PANEL};
@@ -1582,6 +1940,7 @@ class EdenTuiApp(App):
         ("f4", "toggle_motion", "Motion"),
         ("f5", "new_session", "New Session"),
         ("f6", "show_deck", "Deck"),
+        ("f7", "show_review", "Review"),
     ]
 
     def __init__(self, runtime: EdenRuntime) -> None:
@@ -1607,7 +1966,7 @@ class EdenTuiApp(App):
         self.ui_state.current_budget = snapshot.get("current_budget")
 
     async def on_mount(self) -> None:
-        await self.push_screen(StartupScreen())
+        await self.push_screen(ChatScreen())
 
     async def action_show_help(self) -> None:
         await self.push_screen(HelpModal())
@@ -1615,6 +1974,10 @@ class EdenTuiApp(App):
     async def action_show_deck(self) -> None:
         if isinstance(self.screen, ChatScreen):
             await self.screen.handle_deck()
+
+    async def action_show_review(self) -> None:
+        if isinstance(self.screen, ChatScreen):
+            await self.screen.handle_review()
 
     async def action_send_turn(self) -> None:
         if isinstance(self.screen, ChatScreen):
