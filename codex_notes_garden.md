@@ -165,3 +165,81 @@ Docs updated:
 README.md, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
 Remaining uncertainties or follow-ups:
 StartupScreen remains in code as a fallback/reference surface but is no longer the default entry path; further visual tuning can iterate on the signal-field animation density and transcript packing.
+
+## [2026-03-07 11:28:49 EST] PRE-FLIGHT
+Task summary:
+Integrate feedback into the lower-right chat loop, expand and explain the signal field, and make aperture formatting more animated and human-legible.
+Scope of work:
+TUI layout, signal-field rendering, aperture rendering, feedback surfacing, tests/docs sync.
+Likely files/modules:
+eden/tui/app.py, tests/test_tui_smoke.py, docs/TUI_SPEC.md, README.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
+Relevant invariants:
+Repo-local .venv, MLX as real runtime, TUI as primary interface, preserve v1 loop and explicit feedback, use apply_patch, run pytest before handoff.
+Proof path (how success will be verified):
+Run focused TUI smoke coverage, then full ./.venv/bin/pytest -q.
+
+## [2026-03-07 11:34:14 EST] PRE-FLIGHT
+Operator task:
+Add `/Users/brianray/Adam/data/cannonical_secondary_sources` to GitHub ignore list for this repository.
+Task checksum:
+Single-path `.gitignore` change for repository-level ignore behavior.
+Repo situation:
+Working tree has prior local history entries in `codex_notes_garden.md`; no uncommitted code changes affecting runtime behavior were observed for this request.
+Relevant spec surfaces read:
+`AGENTS.md` guidance for Codex-Builder operational process.
+Natural-language contracts in force:
+`spec -> implementation -> evidence -> audit -> next action`; append-only operational log.
+Files/modules likely in scope:
+`/Users/brianray/Adam/.gitignore`, `/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+- Instrumented:
+- Conceptual:
+- Unknown:
+Risks / invariants:
+- Preserve existing ignore semantics while adding this one path.
+- Confirm repository-local `.gitignore` remains canonical over path-level alternatives.
+Evidence plan:
+- Confirm `.gitignore` contains `data/cannonical_secondary_sources/`.
+- Verify current `git status --short` remains clean aside from intended edits.
+Shortest proof path:
+View diff, run `git status --short`, and validate `git check-ignore` on the target path.
+
+## [2026-03-07 11:35:21 EST] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/.gitignore`, `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None (ignore-list operational housekeeping only).
+Natural-language contracts added/revised/preserved:
+Codex-Builder operational loop maintained; no canonical spec surfaces were modified.
+Behavior implemented or modified:
+Ignored `data/cannonical_secondary_sources/` in repository Git ignores.
+Evidence produced (tests / traces / commands / exports):
+`git check-ignore -v /Users/brianray/Adam/data/cannonical_secondary_sources`
+`git status --short`
+`git diff -- .gitignore`
+Status register changes:
+- Implemented:
+  - `.gitignore` now excludes `data/cannonical_secondary_sources/` from Git tracking.
+- Instrumented:
+- Conceptual:
+- Unknown:
+  - Confirmation that the directory is now untracked in all current/previous commits (outside ignore check and working tree status) was not run in this turn.
+Truth-table / limitations updates:
+None needed.
+Remaining uncertainties:
+None for requested change.
+Next shortest proof path:
+Create a file inside `data/cannonical_secondary_sources/`, run `git status`, and confirm it does not appear unignored.
+
+## [2026-03-07 11:41:44 EST] POST-FLIGHT
+Files changed:
+eden/tui/app.py, tests/test_tui_smoke.py, README.md, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
+Behavior implemented or modified:
+Integrated a feedback-loop strip into the lower-right chat deck, expanded the signal field into a full-width explanatory telemetry surface, and rewrote the aperture as an animated readable scan with natural-language summaries and ranked queue rendering.
+Evidence (tests / commands run):
+python3 -m py_compile eden/tui/app.py; ./.venv/bin/pytest -q tests/test_tui_smoke.py; ./.venv/bin/pytest -q
+Docs updated:
+README.md, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
+Remaining uncertainties or follow-ups:
+Further tuning may still help with panel density at smaller terminal sizes, especially if the transcript grows beyond two recent turns or the operator wants quick inline verdict controls instead of the F7 review path.

@@ -28,6 +28,10 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime) -> None
         assert app.screen.query_one("#thinking_panel")
         assert app.screen.query_one("#feedback_panel")
         assert app.screen.query_one("#chat_exchange_panel")
+        assert app.screen.query_one("#feedback_loop_panel")
         assert app.screen.query_one("#signal_field")
         assert app.screen.query_one("#ritual_panel")
         assert app.screen.query_one("#forensic_log")
+        await app.screen.submit_feedback("skip", explanation="", corrected="")
+        await pilot.pause(0.2)
+        assert "SKIP recorded" in app.ui_state.last_feedback

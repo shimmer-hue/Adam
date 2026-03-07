@@ -79,9 +79,9 @@ Original module path from the repo root:
 
 `python3 app.py` is also valid, but only after you have already changed into `/Users/brianray/Adam`.
 
-The startup launcher now lets you choose the runtime surface, open Blank Eden / Seeded Eden / Resume Latest, export the latest surfaces, or open the observatory without front-loading a bunch of flags. EDEN remembers the last runtime choice locally. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
+The live cockpit boots directly into a real chat session on the repo-local runtime. The top action menu exposes review, profile, session, export, observatory, and model-prepare actions without dropping you onto a separate launcher. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
 
-Use flags only when you want to override the remembered launcher settings. The normal path is the repo-local MLX default. The startup surface can prepare the local Qwen model directly if it is not cached yet.
+Use flags only when you want an explicit shell override. The normal path is the repo-local MLX default. The action menu can prepare the local Qwen model directly if it is not cached yet.
 
 Advanced shell override example:
 
@@ -125,20 +125,21 @@ Useful flags:
 
 1. Change into the repo root with `cd /Users/brianray/Adam`.
 2. Start EDEN with `.venv/bin/python app.py`.
-3. In the startup launcher choose the runtime surface (`Adam / Local MLX` by default, `Mock Fallback` as fallback).
-4. If the local Qwen model is not cached yet, use `Prepare Qwen` once. EDEN stores it under `models/` in this repo.
-5. Choose `Blank Eden`, `Seeded Eden`, or `Resume Latest`.
-6. In the session-start modal choose the inference profile mode and bounded parameters for that session.
-7. Once chat is up, use the left operator bay to write a turn for Brian the operator and send it with `Ctrl+S`.
-8. The primary chat surface is now simplified: operator input on the left, animated ritual field and Adam membrane on the right, live console on the bottom.
-9. Open `Deck` when you want the hidden diagnostic surfaces: budget, thinking, active set, trace, telemetry, history, ingest, and launch utilities.
-10. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
-11. Use `Profile` for the bounded hyperparameter / inference-mode surface.
-12. Use `Export` to write graph, basin, geometry, measurement, and index artifacts.
-13. Use `Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
-14. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
-15. Preview a change first, then commit it if the before/after metrics support the edit.
-16. Revert recent observatory-originated mutations from the measurement ledger when needed.
+3. EDEN resumes the latest persisted session automatically. If none exists yet, it creates a blank live session automatically.
+4. If the local Qwen model is not cached yet, use the top action menu and run `Prepare Qwen`. EDEN stores it under `models/` in this repo.
+5. The top action menu is keyboard-first: `Tab` / `Shift+Tab` moves focus, arrow keys choose a menu item, and `Enter` executes it.
+6. The left bay shows the aperture, visible reasoning surface, and feedback/session state.
+7. The upper-right bay is the animated cockpit scope, dials, and live trace bus.
+8. The lower-right deck is the live Brian/Adam transcript and composer.
+9. Type into the lower-right chat deck and send with `Ctrl+S`.
+10. Open `Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
+11. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
+12. Use `Adjust Profile` or `New Session` from the action menu when you want a bounded inference-profile change.
+13. Use `Export Latest` to write graph, basin, geometry, measurement, and index artifacts.
+14. Use `Open Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
+15. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
+16. Preview a change first, then commit it if the before/after metrics support the edit.
+17. Revert recent observatory-originated mutations from the measurement ledger when needed.
 
 ## Inference notes
 

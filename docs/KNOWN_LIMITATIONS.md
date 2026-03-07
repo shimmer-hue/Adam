@@ -14,6 +14,7 @@
 - `current_active_set` geometry export is based on the latest persisted active set for the selected session, not the unsent live composer preview.
 - `Resume Latest` restores the latest persisted session state, not an unsent draft from the composer.
 - The prime chat deck is a fixed-pane cockpit surface, so it shows a bounded recent transcript plus the current Brian draft rather than a full scrolling history of every prior turn.
+- The signal field is an explanatory operator metaphor tied to runtime state, not a literal visualization of the model's internal latent activations or attention tensors.
 - The repo-root `app.py` launcher reuses the repo-local `.venv`, but it does not repair a corrupted virtualenv by itself. If `.venv` was mixed across different base interpreters, rebuild it cleanly from one interpreter path.
 - Seeded Eden remains materially heavier than Blank Eden. The seeded path is real, but full canon ingest can still take substantial time and graph space.
 - Retrieval remains lexical/graph-heuristic rather than embedding-based.

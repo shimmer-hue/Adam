@@ -12,7 +12,7 @@
 | Local MLX shard-readiness tracking | Implemented | live cockpit status surfaces distinguish metadata-only, partial, and ready model states |
 | Repo-local Qwen 3.5 MLX backend | Implemented | repo-local 4-shard model completed and real MLX generation succeeded |
 | Multiline composer | Implemented | `TextArea`-based; covered by TUI smoke test |
-| Cockpit chat layout | Implemented | aperture / thinking / feedback on the left, animated cockpit + trace upper-right, live transcript + composer lower-right |
+| Cockpit chat layout | Implemented | aperture / thinking / feedback on the left, full-width explanatory signal field plus cockpit/trace upper-right, live transcript + feedback loop + composer lower-right |
 | Fixed local-MLX runtime contract | Implemented | the live TUI no longer exposes backend selection on the primary surface; local MLX is the normal runtime contract |
 | Deck + Review secondary surfaces | Implemented | detailed budget / thinking / history remain in `Deck`; explicit feedback remains in `Review` |
 | Dedicated model thinking panel | Implemented | MLX/Qwen reasoning is kept on and surfaced separately from the final answer via Deck |

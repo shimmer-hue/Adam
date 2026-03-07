@@ -55,11 +55,13 @@ Primary split:
   - feedback / session-state panel
 - right cockpit bay:
   - upper stack:
-    - animated signal field
-    - animated amber cockpit instrumentation
-    - forensic structured log
+    - full-width animated signal field with explicit legend and mode rationale
+    - lower instrumentation row:
+      - animated amber cockpit instrumentation
+      - forensic structured log
   - lower chat deck:
     - latest persisted Brian / Adam transcript boxes
+    - feedback-loop strip for pending/reviewed turn state
     - live Brian draft box when the composer is loaded
     - multiline `TextArea` composer for Brian the operator
     - transmit hint surface; `Ctrl+S` sends
@@ -94,7 +96,10 @@ Secondary surfaces:
 - multiline composition is first-class
 - operator turns are persisted and graph-ingested as `Brian the operator: ...`
 - MLX/Qwen model-emitted thinking is surfaced as a dedicated panel instead of leaking into the main Adam response
+- the signal field is explicitly explanatory: it maps scaffold, boundary, feedback turbulence, and reasoning convergence to different visual elements and explains why the current mode was selected
+- the aperture is rendered as an animated readable scan with natural-language summaries plus a ranked queue
 - the prime surface keeps aperture, thinking, feedback, and transcript visible while the operator types; Deck still carries the detailed trace and budget surfaces
+- feedback is integrated into the lower-right chat loop through a dedicated review-status strip in the chat deck
 - budget changes remain visible, but now live in Deck instead of the prime chat pane
 - latest-session resume restores the latest persisted session surface without forcing a new session flow first
 - keyboard-only navigation is supported through top-menu focus, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the function-key bindings

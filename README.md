@@ -109,18 +109,19 @@ Useful flags:
 3. EDEN resumes the latest persisted session automatically. If none exists yet, it creates a blank live session automatically.
 4. If the local Qwen model is not cached yet, use the top action menu and run `Prepare Qwen`. EDEN stores it under `models/` in this repo.
 5. The top action menu is keyboard-first: `Tab` / `Shift+Tab` moves focus, arrow keys choose a menu item, and `Enter` executes it.
-6. The left bay shows the aperture, visible reasoning surface, and feedback/session state.
-7. The upper-right bay is the animated cockpit scope, dials, and live trace bus.
-8. The lower-right deck is the live Brian/Adam transcript and composer.
+6. The left bay shows the aperture as an animated readable scan, the visible reasoning surface, and feedback/session state.
+7. The upper-right bay is split into a full-width signal field plus the cockpit scope and live trace bus beneath it.
+8. The lower-right deck is the live Brian/Adam transcript, a feedback-loop strip, and the composer.
 9. Type into the lower-right chat deck and send with `Ctrl+S`.
-10. Open `Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
-11. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
-12. Use `Adjust Profile` or `New Session` from the action menu when you want a bounded inference-profile change.
-13. Use `Export Latest` to write graph, basin, geometry, measurement, and index artifacts.
-14. Use `Open Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
-15. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
-16. Preview a change first, then commit it if the before/after metrics support the edit.
-17. Revert recent observatory-originated mutations from the measurement ledger when needed.
+10. The signal field is a runtime metaphor, not a hidden-activation visualizer: green scaffold tracks the active set, amber rails indicate boundary/pressure, rose sparks indicate feedback turbulence, and an ice beacon indicates reasoning convergence.
+11. Open `Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
+12. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
+13. Use `Adjust Profile` or `New Session` from the action menu when you want a bounded inference-profile change.
+14. Use `Export Latest` to write graph, basin, geometry, measurement, and index artifacts.
+15. Use `Open Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
+16. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
+17. Preview a change first, then commit it if the before/after metrics support the edit.
+18. Revert recent observatory-originated mutations from the measurement ledger when needed.
 
 ## Inference notes
 
