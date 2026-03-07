@@ -75,3 +75,25 @@ Docs updated:
 Operational log appended; repository code/docs unchanged.
 Remaining uncertainties or follow-ups:
 GitHub commit attribution depends on the email remaining associated with the `shimmer-hue` account; the repo-local git config is now pinned for future commits in this repo.
+## [2026-03-07 10:03:54 EST] PRE-FLIGHT
+Task summary:
+Clarify repo-root setup and launch steps so the app can be opened without ambiguity.
+Scope of work:
+Update the operational log and tighten README install/run instructions around /Users/brianray/Adam and the repo-local .venv.
+Likely files/modules:
+`/Users/brianray/Adam/codex_notes_garden.md` and `/Users/brianray/Adam/README.md`.
+Relevant invariants:
+Use the repo-local .venv with Python 3.12, keep the TUI as the primary runtime, and preserve docs alignment with actual launcher behavior.
+Proof path (how success will be verified):
+Confirm the repo-local editable install and CLI entrypoint exist, then verify the documented launcher command resolves from the repo root.
+## [2026-03-07 10:05:02 EST] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/README.md` and `/Users/brianray/Adam/codex_notes_garden.md`.
+Behavior implemented or modified:
+Clarified that setup and launch commands must be run from `/Users/brianray/Adam`, collapsed the normal install path to `.[dev,mlx]`, and documented the repo-local launcher command that works from a fresh shell.
+Evidence (tests / commands run):
+`./.venv/bin/python -m pip show eden-adam mlx-lm`, `cd /Users/brianray/Adam && .venv/bin/python app.py --help`, and `cd /Users/brianray/Adam && .venv/bin/eden --help`.
+Docs updated:
+`README.md` and the operational log.
+Remaining uncertainties or follow-ups:
+This was a docs-only correction; the app already launched correctly from the repo root, so no behavior tests were required.

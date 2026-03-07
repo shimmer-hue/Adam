@@ -17,14 +17,19 @@ EDEN is a local-first experimental memetic persona runtime. ADAM is the first ag
 
 Validated with repo-local Python 3.12 in `/Users/brianray/Adam/.venv`.
 If you rebuild `.venv`, use one interpreter family consistently; do not layer a Homebrew Python onto a `pyenv`-created venv or vice versa.
+All commands below assume your shell is already at the repo root. If you run them from `~`, pip will try to install `/Users/brianray` instead of this project.
+
+```bash
+cd /Users/brianray/Adam
+```
 
 ```bash
 /opt/homebrew/bin/python3.12 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip setuptools wheel
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pip install -e '.[dev,mlx]'
 ```
 
-Install MLX support for the real backend:
+If you already created `.venv` and only need the MLX extras:
 
 ```bash
 .venv/bin/python -m pip install -e '.[mlx]'
@@ -34,23 +39,26 @@ Install MLX support for the real backend:
 
 ## Run
 
-Fastest normal path:
+From a fresh shell, the safest normal path is:
 
 ```bash
-python3 app.py
+cd /Users/brianray/Adam
+.venv/bin/python app.py
 ```
 
-Equivalent explicit TUI command:
+Equivalent explicit TUI command from the repo root:
 
 ```bash
 .venv/bin/eden
 ```
 
-Original module path:
+Original module path from the repo root:
 
 ```bash
 .venv/bin/python -m eden app
 ```
+
+`python3 app.py` is also valid, but only after you have already changed into `/Users/brianray/Adam`.
 
 The startup launcher now lets you choose the runtime surface, open Blank Eden / Seeded Eden / Resume Latest, export the latest surfaces, or open the observatory without front-loading a bunch of flags. EDEN remembers the last runtime choice locally. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
 
@@ -96,21 +104,22 @@ Useful flags:
 
 ## First Run
 
-1. Start EDEN with `python3 app.py`.
-2. In the startup launcher choose the runtime surface (`Adam / Local MLX` by default, `Mock Fallback` as fallback).
-3. If the local Qwen model is not cached yet, use `Prepare Qwen` once. EDEN stores it under `models/` in this repo.
-4. Choose `Blank Eden`, `Seeded Eden`, or `Resume Latest`.
-5. In the session-start modal choose the inference profile mode and bounded parameters for that session.
-6. Once chat is up, use the left operator bay to write a turn for Brian the operator and send it with `Ctrl+S`.
-7. The primary chat surface is now simplified: operator input on the left, animated ritual field and Adam membrane on the right, live console on the bottom.
-8. Open `Deck` when you want the hidden diagnostic surfaces: budget, thinking, active set, trace, telemetry, history, ingest, and launch utilities.
-9. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
-10. Use `Profile` for the bounded hyperparameter / inference-mode surface.
-11. Use `Export` to write graph, basin, geometry, measurement, and index artifacts.
-12. Use `Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
-13. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
-14. Preview a change first, then commit it if the before/after metrics support the edit.
-15. Revert recent observatory-originated mutations from the measurement ledger when needed.
+1. Change into the repo root with `cd /Users/brianray/Adam`.
+2. Start EDEN with `.venv/bin/python app.py`.
+3. In the startup launcher choose the runtime surface (`Adam / Local MLX` by default, `Mock Fallback` as fallback).
+4. If the local Qwen model is not cached yet, use `Prepare Qwen` once. EDEN stores it under `models/` in this repo.
+5. Choose `Blank Eden`, `Seeded Eden`, or `Resume Latest`.
+6. In the session-start modal choose the inference profile mode and bounded parameters for that session.
+7. Once chat is up, use the left operator bay to write a turn for Brian the operator and send it with `Ctrl+S`.
+8. The primary chat surface is now simplified: operator input on the left, animated ritual field and Adam membrane on the right, live console on the bottom.
+9. Open `Deck` when you want the hidden diagnostic surfaces: budget, thinking, active set, trace, telemetry, history, ingest, and launch utilities.
+10. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
+11. Use `Profile` for the bounded hyperparameter / inference-mode surface.
+12. Use `Export` to write graph, basin, geometry, measurement, and index artifacts.
+13. Use `Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
+14. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
+15. Preview a change first, then commit it if the before/after metrics support the edit.
+16. Revert recent observatory-originated mutations from the measurement ledger when needed.
 
 ## Inference notes
 
