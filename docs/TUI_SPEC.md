@@ -6,13 +6,17 @@ The TUI remains the primary EDEN runtime surface in v1.2.
 
 Startup screen:
 
+- top startup action menu:
+  - `Blank Eden`
+  - `Seeded Eden`
+  - `Resume Latest`
+  - `Prepare Qwen`
+  - `Refresh Model`
+  - `Open Observatory`
+  - `Export Latest`
+  - `Help`
 - aperture / active-set reference panel
-- MLX model status panel
-- fixed `Adam / Local MLX` launcher contract
-- `Prepare Qwen`
-- `Refresh Model`
-- `Blank Eden`, `Seeded Eden`, `Resume Latest`
-- `Open Observatory`, `Export Latest`, `Help`
+- Qwen thinking panel populated from the latest visible reasoning artifact
 - animated cockpit panel
 - startup runtime log
 - latest Brian / Adam chat preview
@@ -81,15 +85,18 @@ Secondary surfaces:
 - amber-on-dark operator grammar preserved
 - cockpit-first primary chat surface: aperture and controls left, animated telemetry upper-right, chat deck lower-right
 - startup launcher is fixed to local MLX; runtime/model-path picking is removed from the launcher surface
+- startup launch/export/observatory actions live in a keyboard-executable top menu instead of left-column buttons
 - normal entry path is `.venv/bin/python -m eden` or `.venv/bin/python -m eden app`
 - shell flags remain optional overrides, but the TUI launcher itself is locked to local MLX
 - the launcher reports model readiness, shard progress, and repo-local storage instead of asking for a manual MLX path
 - multiline composition is first-class
 - operator turns are persisted and graph-ingested as `Brian the operator: ...`
 - MLX/Qwen model-emitted thinking is surfaced in Deck instead of leaking into the main Adam response
+- latest startup reasoning preview is surfaced directly on the startup screen
 - the prime surface keeps the aperture visible while the operator types; Deck still carries the detailed trace and budget surfaces
 - budget changes remain visible, but now live in Deck instead of the prime chat pane
 - latest-session resume restores the latest persisted session surface instead of forcing a new session flow
+- keyboard-only navigation is supported through startup menu focus, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the existing function-key bindings
 
 ## Budget panel contents
 

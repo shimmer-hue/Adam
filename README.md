@@ -60,7 +60,7 @@ Original module path from the repo root:
 
 `python3 app.py` is also valid, but only after you have already changed into `/Users/brianray/Adam`.
 
-The startup cockpit is now locked to `Adam / Local MLX`, with Blank Eden / Seeded Eden / Resume Latest, export, and observatory controls surfaced directly instead of front-loading a runtime picker. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
+The startup cockpit is now locked to `Adam / Local MLX`, with startup actions exposed through a top keyboardable menu instead of a runtime picker or a left-column button stack. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
 
 Use flags only when you want an explicit shell override. The normal path is the repo-local MLX default. The startup surface can prepare the local Qwen model directly if it is not cached yet.
 
@@ -106,7 +106,7 @@ Useful flags:
 
 1. Change into the repo root with `cd /Users/brianray/Adam`.
 2. Start EDEN with `.venv/bin/python app.py`.
-3. If the local Qwen model is not cached yet, use `Prepare Qwen` once. EDEN stores it under `models/` in this repo.
+3. Use the top startup action menu with arrow keys and `Enter`. If the local Qwen model is not cached yet, run `Prepare Qwen` once. EDEN stores it under `models/` in this repo.
 4. Choose `Blank Eden`, `Seeded Eden`, or `Resume Latest`.
 5. In the session-start modal choose the inference profile mode and bounded parameters for that session.
 6. Once chat is up, the left bay shows the aperture, session capsule, and utility controls; the upper-right bay is the animated cockpit and live trace; the lower-right deck is the Brian/Adam exchange plus the composer.

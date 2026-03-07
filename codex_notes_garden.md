@@ -119,3 +119,25 @@ Docs updated:
 `README.md`, `docs/TUI_SPEC.md`, `docs/IMPLEMENTATION_TRUTH_TABLE.md`, `docs/KNOWN_LIMITATIONS.md`, and the operational log.
 Remaining uncertainties or follow-ups:
 Layout proportions and animation cadence were validated by structure and tests; the next pass should be visual tuning against live terminal screenshots now that the cockpit architecture is in place.
+## [2026-03-07 10:33:40 EST] PRE-FLIGHT
+Task summary:
+Refine the startup cockpit by replacing MLX/launch-contract panels with a Qwen thinking panel and moving startup actions into a top keyboard-driven menu.
+Scope of work:
+Update the startup layout and action wiring in the Textual app, strengthen keyboard navigation, refresh tests, and sync docs if the startup contract changes.
+Likely files/modules:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, and `/Users/brianray/Adam/codex_notes_garden.md`.
+Relevant invariants:
+Keep the TUI primary, keep the launcher fixed to local MLX, preserve explicit Qwen reasoning separation, and maintain keyboard-only operability.
+Proof path (how success will be verified):
+Verify the startup menu is focusable/executable from the keyboard, confirm the thinking panel renders latest reasoning, and run the targeted smoke test plus full pytest.
+## [2026-03-07 10:38:08 EST] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/README.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, and `/Users/brianray/Adam/codex_notes_garden.md`.
+Behavior implemented or modified:
+Replaced the startup MLX-readiness and launch-contract stack with a single Qwen thinking panel, moved startup launch/export/observatory controls into a top action menu, and added explicit keyboard-first focus cycling plus menu execution on Enter.
+Evidence (tests / commands run):
+`./.venv/bin/python -m py_compile eden/tui/app.py tests/test_tui_smoke.py`, `./.venv/bin/pytest -q tests/test_tui_smoke.py`, and `./.venv/bin/pytest -q` with `31 passed in 6.87s`.
+Docs updated:
+`README.md`, `docs/TUI_SPEC.md`, `docs/IMPLEMENTATION_TRUTH_TABLE.md`, and the operational log.
+Remaining uncertainties or follow-ups:
+The keyboard path is covered structurally and by the startup smoke test; the next pass can refine menu phrasing and reasoning-panel density from live screenshots if you want the startup surface even tighter.

@@ -5,7 +5,7 @@
 | Blank Eden bootstrap | Implemented | runtime + TUI path; validated in tests and demo |
 | Seeded Eden bootstrap code path | Implemented | ingests `assets/seed_canon/`; heavy-path validation started on real canon files |
 | Fixed-pane amber TUI | Implemented | preserved and refocused around a cockpit-style primary chat surface |
-| Panel-based launcher for startup and runtime surfaces | Implemented | startup cockpit keeps launch actions, MLX readiness, runtime trace, and preview chat on one screen |
+| Panel-based launcher for startup and runtime surfaces | Implemented | startup cockpit keeps the top action menu, Qwen thinking preview, runtime trace, and preview chat on one screen |
 | `python -m eden` default entry path | Implemented | no subcommand required for the normal TUI path; flags remain optional overrides |
 | Repo-root `python3 app.py` launcher | Implemented | root launcher re-execs the repo-local `.venv` interpreter and then dispatches into `eden.app:main` |
 | Local repo-managed MLX model storage | Implemented | default MLX model target is `models/qwen3.5-35b-a3b-mlx-mxfp4` under repo root |

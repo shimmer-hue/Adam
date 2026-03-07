@@ -12,6 +12,7 @@ from rich.panel import Panel
 from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Footer, Header, Input, RichLog, Select, Static, TextArea
@@ -64,6 +65,7 @@ class HelpModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         help_text = Text.from_markup(
             "[bold #ffbf66]EDEN Controls[/]\n\n"
+            "Startup uses a top action menu: arrows choose, Enter executes.\n"
             "The left bay is the aperture and control stack.\n"
             "The upper-right bay is the animated cockpit and live trace.\n"
             "The lower-right deck is the Brian/Adam exchange surface.\n"
@@ -502,28 +504,34 @@ class StartupScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        with Horizontal(id="startup_shell"):
-            with Vertical(id="startup_left"):
-                yield Static(id="startup_aperture_panel")
-                yield Static(id="model_status_panel")
-                with Vertical(id="startup_controls_box"):
-                    yield Static(id="startup_controls_summary")
-                    with Horizontal(classes="control_row"):
-                        yield Button("Blank Eden", id="blank_btn", variant="primary")
-                        yield Button("Seeded Eden", id="seeded_btn")
-                        yield Button("Resume Latest", id="resume_btn")
-                    with Horizontal(classes="control_row"):
-                        yield Button("Prepare Qwen", id="prepare_mlx_btn")
-                        yield Button("Refresh Model", id="refresh_model_btn")
-                        yield Button("Help", id="startup_help_btn")
-                    with Horizontal(classes="control_row"):
-                        yield Button("Open Observatory", id="startup_observatory_btn")
-                        yield Button("Export Latest", id="startup_export_btn")
-            with Vertical(id="startup_right"):
-                with Vertical(id="startup_cockpit_stack"):
-                    yield AdamSigil(id="startup_cockpit")
-                    yield RichLog(id="startup_log", wrap=True, auto_scroll=True, highlight=True)
-                yield Static(id="startup_transcript_panel")
+        with Vertical(id="startup_frame"):
+            with Horizontal(id="startup_topbar"):
+                yield Select(
+                    [
+                        ("Blank Eden", "blank"),
+                        ("Seeded Eden", "seeded"),
+                        ("Resume Latest", "resume"),
+                        ("Prepare Qwen", "prepare_mlx"),
+                        ("Refresh Model", "refresh_model"),
+                        ("Open Observatory", "observatory"),
+                        ("Export Latest", "export"),
+                        ("Help", "help"),
+                    ],
+                    value="blank",
+                    allow_blank=False,
+                    id="startup_action_menu",
+                    prompt="Startup actions",
+                )
+                yield Static(id="startup_menu_hint")
+            with Horizontal(id="startup_shell"):
+                with Vertical(id="startup_left"):
+                    yield Static(id="startup_aperture_panel")
+                    yield Static(id="startup_reasoning_panel")
+                with Vertical(id="startup_right"):
+                    with Vertical(id="startup_cockpit_stack"):
+                        yield AdamSigil(id="startup_cockpit")
+                        yield RichLog(id="startup_log", wrap=True, auto_scroll=True, highlight=True)
+                    yield Static(id="startup_transcript_panel")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -533,11 +541,12 @@ class StartupScreen(Screen):
         app.ui_state.model_status = app.runtime.mlx_model_status()
         self._refresh_panels()
         self.set_interval(0.6, self._poll_logs)
+        self.call_after_refresh(lambda: self.query_one("#startup_action_menu", Select).focus())
 
     def _refresh_panels(self) -> None:
         self.query_one("#startup_aperture_panel", Static).update(self._aperture_panel())
-        self._refresh_model_status_panel()
-        self.query_one("#startup_controls_summary", Static).update(self._controls_text())
+        self.query_one("#startup_reasoning_panel", Static).update(self._thinking_panel())
+        self.query_one("#startup_menu_hint", Static).update(self._menu_hint_panel())
         self.query_one("#startup_transcript_panel", Static).update(self._transcript_panel())
 
     def _latest_snapshot(self) -> dict[str, Any] | None:
@@ -581,42 +590,33 @@ class StartupScreen(Screen):
         )
         return Panel(content, title="Aperture", border_style=AMBER)
 
-    def _refresh_model_status_panel(self) -> None:
-        app = self.app
-        assert isinstance(app, EdenTuiApp)
-        status = app.runtime.mlx_model_status()
-        app.ui_state.model_status = status
-        readiness = "READY" if status["ready"] else "PREPARING" if status.get("safetensor_count") else "NOT CACHED"
-        storage = f"models/{Path(status['local_dir']).name}"
-        expected = status.get("weight_files_expected")
-        shard_progress = (
-            f"{status['weight_files_present']}/{expected}"
-            if expected
-            else str(status["weight_files_present"])
+    def _thinking_panel(self) -> Panel:
+        snapshot = self._latest_snapshot() or {}
+        reasoning_text = snapshot.get("last_reasoning") or ""
+        summary = safe_excerpt(reasoning_text, limit=1600) if reasoning_text else "No Qwen reasoning captured yet. Once Adam has generated with visible reasoning, the latest chain-of-thought surface will appear here as an operator-visible model artifact."
+        title_suffix = f" :: {snapshot.get('session_title', 'none')}" if snapshot else ""
+        style = TEXT if reasoning_text else MUTED
+        body = Text.from_markup(
+            f"[bold {AMBER}]Qwen Thinking[/]\n"
+            "Visible model reasoning artifact; not hidden chain-of-thought claims.\n\n"
         )
-        text = Text.from_markup(
-            f"[bold {AMBER}]Default MLX Model[/]\n"
-            f"label={status['label']}\n"
-            f"base={status['base_model']}\n"
-            f"source={status['repo_id']}\n"
-            f"cache={readiness} stage={status.get('stage', 'missing')}\n"
-            f"weights={shard_progress} size={status.get('gib_on_disk', 0)} GiB\n"
-            f"storage={storage}"
-        )
-        self.query_one("#model_status_panel", Static).update(Panel(text, title="MLX Flight Readiness", border_style=AMBER))
+        body.append(summary, style=style)
+        return Panel(body, title=f"Thinking{title_suffix}", border_style=AMBER)
 
-    def _controls_text(self) -> Text:
+    def _menu_hint_panel(self) -> Panel:
         app = self.app
         assert isinstance(app, EdenTuiApp)
         status = app.runtime.mlx_model_status()
-        return Text.from_markup(
+        selected = str(self.query_one("#startup_action_menu", Select).value or "blank").replace("_", " ")
+        text = Text.from_markup(
             f"[bold {AMBER}]Launch Contract[/]\n"
             "runtime=Adam / Local MLX (locked)\n"
             f"cache={status.get('stage', 'missing')} storage=models/{Path(status['local_dir']).name}\n"
-            "launch blank / seeded / resume directly from this cockpit\n"
-            "observatory and export remain available before chat opens\n"
-            "Ctrl+S becomes active once the chat deck is live"
+            f"menu={selected}\n"
+            "keyboard: up/down opens menu focus, arrows choose, Enter executes, Tab cycles focus\n"
+            "chat deck remains keyboard-first once a session is live"
         )
+        return Panel(text, title="Action Menu", border_style=AMBER)
 
     def _transcript_panel(self) -> Panel:
         snapshot = self._latest_snapshot() or {}
@@ -638,6 +638,25 @@ class StartupScreen(Screen):
         )
         return Panel(exchange, title="Chat Preview", border_style=AMBER)
 
+    def _execute_startup_action(self, action: str) -> None:
+        normalized = (action or "blank").strip().lower()
+        if normalized == "blank":
+            self.begin_launch_session("blank")
+        elif normalized == "seeded":
+            self.begin_launch_session("seeded")
+        elif normalized == "resume":
+            self.begin_launch_session("resume")
+        elif normalized == "prepare_mlx":
+            self.handle_prepare_mlx()
+        elif normalized == "refresh_model":
+            self.handle_refresh_model()
+        elif normalized == "observatory":
+            self.handle_startup_observatory()
+        elif normalized == "export":
+            self.handle_startup_export()
+        elif normalized == "help":
+            self.run_worker(self.app.push_screen(HelpModal()), exclusive=True, group="startup_help")
+
     def _poll_logs(self) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -655,7 +674,7 @@ class StartupScreen(Screen):
         if status is None:
             return
         app.ui_state.model_status = status
-        self._refresh_model_status_panel()
+        self._refresh_panels()
         if action == "resume":
             latest = app.runtime.store.get_latest_experiment()
             if latest is None:
@@ -709,18 +728,6 @@ class StartupScreen(Screen):
     def begin_launch_session(self, action: str) -> None:
         self.run_worker(self._launch_session_worker(action), exclusive=True, group="launch")
 
-    @on(Button.Pressed, "#blank_btn")
-    def handle_blank(self) -> None:
-        self.begin_launch_session("blank")
-
-    @on(Button.Pressed, "#seeded_btn")
-    def handle_seeded(self) -> None:
-        self.begin_launch_session("seeded")
-
-    @on(Button.Pressed, "#resume_btn")
-    def handle_resume(self) -> None:
-        self.begin_launch_session("resume")
-
     async def _ensure_local_mlx_model(self) -> dict[str, Any] | None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -746,14 +753,11 @@ class StartupScreen(Screen):
             self.app.ui_state.model_status = status
             self._refresh_panels()
 
-    @on(Button.Pressed, "#prepare_mlx_btn")
     def handle_prepare_mlx(self) -> None:
         self.run_worker(self._prepare_mlx_worker(), exclusive=True, group="prepare_mlx")
 
-    @on(Button.Pressed, "#refresh_model_btn")
     def handle_refresh_model(self) -> None:
         self._refresh_panels()
-        self._refresh_model_status_panel()
 
     async def _startup_export_worker(self) -> None:
         app = self.app
@@ -787,17 +791,21 @@ class StartupScreen(Screen):
         )
         self._refresh_panels()
 
-    @on(Button.Pressed, "#startup_export_btn")
     def handle_startup_export(self) -> None:
         self.run_worker(self._startup_export_worker(), exclusive=True, group="startup_export")
 
-    @on(Button.Pressed, "#startup_observatory_btn")
     def handle_startup_observatory(self) -> None:
         self.run_worker(self._startup_observatory_worker(), exclusive=True, group="startup_observatory")
 
-    @on(Button.Pressed, "#startup_help_btn")
-    async def handle_startup_help(self) -> None:
-        await self.app.push_screen(HelpModal())
+    @on(Select.Changed, "#startup_action_menu")
+    def handle_startup_action_changed(self, _event: Select.Changed) -> None:
+        self.query_one("#startup_menu_hint", Static).update(self._menu_hint_panel())
+
+    def on_key(self, event) -> None:
+        if event.key == "enter" and self.app.focused and getattr(self.app.focused, "id", None) == "startup_action_menu":
+            action = str(self.query_one("#startup_action_menu", Select).value or "blank")
+            self._execute_startup_action(action)
+            event.stop()
 
 
 class ChatScreen(Screen):
@@ -1443,6 +1451,20 @@ class EdenTuiApp(App):
         background: {BG};
         color: {TEXT};
     }}
+    #startup_frame {{
+        height: 1fr;
+    }}
+    #startup_topbar {{
+        height: 8;
+        padding: 0 1 1 1;
+    }}
+    #startup_action_menu {{
+        width: 32;
+        margin-right: 1;
+    }}
+    #startup_menu_hint {{
+        width: 1fr;
+    }}
     #startup_shell, #chat_shell {{
         height: 1fr;
         layout: horizontal;
@@ -1462,23 +1484,20 @@ class EdenTuiApp(App):
         height: 1fr;
         min-height: 16;
     }}
-    #model_status_panel, #session_capsule_panel {{
+    #session_capsule_panel {{
         height: 13;
     }}
-    #startup_controls_box, #control_panel, #chat_deck {{
+    #startup_reasoning_panel {{
+        height: 1fr;
+        min-height: 18;
+    }}
+    #control_panel, #chat_deck {{
         border: tall {AMBER};
         background: {PANEL};
         padding: 0 1;
     }}
-    #startup_controls_box {{
-        height: 18;
-    }}
     #control_panel {{
         height: 12;
-    }}
-    #startup_controls_summary, #control_summary_panel {{
-        margin-bottom: 1;
-        color: {TEXT};
     }}
     #startup_cockpit_stack, #chat_cockpit_stack {{
         height: 1fr;
@@ -1554,6 +1573,8 @@ class EdenTuiApp(App):
     }}
     """
     BINDINGS = [
+        Binding("tab", "focus_next", "", show=False),
+        Binding("shift+tab", "focus_previous", "", show=False),
         ("f1", "show_help", "Help"),
         ("ctrl+s", "send_turn", "Send"),
         ("f2", "export_all", "Export"),

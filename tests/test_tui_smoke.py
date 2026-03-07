@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from textual.widgets import Button, TextArea
+from textual.widgets import Button, Select, TextArea
 
 from eden.tui.app import ChatScreen, EdenTuiApp
 
@@ -13,8 +13,12 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime) -> None
     async with app.run_test() as pilot:
         await pilot.pause()
         assert app.screen.query_one("#startup_aperture_panel")
-        assert len(app.screen.query("#backend_select")) == 0
-        app.screen.query_one("#blank_btn", Button).press()
+        assert app.screen.query_one("#startup_reasoning_panel")
+        assert len(app.screen.query("#model_status_panel")) == 0
+        assert len(app.screen.query("#startup_controls_box")) == 0
+        menu = app.screen.query_one("#startup_action_menu", Select)
+        menu.focus()
+        await pilot.press("enter")
         await pilot.pause(0.6)
         app.screen.query_one("#session_confirm_btn", Button).press()
         await pilot.pause(1.4)
