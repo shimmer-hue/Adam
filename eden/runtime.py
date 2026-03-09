@@ -39,6 +39,39 @@ RUNTIME_LAUNCH_PROFILE_KEY = "runtime_launch_profile"
 OPERATOR_LABEL = "Brian the operator"
 
 
+def _normalize_archive_folder(folder: Any) -> str:
+    value = str(folder or "").strip().replace("\\", "/")
+    value = re.sub(r"/{2,}", "/", value).strip("/")
+    return value or "inbox"
+
+
+def _normalize_archive_tags(tags: Any) -> list[str]:
+    if isinstance(tags, list):
+        raw_values = tags
+    else:
+        raw_values = re.split(r"[,;\n]", str(tags or ""))
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in raw_values:
+        tag = re.sub(r"\s+", " ", str(value or "").strip().lstrip("#"))
+        if not tag:
+            continue
+        lowered = tag.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        normalized.append(tag)
+    return normalized
+
+
+def _normalize_archive_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    archive = metadata.get("archive") if isinstance(metadata, dict) and isinstance(metadata.get("archive"), dict) else {}
+    return {
+        "folder": _normalize_archive_folder(archive.get("folder")),
+        "tags": _normalize_archive_tags(archive.get("tags")),
+    }
+
+
 @dataclass(slots=True)
 class ChatOutcome:
     turn: dict[str, Any]
@@ -384,6 +417,97 @@ class EdenRuntime:
 
     def session_profile_request(self, session_id: str) -> dict[str, Any]:
         return self._session_profile_request(session_id).to_dict()
+
+    def update_conversation_archive(self, session_id: str, *, folder: str, tags: Any) -> dict[str, Any]:
+        archive = {
+            "folder": _normalize_archive_folder(folder),
+            "tags": _normalize_archive_tags(tags),
+        }
+        session = self.store.update_session_metadata(session_id, {"archive": archive})
+        metadata = json.loads(session["metadata_json"] or "{}")
+        return {"session_id": session_id, "archive": _normalize_archive_metadata(metadata)}
+
+    def conversation_archive_records(self) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        for row in self.store.list_session_catalog():
+            metadata = json.loads(row.get("metadata_json") or "{}")
+            archive = _normalize_archive_metadata(metadata)
+            profile_request = metadata.get("requested_inference_profile") or {}
+            last_user = (row.get("last_user_text") or "").strip()
+            if last_user.lower().startswith(f"{OPERATOR_LABEL.lower()}:"):
+                last_user = last_user.split(":", 1)[1].strip()
+            visible_response, _ = self.sanitize_operator_response(
+                row.get("last_response_text") or "",
+                response_char_cap=320,
+            )
+            transcript_path = self.conversation_log_path(row["id"])
+            tags = archive["tags"]
+            records.append(
+                {
+                    **row,
+                    "folder": archive["folder"],
+                    "tags": tags,
+                    "tag_display": ", ".join(f"#{tag}" for tag in tags) if tags else "untagged",
+                    "requested_mode": profile_request.get("mode", "manual"),
+                    "budget_mode": profile_request.get("budget_mode", "balanced"),
+                    "conversation_log_path": str(transcript_path),
+                    "conversation_log_exists": transcript_path.exists(),
+                    "last_user_excerpt": safe_excerpt(last_user or "No Brian turn yet.", limit=96),
+                    "last_response_excerpt": safe_excerpt(visible_response or "No Adam response yet.", limit=120),
+                    "projection_paths": [
+                        "all_texts",
+                        f"folder:{archive['folder']}",
+                        *[f"tag:{tag}" for tag in tags],
+                        f"experiment:{row.get('experiment_slug') or row['experiment_id']}",
+                    ],
+                    "search_text": " ".join(
+                        [
+                            str(row.get("title") or ""),
+                            str(row.get("experiment_name") or ""),
+                            str(row.get("experiment_mode") or ""),
+                            archive["folder"],
+                            " ".join(tags),
+                            last_user,
+                            visible_response,
+                        ]
+                    ).lower(),
+                }
+            )
+        return records
+
+    def conversation_archive_preview(self, session_id: str, *, turn_limit: int = 4) -> dict[str, Any]:
+        session = self.store.get_session(session_id)
+        experiment = self.store.get_experiment(session["experiment_id"])
+        metadata = json.loads(session["metadata_json"] or "{}")
+        archive = _normalize_archive_metadata(metadata)
+        recent_turns: list[dict[str, Any]] = []
+        for turn in reversed(self.store.list_turns(session_id, limit=turn_limit)):
+            user_text = (turn.get("user_text") or "").strip()
+            if user_text.lower().startswith(f"{OPERATOR_LABEL.lower()}:"):
+                user_text = user_text.split(":", 1)[1].strip()
+            visible_response, _ = self.sanitize_operator_response(
+                turn.get("membrane_text") or turn.get("response_text") or "",
+                response_char_cap=320,
+            )
+            recent_turns.append(
+                {
+                    "turn_index": turn["turn_index"],
+                    "user_excerpt": safe_excerpt(user_text or "No Brian text.", limit=110),
+                    "response_excerpt": safe_excerpt(visible_response or "No Adam text.", limit=140),
+                }
+            )
+        return {
+            "session_id": session_id,
+            "session_title": session["title"],
+            "experiment_name": experiment["name"],
+            "experiment_mode": experiment["mode"],
+            "archive": archive,
+            "profile_request": self.session_profile_request(session_id),
+            "conversation_log_path": str(self.conversation_log_path(session_id)),
+            "conversation_log_exists": self.conversation_log_path(session_id).exists(),
+            "recent_turns": recent_turns,
+            "recent_feedback": self.store.recent_feedback(session_id, limit=4),
+        }
 
     def conversation_log_path(self, session_id: str) -> Path:
         session = self.store.get_session(session_id)

@@ -112,20 +112,22 @@ Useful flags:
 6. If focus drifts away from the composer, press `Esc` to return to it. Printable keys typed outside editable widgets are routed back into the composer automatically.
 7. Press `F8` to pull down the full-width aperture drawer. It occupies the top band of the screen and renders a wider natural-language scan of the active set.
 8. The large left column is the Adam dialogue surface: scrolling Brian/Adam tape, inline reply-review strip, and always-visible composer.
-9. The right column stacks an enlarged memgraph bus, a larger bus-to-aperture active-set read, and a lower reasoning slice as secondary telemetry.
-10. The memgraph bus includes a visible glyph legend so `D`, `o`, `^`, `M`, `@`, `R`, `*`, `!`, and `?` can be read directly on-screen.
-11. The runtime loop and session/event summary now ride in a merged bottom chyron instead of taking a full telemetry square.
-12. Type into the visible composer at the bottom of the left dialogue column and send with `Ctrl+S`.
-13. Start a conversation by asking Adam a question or pressing `F9` to ingest a document with a framing prompt. End a conversation by opening a new session with `F5`.
-14. The signal field is an orthographic operator slice of the live memgraph: `D` marks the latest ingested document root, `o` knowledge memes, `^` behavior memes, `M` memodes, `@` the session anchor, and `R` the high-regard recall bank. `*` marks turn pulses, `!` feedback sparks, and `?` a framing-brief lens. It is still not a hidden-activation visualizer.
-15. `F9` opens the ingest bay, where you provide a PDF/document path plus a short framing prompt. The document content and framing prompt are both indexed into the memgraph for later retrieval.
-16. Open `Utilities Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
-17. Review Adam inline: after each Adam reply, the reply-review strip appears directly under the transcript. Type `A`, `E`, `R`, or `S`, then type `Y` and press `Enter` to commit. `A` / `R` require explanation; `E` requires explanation plus corrected text. Submitting there writes a feedback event and updates graph channels.
-18. Conversation logs are also written to `exports/conversations/<experiment-slug>/...md`. The merged bottom chyron shows the active transcript file, and `Open Conversation Log` in the action bus opens it directly.
-19. Adam's visible reply is now a clean operator-facing answer. Model thinking stays in the separate thinking surface instead of appearing as `Answer`, `Basis`, or `Next Step` scaffolding inside the dialogue.
-20. Use `Tune Session` or `Start New Session` from the action bus when you want a bounded inference-profile change.
-21. Use `Export Artifacts` to write graph, basin, geometry, measurement, and index artifacts.
-22. Use `Open Browser Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
+9. Transcript cards now use static chiaroscuro shading instead of animated decorative glyph bands inside the chat surface.
+10. The right column stacks an enlarged memgraph bus, a larger bus-to-aperture active-set read, and a lower reasoning slice as secondary telemetry.
+11. The memgraph bus includes a visible glyph legend so `D`, `o`, `^`, `M`, `@`, `R`, `*`, `!`, and `?` can be read directly on-screen.
+12. The runtime loop and session/event summary now ride in a merged bottom chyron instead of taking a full telemetry square.
+13. Type into the visible composer at the bottom of the left dialogue column and send with `Ctrl+S`.
+14. The prime screen now refreshes on state changes instead of a constant whole-screen repaint loop, which materially improves typing responsiveness.
+15. Start a conversation by asking Adam a question or pressing `F9` to ingest a document with a framing prompt. End a conversation by opening a new session with `F5`.
+16. The signal field is an orthographic operator slice of the live memgraph: `D` marks the latest ingested document root, `o` knowledge memes, `^` behavior memes, `M` memodes, `@` the session anchor, and `R` the high-regard recall bank. `*` marks turn pulses, `!` feedback sparks, and `?` a framing-brief lens. It is still not a hidden-activation visualizer.
+17. `F9` opens the ingest bay, where you provide a PDF/document path plus a short framing prompt. The document content and framing prompt are both indexed into the memgraph for later retrieval.
+18. Open `Utilities Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
+19. Review Adam inline: after each Adam reply, the reply-review strip appears directly under the transcript. Type `A`, `E`, `R`, or `S`, then type `Y` and press `Enter` to commit. `A` / `R` require explanation; `E` requires explanation plus corrected text. Submitting there writes a feedback event and updates graph channels.
+20. Conversation logs are also written to `exports/conversations/<experiment-slug>/...md`. The merged bottom chyron shows the active transcript file, and `Open Conversation Log` in the action bus opens it directly.
+21. Adam's visible reply is now a clean operator-facing answer. Model thinking stays in the separate thinking surface instead of appearing as `Answer`, `Basis`, or `Next Step` scaffolding inside the dialogue.
+22. Use `Tune Session` or `Start New Session` from the action bus when you want a bounded inference-profile change.
+23. Use `Export Artifacts` to write graph, basin, geometry, measurement, and index artifacts.
+24. Use `Open Browser Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
 23. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
 24. Preview a change first, then commit it if the before/after metrics support the edit.
 25. Revert recent observatory-originated mutations from the measurement ledger when needed.

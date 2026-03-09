@@ -28,6 +28,13 @@ EDEN v1 uses SQLite for local reliability, with graph semantics implemented in d
 
 ## Key row fields
 
+### `sessions`
+
+- `title`, `created_at`, `updated_at`
+- `metadata_json.requested_inference_profile`
+- `metadata_json.archive.folder`
+- `metadata_json.archive.tags`
+
 ### `memes`
 
 - `label`, `canonical_label`, `text`, `domain`, `source_kind`, `scope`

@@ -176,6 +176,56 @@ class GraphStore:
         ).fetchone()
         return _row_to_dict(row)
 
+    def list_session_catalog(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        sql = """
+            SELECT
+                s.*,
+                e.name AS experiment_name,
+                e.slug AS experiment_slug,
+                e.mode AS experiment_mode,
+                (
+                    SELECT COUNT(*)
+                    FROM turns t
+                    WHERE t.session_id = s.id
+                ) AS turn_count,
+                (
+                    SELECT COUNT(*)
+                    FROM feedback_events f
+                    WHERE f.session_id = s.id
+                ) AS feedback_count,
+                COALESCE(
+                    (
+                        SELECT MAX(t.created_at)
+                        FROM turns t
+                        WHERE t.session_id = s.id
+                    ),
+                    s.updated_at
+                ) AS last_turn_at,
+                (
+                    SELECT t.user_text
+                    FROM turns t
+                    WHERE t.session_id = s.id
+                    ORDER BY t.turn_index DESC
+                    LIMIT 1
+                ) AS last_user_text,
+                (
+                    SELECT COALESCE(t.membrane_text, t.response_text, '')
+                    FROM turns t
+                    WHERE t.session_id = s.id
+                    ORDER BY t.turn_index DESC
+                    LIMIT 1
+                ) AS last_response_text
+            FROM sessions s
+            JOIN experiments e ON e.id = s.experiment_id
+            ORDER BY s.updated_at DESC, s.created_at DESC
+        """
+        params: list[Any] = []
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(int(limit))
+        rows = self._conn.execute(sql, tuple(params)).fetchall()
+        return [_row_to_dict(row) for row in rows if row is not None]
+
     def get_next_turn_index(self, session_id: str) -> int:
         row = self._conn.execute(
             "SELECT COALESCE(MAX(turn_index), -1) + 1 AS turn_index FROM turns WHERE session_id = ?",

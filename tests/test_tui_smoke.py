@@ -6,7 +6,7 @@ import pytest
 
 from textual.widgets import Button, Input, Select, TextArea
 
-from eden.tui.app import ChatScreen, EdenTuiApp
+from eden.tui.app import ChatScreen, ConversationAtlasModal, EdenTuiApp
 
 
 @pytest.mark.asyncio
@@ -47,6 +47,9 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         composer.load_text("line one\nline two")
         await pilot.pause()
         assert "\n" in composer.text
+        draft_group = app.screen.main_chat_exchange_panel()
+        draft_panel = draft_group.renderables[-1]
+        assert getattr(draft_panel.renderable, "plain", "") == "line one\nline two"
         await app.screen._send_turn()
         await pilot.pause(0.4)
         assert app.ui_state.last_turn_id is not None
@@ -81,3 +84,51 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         assert runtime.graph_health(app.ui_state.experiment_id)["feedback"] == 1
         transcript_text = transcript_path.read_text(encoding="utf-8")
         assert "ACCEPT" in transcript_text
+        call_count = 0
+        original_graph_health = runtime.graph_health
+
+        def counted_graph_health(experiment_id):
+            nonlocal call_count
+            call_count += 1
+            return original_graph_health(experiment_id)
+
+        runtime.graph_health = counted_graph_health
+        app.screen._graph_health_dirty = True
+        app.screen._health()
+        app.screen._health()
+        assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    first_session = runtime.start_session(experiment["id"], title="Atlas One")
+    runtime.chat(session_id=first_session["id"], user_text="Describe conversation atlas one.")
+    second_session = runtime.start_session(experiment["id"], title="Atlas Two")
+    runtime.chat(session_id=second_session["id"], user_text="Describe conversation atlas two.")
+
+    app = EdenTuiApp(runtime)
+    async with app.run_test() as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+        app.screen._execute_runtime_action("archive")
+        await pilot.pause(0.5)
+        assert isinstance(app.screen, ConversationAtlasModal)
+        modal = app.screen
+        search = modal.query_one("#atlas_search_input", Input)
+        search.value = "Atlas One"
+        await pilot.pause(0.3)
+        assert len(modal._filtered_records) == 1
+        assert modal._selected_record()["id"] == first_session["id"]
+        modal.query_one("#atlas_folder_input", Input).value = "library/notes"
+        modal.query_one("#atlas_tags_input", Input).value = "research, archive, research"
+        await modal._save_metadata_worker()
+        await pilot.pause(0.3)
+        record = next(item for item in runtime.conversation_archive_records() if item["id"] == first_session["id"])
+        assert record["folder"] == "library/notes"
+        assert record["tags"] == ["research", "archive"]
+        modal.query_one("#atlas_resume_btn", Button).press()
+        await pilot.pause(0.5)
+        assert isinstance(app.screen, ChatScreen)
+        assert app.ui_state.session_id == first_session["id"]
+        assert app.ui_state.session_title == "Atlas One"

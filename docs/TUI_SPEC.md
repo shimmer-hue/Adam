@@ -15,6 +15,7 @@ Live dialogue boot:
     - `Ingest PDF / Doc`
     - `Review Last Reply`
     - `Open Conversation Log`
+    - `Open Conversation Atlas`
     - `Tune Session`
     - `Start New Session`
     - `Continue Latest`
@@ -61,6 +62,7 @@ Primary split:
 
 - left primary dialogue bay:
   - scrolling dialogue tape with persisted Brian / Adam turn boxes for the active session
+  - static chiaroscuro-shaded transcript cards; decorative interior glyph bands are no longer rendered inside the chat text surface
   - live Brian draft box when the composer is loaded
   - inline reply-review strip for pending/reviewed turn state
   - typed inline review flow:
@@ -72,7 +74,7 @@ Primary split:
   - message-input hint surface directly under the composer; `Ctrl+S` sends
   - keyboard-scrollable tape container so the operator can move up/down through the session history
 - right secondary telemetry bay:
-  - enlarged animated signal field / memgraph bus with explicit symbol legend and live update explanation
+  - enlarged slower-pulsing signal field / memgraph bus with explicit symbol legend and live update explanation
   - enlarged aperture / active-set slice that speaks directly to the bus lanes: docs, knowledge memes, behavior memes, memodes, and relation read
   - lower thinking / reasoning slice
 - bottom runtime strip:
@@ -103,11 +105,19 @@ Secondary surfaces:
   - keyboard-first submit / cancel flow
 - `Review` action:
   - focuses the inline reply-review inputs under Adam's latest answer
+- `Conversation Atlas` modal:
+  - `all_texts` root shelf over every persisted session transcript
+  - relational lenses for folders, tags, experiments, and experiment modes
+  - search + facet filter + sort over saved sessions
+  - selected-session preview with recent turns and feedback excerpts
+  - metadata editor for virtual `folder` path and multi-value `tags`
+  - direct `Open Transcript` and `Resume Session` actions
 
 ## Design contract
 
 - fixed telemetry panes, but the prime dialogue tape itself scrolls
 - amber-on-dark operator grammar preserved
+- the prime screen now refreshes on state changes instead of a constant whole-screen repaint loop; decorative chat shading is static rather than animated
 - dialogue-first prime surface: visible transcript and composer dominate the left column; telemetry stays visible but secondary on the right
 - live-session boot is the default path; the app no longer lands on a launcher before chat opens
 - session and utility actions now live in the keyboard-executable top action bus instead of left-column buttons
@@ -126,6 +136,7 @@ Secondary surfaces:
 - feedback is integrated directly into the primary dialogue bay through an inline reply-review strip under Adam's latest answer
 - inline review uses typed `A` / `E` / `R` / `S` codes plus `Y` confirmation, but still reuses the graph-backed feedback path and therefore updates regard, reward, risk, and edit channels
 - conversation logs are written as markdown artifacts under `exports/conversations/` for the active session and surfaced on-screen plus via `Open Conversation Log`
+- the conversation atlas treats saved sessions as a relational transcript library: all logs remain under the single export root while folder/tag organization is stored as session metadata and projected in the atlas
 - conversation boundaries are explicit through the live contract, transcript state, and inline review flow: ask or ingest, review when Adam answers, and end by opening a new session
 - budget changes remain visible, but now live in Deck instead of the prime chat pane
 - latest-session resume restores the latest persisted session surface without forcing a new session flow first
@@ -161,4 +172,5 @@ Secondary surfaces:
 - `F7`: focus the inline reply-review strip
 - `F8`: toggle the full-width aperture drawer
 - `F9`: open document ingest with framing prompt
+- `F10`: open the conversation atlas
 - `Esc`: return focus to the composer on the main chat screen

@@ -92,6 +92,48 @@ def test_runtime_launch_profile_and_session_snapshot(runtime) -> None:
     assert snapshot["conversation_log_path"].endswith(".md")
 
 
+def test_conversation_archive_records_and_taxonomy(runtime) -> None:
+    first_experiment = runtime.initialize_experiment("blank")
+    first_session = runtime.start_session(first_experiment["id"], title="Archive One")
+    runtime.chat(session_id=first_session["id"], user_text="Describe the archive surface.")
+
+    second_experiment = runtime.initialize_experiment("blank")
+    second_session = runtime.start_session(second_experiment["id"], title="Archive Two")
+    runtime.chat(session_id=second_session["id"], user_text="Describe the seeded archive surface.")
+
+    updated = runtime.update_conversation_archive(
+        first_session["id"],
+        folder="projects/archive",
+        tags="memory, atlas, memory",
+    )
+    assert updated["archive"]["folder"] == "projects/archive"
+    assert updated["archive"]["tags"] == ["memory", "atlas"]
+
+    records = runtime.conversation_archive_records()
+    assert len(records) == 2
+    first_record = next(record for record in records if record["id"] == first_session["id"])
+    second_record = next(record for record in records if record["id"] == second_session["id"])
+
+    assert first_record["folder"] == "projects/archive"
+    assert first_record["tags"] == ["memory", "atlas"]
+    assert "all_texts" in first_record["projection_paths"]
+    assert first_record["requested_mode"] == "manual"
+    assert first_record["conversation_log_exists"] is False
+    assert second_record["folder"] == "inbox"
+    assert second_record["tags"] == []
+
+    preview = runtime.conversation_archive_preview(first_session["id"])
+    assert preview["archive"]["folder"] == "projects/archive"
+    assert preview["archive"]["tags"] == ["memory", "atlas"]
+    assert preview["recent_turns"]
+    assert preview["conversation_log_exists"] is False
+
+    log_path = runtime.write_conversation_log(first_session["id"])
+    assert log_path.exists()
+    refreshed_preview = runtime.conversation_archive_preview(first_session["id"])
+    assert refreshed_preview["conversation_log_exists"] is True
+
+
 def test_index_text_into_graph_builds_memode_label_without_refetching_memes(runtime, monkeypatch) -> None:
     monkeypatch.setattr(
         runtime_module,

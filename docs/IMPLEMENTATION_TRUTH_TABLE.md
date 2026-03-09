@@ -15,10 +15,13 @@
 | Composer focus recovery | Implemented | `Esc` returns focus to the composer and printable keys outside editable widgets are routed there automatically |
 | Dialogue-first chat layout | Implemented | primary left dialogue deck keeps transcript + inline review + composer visible; right telemetry stack now uses full-width memgraph/aperture/thinking/event slices plus a thin runtime chyron |
 | Scrolling dialogue tape | Implemented | prime transcript now renders the persisted session inside a focusable scroll container instead of a bounded fixed pane |
+| Static chiaroscuro transcript shading | Implemented | chat cards now use static shaded panel treatments instead of animated decorative glyph bands inside the message surface |
+| Event-driven prime-screen refresh | Implemented | removed the 450ms whole-screen repaint loop; transcript and graph-health surfaces now cache and refresh on state changes |
 | Operator-facing answer sanitization | Implemented | membrane now strips `Answer` / `Basis` / `Next Step` scaffolding and keeps model reasoning separate from Adam's visible reply |
 | Aperture pull-down drawer | Implemented | `F8` opens a full-width readable active-set scan above the dialogue/telemetry split |
 | Inline reply review | Implemented | typed `A` / `E` / `R` / `S` plus `Y` confirmation now live directly under Adam's latest answer and write through the graph-backed feedback path |
 | Conversation log artifact | Implemented | active session transcript is written to markdown under `exports/conversations/` and surfaced via the action bus + merged runtime/event chyron |
+| Conversation atlas archive surface | Implemented | modal archive browser exposes all saved sessions through sort/filter plus virtual folder/tag projections stored in session metadata |
 | Fixed local-MLX runtime contract | Implemented | the live TUI no longer exposes backend selection on the primary surface; local MLX is the normal runtime contract |
 | Deck + Review secondary surfaces | Implemented | detailed budget / thinking / history remain in `Deck`; explicit feedback remains in `Review` |
 | Dedicated model thinking panel | Implemented | MLX/Qwen reasoning is kept on and surfaced separately from the final answer via Deck |
@@ -64,7 +67,7 @@
 
 Validated in this patch:
 
-- `.venv/bin/pytest -q` -> `31 passed`
+- `.venv/bin/pytest -q` -> `34 passed`
 - CLI observatory fallback from occupied requested port to actual port `8877`
 - live observatory preview / commit / revert succeeded against a real experiment
 - mock demo export wrote graph, basin, geometry, measurement, and index artifacts

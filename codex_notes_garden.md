@@ -587,3 +587,116 @@ Remaining uncertainties:
 The current fix removes the brittle lookup that triggered the crash. If another shared-connection race appears on a different read path, the next bounded step would be to audit and lock all GraphStore reads consistently.
 Next shortest proof path:
 Relaunch the TUI, send the same prompt that previously crashed, and confirm the turn persists normally with the reply-review strip appearing instead of a traceback.
+
+## [2026-03-08 14:28:47 EDT] PRE-FLIGHT
+Operator task:
+Replace the animated decorative chat glyph bands with static chiaroscuro panel shading, reduce panel animation cost, and make the chat materially faster while preserving the dialogue-first cockpit.
+Task checksum:
+adam-tui-static-chiaroscuro-refresh-optimization-20260308
+Repo situation:
+Dirty worktree already includes the reply-surface redesign and the recent turn-index crash fix; this turn should stay bounded to TUI rendering/performance surfaces plus matching docs/tests.
+Relevant spec surfaces read:
+docs/TUI_SPEC.md, docs/KNOWN_LIMITATIONS.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, current chat/preview/render loop in eden/tui/app.py.
+Natural-language contracts in force:
+The TUI remains the primary runtime interface; telemetry stays visible but secondary; Adam/Brian transcript readability takes precedence over decorative effects; changes must remain stable on this Apple Silicon local machine.
+Files/modules likely in scope:
+eden/tui/app.py, tests/test_tui_smoke.py, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, README.md, codex_notes_garden.md.
+Status register:
+- Implemented:
+Dialogue-first chat tape, inline typed review, merged runtime/event chyron, memgraph bus, aperture stack, conversation logs, operator-facing answer sanitization.
+- Instrumented:
+Live preview, memgraph bus animation, runtime/event trace surfaces.
+- Conceptual:
+Terminal-native neo-classical cyberspace shading with no animated chat ornament and a lighter prime-screen refresh path.
+- Unknown:
+Which hot path is dominating perceived slowness: the 450ms full-screen repaint loop, live preview churn while typing, repeated graph-health computation, transcript rebuild cost, or some combination.
+Risks / invariants:
+Do not regress transcript readability, preview correctness, keyboard focus flow, inline review, or signal-field utility. Avoid decorative glyphs inside the message surface that can be mistaken for semantic content.
+Evidence plan:
+Remove the whole-screen repaint interval, make transcript cards static, cache historical transcript renderables and graph-health reads, slow the signal-field tick, debounce preview harder, add at least one smoke-test ratchet for the simpler transcript surface / cached health path, then run py_compile and focused/full pytest.
+Shortest proof path:
+Patch eden/tui/app.py, update tests/test_tui_smoke.py and the relevant docs, run `./.venv/bin/python -m py_compile eden/tui/app.py tests/test_tui_smoke.py`, then `./.venv/bin/pytest -q tests/test_tui_smoke.py` and full `./.venv/bin/pytest -q`.
+
+## [2026-03-08 14:31:34 EDT] POST-FLIGHT
+Files changed:
+eden/tui/app.py, tests/test_tui_smoke.py, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, README.md, codex_notes_garden.md
+Specs changed:
+docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, README.md
+Natural-language contracts added/revised/preserved:
+Preserved the dialogue-first cockpit and readable secondary telemetry stack; revised the chat-surface aesthetic contract from animated interior glyph bands to static chiaroscuro shading; revised the prime-screen refresh contract from periodic whole-screen repaint to event-driven refresh with cached heavy surfaces.
+Behavior implemented or modified:
+Removed the 450ms whole-screen `refresh_panels()` loop from the live chat screen; cached graph-health computation until the graph changes; cached historical transcript panel renderables per session and invalidated them only on graph/session mutation; slowed the signal-field animation tick; made preview refresh single-flight with a longer debounce while typing; removed decorative animated glyph bands from Brian/Adam/review/draft cards and replaced them with static shaded panel treatments plus darker, neo-classical cyberpunk/chiaroscuro color fields.
+Evidence produced (tests / traces / commands / exports):
+./.venv/bin/python -m py_compile eden/tui/app.py tests/test_tui_smoke.py; ./.venv/bin/pytest -q tests/test_tui_smoke.py -> 1 passed; ./.venv/bin/pytest -q -> 32 passed
+Status register changes:
+- Implemented:
+Static shaded transcript cards, event-driven prime-screen refresh, cached graph-health reads, cached historical transcript rendering, slower memgraph pulse cadence, and single-flight debounced preview refresh.
+- Instrumented:
+Signal-field animation and preview retrieval remain live, but now on a lighter cadence/path.
+- Conceptual:
+Terminal-native “shader” aesthetics remain constrained to color fields, borders, and dither-like static shading rather than true pixel shaders.
+- Unknown:
+No fresh screenshot artifact from this turn proves the final neo-classical cyberspace look or the perceived typing-speed improvement at the operator’s exact window geometry.
+Truth-table / limitations updates:
+Updated docs/TUI_SPEC.md to record static shaded transcript cards and event-driven refresh; updated docs/IMPLEMENTATION_TRUTH_TABLE.md for static transcript shading plus event-driven prime refresh; updated docs/KNOWN_LIMITATIONS.md to document the lighter refresh path and remaining preview/signal-field cost.
+Remaining uncertainties:
+The correctness path is proved, but the aesthetic/performance outcome still needs operator validation in a live session. If typing is still slower than acceptable, the next bounded target is live preview itself rather than panel repaint.
+Next shortest proof path:
+Launch the TUI, type a multi-line draft in a seeded session, confirm the transcript no longer shows interior glyph ornaments, and judge whether preview responsiveness is acceptable; if not, gate live preview behind a manual toggle or a larger idle delay.
+
+
+## [2026-03-09 09:05:47 EDT] PRE-FLIGHT
+Operator task:
+Add a new TUI conversation-archive screen for browsing saved conversations with relational sorting/grouping, plus persisted virtual folder/tag metadata and direct transcript/session actions.
+Task checksum:
+adam-conversation-atlas-terminal-archive-20260309
+Repo situation:
+Dirty worktree already contains the recent TUI refresh optimization and turn-index crash fix; this turn should stay bounded to TUI archive surfaces, session metadata/query helpers, tests, and matching docs.
+Relevant spec surfaces read:
+docs/TUI_SPEC.md, docs/GRAPH_SCHEMA.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, conversation-log/session paths in eden/runtime.py, session storage in eden/storage/graph_store.py.
+Natural-language contracts in force:
+TUI remains the primary runtime surface; conversation logs are markdown artifacts under exports; SQLite remains the local persistence layer; new behavior must preserve the experiment/session ontology and keep claims truthful about virtual archive organization vs physical files.
+Files/modules likely in scope:
+eden/tui/app.py, eden/storage/graph_store.py, eden/runtime.py, tests/test_tui_smoke.py, tests/test_runtime_e2e.py, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, codex_notes_garden.md.
+Status register:
+- Implemented:
+Conversation log markdown export per session; session metadata persistence; deck/history surfaces; session resume/new-session/profile flows.
+- Instrumented:
+Runtime/event traces and conversation-log sync already expose saved-session activity, but there is no dedicated archive browser.
+- Conceptual:
+A terminal-native conversation archive/atlas with relational folder/tag projections over the transcript corpus.
+- Unknown:
+How much metadata editing and grouping UX can be added cleanly in one bounded patch without destabilizing the prime chat flow.
+Risks / invariants:
+Do not break live chat focus flow, session resume, or transcript export. Keep all text logs under the existing export root while making folder/tag organization explicitly relational metadata, not a misleading filesystem duplication claim.
+Evidence plan:
+Add session-catalog query/update helpers, implement a modal archive browser with sorting/grouping and metadata editing, wire it into startup/runtime menus and bindings, add smoke/runtime tests, then run py_compile and focused/full pytest.
+Shortest proof path:
+Patch storage/runtime/TUI surfaces, verify the modal can list sessions and persist folder/tags, then run `./.venv/bin/python -m py_compile eden/tui/app.py eden/storage/graph_store.py eden/runtime.py tests/test_tui_smoke.py tests/test_runtime_e2e.py` followed by focused pytest and full `./.venv/bin/pytest -q`.
+
+## [2026-03-09 09:23:06 EDT] POST-FLIGHT
+Files changed:
+eden/storage/graph_store.py, eden/runtime.py, eden/tui/app.py, tests/test_runtime_e2e.py, tests/test_tui_smoke.py, docs/TUI_SPEC.md, docs/GRAPH_SCHEMA.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, codex_notes_garden.md
+Specs changed:
+docs/TUI_SPEC.md, docs/GRAPH_SCHEMA.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
+Natural-language contracts added/revised/preserved:
+Added a new `Conversation Atlas` secondary TUI surface with an `all_texts` root shelf plus relational folder/tag projections over saved sessions. Preserved the existing contract that conversation logs remain markdown artifacts under the export root and clarified that atlas folders/tags are session-metadata projections rather than duplicate filesystem copies.
+Behavior implemented or modified:
+Added `GraphStore.list_session_catalog()` for experiment/session catalog queries with turn and feedback counts plus latest-turn excerpts. Added runtime archive helpers to normalize and persist `sessions.metadata_json.archive.folder` and `sessions.metadata_json.archive.tags`, expose atlas records, and build selected-session previews. Added a new `ConversationAtlasModal` with search, facet filtering, sort modes, projection summaries, selected-session preview, metadata editing, transcript opening, and session resume. Wired the atlas into the startup launcher, live action bus, deck, help text, and `F10`.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python -m py_compile eden/tui/app.py eden/runtime.py eden/storage/graph_store.py tests/test_tui_smoke.py tests/test_runtime_e2e.py`; `./.venv/bin/pytest -q tests/test_runtime_e2e.py::test_conversation_archive_records_and_taxonomy` -> `1 passed`; `./.venv/bin/pytest -q tests/test_runtime_e2e.py` -> `4 passed`; `./.venv/bin/pytest -q tests/test_tui_smoke.py` -> `2 passed`; `./.venv/bin/pytest -q` -> `34 passed`
+Status register changes:
+- Implemented:
+Terminal-native conversation atlas with persisted folder/tag taxonomy over saved sessions, startup/runtime access points, transcript open, and resume-session flow.
+- Instrumented:
+Atlas preview panels surface recent turns and recent feedback excerpts from persisted session data, but they remain bounded summaries rather than full replay timelines.
+- Conceptual:
+More ambitious DEVONthink-class boolean querying, arbitrary multi-parent folder graphs, or richer transcript diff/replay tooling remain out of scope.
+- Unknown:
+How the atlas feels with a very large real-world session library; the smoke path proves correctness, not large-catalog ergonomics.
+Truth-table / limitations updates:
+Updated TUI, graph-schema, truth-table, and limitations docs to record the atlas surface, persisted archive metadata, and the explicit limitation that the taxonomy is relational metadata rather than a physical transcript mirror.
+Remaining uncertainties:
+The atlas now works and is tested, but very large catalogs may need pagination, cached counts, or richer facet widgets later.
+Next shortest proof path:
+Launch the TUI, open `Conversation Atlas` from the action bus or `F10`, assign real folder/tag metadata to several sessions, then judge whether you want the next patch to focus on nested shelves, saved searches, or richer transcript preview/replay.

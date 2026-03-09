@@ -12,12 +12,12 @@ from typing import Any
 from rich.console import Group
 from rich.panel import Panel
 from rich.text import Text
-from textual import on
+from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Footer, Header, Input, RichLog, Select, Static, TextArea
+from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, Select, Static, TextArea
 
 from ..runtime import EdenRuntime
 from ..utils import safe_excerpt
@@ -37,12 +37,17 @@ EMBER = "#ffae57"
 VIOLET = "#a890ff"
 MARBLE_DARK = "#160a14"
 MARBLE_LIGHT = "#351629"
+CHIARO_SHADOW = "#10070a"
+CHIARO_BRONZE = "#21100f"
+CHIARO_WINE = "#22101a"
+CHIARO_SLATE = "#101622"
 
 ACTION_MENU_OPTIONS = [
     ("Toggle Aperture Drawer", "toggle_aperture"),
     ("Ingest PDF / Doc", "ingest_pdf"),
     ("Review Last Reply", "review"),
     ("Open Conversation Log", "conversation_log"),
+    ("Open Conversation Atlas", "archive"),
     ("Tune Session", "profile"),
     ("Start New Session", "new_session"),
     ("Continue Latest", "resume"),
@@ -56,6 +61,23 @@ ACTION_MENU_OPTIONS = [
 ]
 
 ACTION_MENU_LABELS = {value: label for label, value in ACTION_MENU_OPTIONS}
+
+ARCHIVE_SORT_OPTIONS = [
+    ("Recently Updated", "updated_desc"),
+    ("Oldest Updated", "updated_asc"),
+    ("Title A-Z", "title_asc"),
+    ("Most Turns", "turns_desc"),
+    ("Folder A-Z", "folder_asc"),
+    ("Experiment A-Z", "experiment_asc"),
+]
+
+ARCHIVE_GROUP_OPTIONS = [
+    ("All Texts", "all_texts"),
+    ("Folders", "folder"),
+    ("Tags", "tag"),
+    ("Experiments", "experiment"),
+    ("Modes", "mode"),
+]
 
 
 def _observatory_target_url(runtime: EdenRuntime, status: dict[str, Any], experiment_id: str | None) -> str:
@@ -105,6 +127,7 @@ class HelpModal(ModalScreen[None]):
             "The right column stacks the memgraph bus, a larger aperture/active-set read, and a lower thinking surface.\n"
             "The runtime loop and session/event state ride in the merged bottom chyron so they stay visible without stealing panel width.\n"
             "Use Action Bus -> Open Conversation Log to open the saved markdown transcript for the live session.\n"
+            "Use Action Bus -> Open Conversation Atlas to browse saved sessions through folder and tag projections.\n"
             "Open Utilities Deck for detailed budget, thinking, history, ingest, and launch utilities.\n"
             "Review Last Reply jumps focus to the inline reply-review strip.\n\n"
             "[bold]F1[/] help overlay\n"
@@ -117,6 +140,7 @@ class HelpModal(ModalScreen[None]):
             "[bold]F7[/] focus inline reply review\n"
             "[bold]F8[/] toggle the full-width aperture drawer\n"
             "[bold]F9[/] open document ingest with framing prompt\n"
+            "[bold]F10[/] open the conversation atlas\n"
             "[bold]Esc[/] focus the composer on the main chat screen\n"
             "[bold]Esc[/] close this overlay\n\n"
             "Printable keys typed outside editable widgets are routed back into the composer automatically.\n"
@@ -356,6 +380,386 @@ class FeedbackModal(ModalScreen[None]):
             self.dismiss(None)
 
 
+class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
+    def __init__(self, *, preferred_session_id: str | None = None) -> None:
+        super().__init__()
+        self.preferred_session_id = preferred_session_id
+        self._records: list[dict[str, Any]] = []
+        self._filtered_records: list[dict[str, Any]] = []
+        self._selected_session_id: str | None = preferred_session_id
+        self._selected_preview: dict[str, Any] | None = None
+        self._status_message = "Atlas root = all_texts. Folder and tag lenses are relational overlays over saved session transcripts."
+
+    def compose(self) -> ComposeResult:
+        yield Static(id="atlas_summary")
+        with Horizontal(id="atlas_shell"):
+            with Vertical(classes="atlas_column"):
+                yield Input(placeholder="Search title, experiment, folder, tag, or excerpt", id="atlas_search_input")
+                yield Select(
+                    ARCHIVE_SORT_OPTIONS,
+                    value="updated_desc",
+                    allow_blank=False,
+                    id="atlas_sort_select",
+                    prompt="Sort order",
+                )
+                yield Select(
+                    ARCHIVE_GROUP_OPTIONS,
+                    value="all_texts",
+                    allow_blank=False,
+                    id="atlas_group_select",
+                    prompt="Lens",
+                )
+                yield Input(placeholder="Optional facet filter for the current lens", id="atlas_filter_input")
+                yield Static(id="atlas_taxonomy_panel")
+                yield Static(id="atlas_status_panel")
+            with Vertical(classes="atlas_column atlas_records_column"):
+                yield DataTable(zebra_stripes=True, cursor_type="row", id="atlas_records_table")
+                yield Static(id="atlas_projection_panel")
+            with Vertical(classes="atlas_column"):
+                yield Static(id="atlas_preview_panel")
+                yield Input(placeholder="Folder path, e.g. projects/atlas", id="atlas_folder_input")
+                yield Input(placeholder="Tags, comma-separated", id="atlas_tags_input")
+                with Horizontal():
+                    yield Button("Save Taxonomy", id="atlas_save_btn", variant="primary")
+                    yield Button("Open Transcript", id="atlas_open_btn")
+                with Horizontal():
+                    yield Button("Resume Session", id="atlas_resume_btn")
+                    yield Button("Refresh", id="atlas_refresh_btn")
+                    yield Button("Close", id="atlas_close_btn")
+                yield Static(id="atlas_editor_hint")
+
+    def on_mount(self) -> None:
+        table = self.query_one("#atlas_records_table", DataTable)
+        table.add_columns("Session", "Experiment", "Mode", "Turns", "Folder", "Tags", "Updated")
+        self._refresh_panels()
+        self.run_worker(self._load_records_worker(), exclusive=True, group="atlas_load")
+        self.call_after_refresh(lambda: self.query_one("#atlas_search_input", Input).focus())
+
+    async def _load_records_worker(self) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        self._records = await asyncio.to_thread(app.runtime.conversation_archive_records)
+        self._refresh_table()
+
+    async def _load_preview_worker(self, session_id: str) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        try:
+            preview = await asyncio.to_thread(partial(app.runtime.conversation_archive_preview, session_id))
+        except KeyError:
+            self._status_message = "Atlas detected a stale session pointer and refreshed its index."
+            self._records = await asyncio.to_thread(app.runtime.conversation_archive_records)
+            if session_id == self._selected_session_id:
+                self._selected_session_id = None
+            self._refresh_table()
+            return
+        if session_id != self._selected_session_id:
+            return
+        self._selected_preview = preview
+        self._refresh_panels()
+
+    def _selected_record(self) -> dict[str, Any] | None:
+        if not self._selected_session_id:
+            return None
+        for record in self._filtered_records:
+            if record["id"] == self._selected_session_id:
+                return record
+        for record in self._records:
+            if record["id"] == self._selected_session_id:
+                return record
+        return None
+
+    def _current_lens(self) -> str:
+        return str(self.query_one("#atlas_group_select", Select).value or "all_texts")
+
+    def _current_filter(self) -> str:
+        return self.query_one("#atlas_filter_input", Input).value.strip().lower()
+
+    def _current_search(self) -> str:
+        return self.query_one("#atlas_search_input", Input).value.strip().lower()
+
+    def _record_matches(self, record: dict[str, Any], *, search: str, lens: str, facet: str) -> bool:
+        if search and search not in record["search_text"]:
+            return False
+        if not facet:
+            return True
+        if lens == "folder":
+            return facet in record["folder"].lower()
+        if lens == "tag":
+            return any(facet in tag.lower() for tag in record["tags"])
+        if lens == "experiment":
+            return facet in str(record["experiment_name"]).lower()
+        if lens == "mode":
+            return facet in str(record.get("experiment_mode") or "").lower()
+        return facet in record["search_text"]
+
+    def _sort_key(self, record: dict[str, Any]) -> tuple[Any, ...]:
+        sort_mode = str(self.query_one("#atlas_sort_select", Select).value or "updated_desc")
+        if sort_mode == "updated_asc":
+            return (str(record.get("updated_at") or ""), str(record["title"]).lower())
+        if sort_mode == "title_asc":
+            return (str(record["title"]).lower(), str(record.get("updated_at") or ""))
+        if sort_mode == "turns_desc":
+            return (int(record.get("turn_count") or 0), str(record.get("updated_at") or ""))
+        if sort_mode == "folder_asc":
+            return (str(record["folder"]).lower(), str(record["title"]).lower())
+        if sort_mode == "experiment_asc":
+            return (str(record["experiment_name"]).lower(), str(record["title"]).lower())
+        return (str(record.get("updated_at") or ""), int(record.get("turn_count") or 0))
+
+    def _sort_reverse(self) -> bool:
+        sort_mode = str(self.query_one("#atlas_sort_select", Select).value or "updated_desc")
+        return sort_mode in {"updated_desc", "turns_desc"}
+
+    def _sync_editor_fields(self) -> None:
+        record = self._selected_record()
+        folder_input = self.query_one("#atlas_folder_input", Input)
+        tags_input = self.query_one("#atlas_tags_input", Input)
+        if record is None:
+            folder_input.value = ""
+            tags_input.value = ""
+            return
+        folder_input.value = record["folder"]
+        tags_input.value = ", ".join(record["tags"])
+
+    def _counts_for_lens(self, lens: str) -> list[tuple[str, int]]:
+        counts: dict[str, int] = {}
+        for record in self._records:
+            if lens == "folder":
+                values = [record["folder"]]
+            elif lens == "tag":
+                values = record["tags"] or ["untagged"]
+            elif lens == "experiment":
+                values = [record["experiment_name"]]
+            elif lens == "mode":
+                values = [str(record.get("experiment_mode") or "blank")]
+            else:
+                values = ["all_texts"]
+            for value in values:
+                counts[value] = counts.get(value, 0) + 1
+        return sorted(counts.items(), key=lambda item: (-item[1], item[0].lower()))
+
+    def _refresh_table(self) -> None:
+        table = self.query_one("#atlas_records_table", DataTable)
+        search = self._current_search()
+        lens = self._current_lens()
+        facet = self._current_filter()
+        filtered = [record for record in self._records if self._record_matches(record, search=search, lens=lens, facet=facet)]
+        filtered.sort(key=self._sort_key, reverse=self._sort_reverse())
+        self._filtered_records = filtered
+        table.clear(columns=False)
+        for record in filtered:
+            table.add_row(
+                safe_excerpt(record["title"], limit=26),
+                safe_excerpt(record["experiment_name"], limit=20),
+                str(record.get("experiment_mode") or "blank"),
+                str(record.get("turn_count") or 0),
+                safe_excerpt(record["folder"], limit=18),
+                safe_excerpt(record["tag_display"], limit=22),
+                safe_excerpt(str(record.get("updated_at") or ""), limit=19),
+                key=record["id"],
+            )
+        if not filtered:
+            self._selected_session_id = None
+            self._selected_preview = None
+            self.query_one("#atlas_folder_input", Input).value = ""
+            self.query_one("#atlas_tags_input", Input).value = ""
+            self._refresh_panels()
+            return
+        selected_ids = {record["id"] for record in filtered}
+        target_id = self._selected_session_id if self._selected_session_id in selected_ids else None
+        if target_id is None and self.preferred_session_id in selected_ids:
+            target_id = self.preferred_session_id
+        if target_id is None:
+            target_id = filtered[0]["id"]
+        target_index = next(index for index, record in enumerate(filtered) if record["id"] == target_id)
+        self._selected_session_id = target_id
+        self._sync_editor_fields()
+        table.move_cursor(row=target_index, column=0)
+        self.run_worker(self._load_preview_worker(target_id), exclusive=True, group="atlas_preview")
+        self._refresh_panels()
+
+    def _summary_panel(self) -> Panel:
+        lens = self._current_lens()
+        selected = self._selected_record()
+        body = Text.from_markup(
+            "[bold #ffbf66]Conversation Atlas[/]\n"
+            "all_texts is the root shelf. Folders and tags are relational projections over persisted sessions, not duplicate transcript files.\n\n"
+            f"records={len(self._records)} filtered={len(self._filtered_records)} lens={lens}\n"
+            f"selected={(selected or {}).get('title', 'none')}"
+        )
+        return Panel(body, title="Atlas Root", border_style=AMBER)
+
+    def _taxonomy_panel(self) -> Panel:
+        folder_counts = self._counts_for_lens("folder")[:5]
+        tag_counts = self._counts_for_lens("tag")[:6]
+        lines = ["[bold #ffbf66]Folder Projections[/]"]
+        lines.extend(f"{name} :: {count}" for name, count in folder_counts)
+        lines.append("")
+        lines.append("[bold #ffbf66]Tag Projections[/]")
+        lines.extend(f"#{name} :: {count}" for name, count in tag_counts)
+        return Panel(Text.from_markup("\n".join(lines)), title="Taxonomy", border_style=ROSE)
+
+    def _status_panel(self) -> Panel:
+        record = self._selected_record()
+        transcript_state = "ready" if record and record.get("conversation_log_exists") else "derived-on-open"
+        facet = self._current_filter() or "none"
+        body = Text.from_markup(
+            f"[bold {AMBER}]Lens[/] {self._current_lens()} / facet={facet}\n"
+            f"[bold {AMBER}]Search[/] {self._current_search() or 'none'}\n"
+            f"[bold {AMBER}]Transcript[/] {transcript_state}\n\n"
+            + safe_excerpt(self._status_message, limit=220)
+        )
+        return Panel(body, title="Atlas Status", border_style=ICE)
+
+    def _projection_panel(self) -> Panel:
+        lens = self._current_lens()
+        counts = self._counts_for_lens(lens if lens != "all_texts" else "folder")[:8]
+        header = "Current projection counts" if lens != "all_texts" else "Folder shelves beneath all_texts"
+        lines = [f"[bold {AMBER}]{header}[/]"]
+        lines.extend(f"{name} -> {count}" for name, count in counts)
+        if not counts:
+            lines.append("No saved sessions yet.")
+        return Panel(Text.from_markup("\n".join(lines)), title="Projection Map", border_style=AMBER)
+
+    def _preview_panel(self) -> Panel:
+        record = self._selected_record()
+        preview = self._selected_preview
+        if record is None:
+            return Panel(Text("No saved conversations yet.", style=MUTED), title="Session Preview", border_style=AMBER)
+        projection = " / ".join(["all_texts", record["folder"], *[f"#{tag}" for tag in record["tags"]]])
+        recent_turn_lines = []
+        feedback_lines = []
+        if preview:
+            for turn in preview.get("recent_turns", []):
+                recent_turn_lines.append(f"T{turn['turn_index']} Brian :: {turn['user_excerpt']}")
+                recent_turn_lines.append(f"T{turn['turn_index']} Adam  :: {turn['response_excerpt']}")
+            feedback_lines = [
+                f"{str(item.get('verdict', 'skip')).upper()} :: {safe_excerpt(item.get('explanation') or 'no explanation', limit=72)}"
+                for item in preview.get("recent_feedback", [])
+            ]
+        else:
+            recent_turn_lines = ["Loading preview surface..."]
+        body = Text.from_markup(
+            f"[bold {AMBER}]Session[/] {record['title']}\n"
+            f"experiment={record['experiment_name']} mode={record.get('experiment_mode', 'blank')}\n"
+            f"requested={record.get('requested_mode', 'manual')} budget={record.get('budget_mode', 'balanced')}\n"
+            f"turns={record.get('turn_count', 0)} feedback={record.get('feedback_count', 0)}\n"
+            f"updated={record.get('updated_at', 'n/a')}\n"
+            f"path={projection or 'all_texts'}\n\n"
+            f"[bold {AMBER}]Latest Brian[/] {record['last_user_excerpt']}\n"
+            f"[bold {AMBER}]Latest Adam[/] {record['last_response_excerpt']}\n\n"
+            f"[bold {AMBER}]Recent Turns[/]\n"
+            + ("\n".join(recent_turn_lines) if recent_turn_lines else "No recent turns.")
+            + (
+                "\n\n[bold #ffbf66]Recent Feedback[/]\n" + "\n".join(feedback_lines)
+                if feedback_lines
+                else ""
+            )
+        )
+        return Panel(body, title="Session Preview", border_style=AMBER)
+
+    def _editor_hint_panel(self) -> Panel:
+        body = Text.from_markup(
+            "[bold #ffbf66]Editor[/]\n"
+            "Assign one folder path and any number of tags. The same conversation still lives under all_texts while also appearing through those relational lenses."
+        )
+        return Panel(body, title="Metadata Editor", border_style=ROSE)
+
+    def _refresh_panels(self) -> None:
+        self.query_one("#atlas_summary", Static).update(self._summary_panel())
+        self.query_one("#atlas_taxonomy_panel", Static).update(self._taxonomy_panel())
+        self.query_one("#atlas_status_panel", Static).update(self._status_panel())
+        self.query_one("#atlas_projection_panel", Static).update(self._projection_panel())
+        self.query_one("#atlas_preview_panel", Static).update(self._preview_panel())
+        self.query_one("#atlas_editor_hint", Static).update(self._editor_hint_panel())
+
+    @on(Input.Changed, "#atlas_search_input")
+    @on(Input.Changed, "#atlas_filter_input")
+    @on(Select.Changed, "#atlas_sort_select")
+    @on(Select.Changed, "#atlas_group_select")
+    def handle_query_change(self, _event) -> None:
+        if self.is_mounted:
+            self._refresh_table()
+
+    @on(DataTable.RowHighlighted, "#atlas_records_table")
+    def handle_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        session_id = str(event.row_key.value)
+        if session_id == self._selected_session_id and self._selected_preview is not None:
+            return
+        self._selected_session_id = session_id
+        self._selected_preview = None
+        self._sync_editor_fields()
+        self._refresh_panels()
+        self.run_worker(self._load_preview_worker(session_id), exclusive=True, group="atlas_preview")
+
+    @on(Button.Pressed, "#atlas_save_btn")
+    def handle_save_metadata(self) -> None:
+        self.run_worker(self._save_metadata_worker(), exclusive=True, group="atlas_save")
+
+    async def _save_metadata_worker(self) -> None:
+        if not self._selected_session_id:
+            self._status_message = "No session selected."
+            self._refresh_panels()
+            return
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        record = self._selected_record()
+        folder = self.query_one("#atlas_folder_input", Input).value
+        tags = self.query_one("#atlas_tags_input", Input).value
+        updated = await asyncio.to_thread(
+            partial(app.runtime.update_conversation_archive, self._selected_session_id, folder=folder, tags=tags)
+        )
+        title = record["title"] if record else self._selected_session_id
+        self._status_message = (
+            f"Saved taxonomy for {title}: "
+            f"{updated['archive']['folder']} / "
+            f"{', '.join('#' + tag for tag in updated['archive']['tags']) or 'untagged'}"
+        )
+        self._records = await asyncio.to_thread(app.runtime.conversation_archive_records)
+        self._refresh_table()
+
+    @on(Button.Pressed, "#atlas_open_btn")
+    def handle_open_transcript(self) -> None:
+        self.run_worker(self._open_transcript_worker(), exclusive=True, group="atlas_open")
+
+    async def _open_transcript_worker(self) -> None:
+        if not self._selected_session_id:
+            self._status_message = "No session selected."
+            self._refresh_panels()
+            return
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        path = await asyncio.to_thread(partial(app.runtime.write_conversation_log, self._selected_session_id))
+        webbrowser.open(path.as_uri())
+        self._status_message = f"Opened transcript {path.name}."
+        self._records = await asyncio.to_thread(app.runtime.conversation_archive_records)
+        self._selected_preview = await asyncio.to_thread(partial(app.runtime.conversation_archive_preview, self._selected_session_id))
+        self._refresh_panels()
+
+    @on(Button.Pressed, "#atlas_resume_btn")
+    def handle_resume_session(self) -> None:
+        if not self._selected_session_id:
+            self._status_message = "No session selected."
+            self._refresh_panels()
+            return
+        self.dismiss({"action": "resume", "session_id": self._selected_session_id})
+
+    @on(Button.Pressed, "#atlas_refresh_btn")
+    def handle_refresh(self) -> None:
+        self._status_message = "Refreshing atlas index."
+        self._refresh_panels()
+        self.run_worker(self._load_records_worker(), exclusive=True, group="atlas_refresh")
+
+    @on(Button.Pressed, "#atlas_close_btn")
+    def handle_close(self) -> None:
+        self.dismiss(None)
+
+    def on_key(self, event) -> None:
+        if event.key == "escape":
+            self.dismiss(None)
+
+
 class DeckModal(ModalScreen[None]):
     def __init__(self, chat_screen: "ChatScreen") -> None:
         super().__init__()
@@ -381,6 +785,7 @@ class DeckModal(ModalScreen[None]):
                 with Horizontal():
                     yield Button("Resume Latest", id="deck_resume_btn")
                     yield Button("New Session", id="deck_new_session_btn")
+                    yield Button("Conversation Atlas", id="deck_archive_btn")
                 with Horizontal():
                     yield Button("Low Motion", id="deck_motion_btn")
                     yield Button("Debug", id="deck_debug_btn")
@@ -426,6 +831,11 @@ class DeckModal(ModalScreen[None]):
     def handle_new_session(self) -> None:
         self.dismiss(None)
         self.chat_screen.begin_new_session_flow()
+
+    @on(Button.Pressed, "#deck_archive_btn")
+    def handle_archive(self) -> None:
+        self.dismiss(None)
+        self.chat_screen.run_worker(self.chat_screen.handle_archive(), exclusive=True, group="archive")
 
     @on(Button.Pressed, "#deck_motion_btn")
     async def handle_motion(self) -> None:
@@ -601,7 +1011,7 @@ class AdamSigil(Static):
 class SignalField(Static):
     def on_mount(self) -> None:
         self._frame = 0
-        self.set_interval(0.28, self._tick)
+        self.set_interval(0.55, self._tick)
         self._tick()
 
     def _trace_payload(self, event: dict[str, Any]) -> dict[str, Any]:
@@ -907,6 +1317,7 @@ class StartupScreen(Screen):
                         ("Refresh Model", "refresh_model"),
                         ("Open Browser Observatory", "observatory"),
                         ("Export Artifacts", "export"),
+                        ("Open Conversation Atlas", "archive"),
                         ("Help", "help"),
                     ],
                     value="blank",
@@ -1049,6 +1460,8 @@ class StartupScreen(Screen):
             self.handle_startup_observatory()
         elif normalized == "export":
             self.handle_startup_export()
+        elif normalized == "archive":
+            self.handle_startup_archive()
         elif normalized == "help":
             self.run_worker(self.app.push_screen(HelpModal()), exclusive=True, group="startup_help")
 
@@ -1189,6 +1602,20 @@ class StartupScreen(Screen):
     def handle_startup_export(self) -> None:
         self.run_worker(self._startup_export_worker(), exclusive=True, group="startup_export")
 
+    async def _startup_archive_worker(self) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        payload = await app.push_screen_wait(ConversationAtlasModal(preferred_session_id=app.ui_state.session_id))
+        if not payload or payload.get("action") != "resume" or not payload.get("session_id"):
+            return
+        snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, payload["session_id"]))
+        app.apply_session_snapshot(snapshot)
+        self.query_one("#startup_log", RichLog).write(f"[INFO] Atlas resumed :: {snapshot['session_title']}")
+        await app.push_screen(ChatScreen())
+
+    def handle_startup_archive(self) -> None:
+        self.run_worker(self._startup_archive_worker(), exclusive=True, group="startup_archive")
+
     def handle_startup_observatory(self) -> None:
         self.run_worker(self._startup_observatory_worker(), exclusive=True, group="startup_observatory")
 
@@ -1209,7 +1636,11 @@ class ChatScreen(Screen):
         self._seen_log_count = 0
         self._preview_task: asyncio.Task[None] | None = None
         self._preview_generation = 0
-        self._display_frame = 0
+        self._preview_running = False
+        self._preview_rerun_requested = False
+        self._transcript_cache_session_id: str | None = None
+        self._transcript_cache_panels: tuple[Panel, ...] = ()
+        self._graph_health_dirty = True
         self._event_lines: list[str] = []
 
     def compose(self) -> ComposeResult:
@@ -1276,13 +1707,11 @@ class ChatScreen(Screen):
 
     def on_mount(self) -> None:
         self.set_interval(0.6, self._poll_logs)
-        self.set_interval(0.45, self.refresh_panels)
         self.refresh_panels()
         self.run_worker(self._bootstrap_live_surface(), exclusive=True, group="bootstrap")
         self.call_after_refresh(lambda: self.query_one("#composer_input", TextArea).focus())
 
     def refresh_panels(self) -> None:
-        self._display_frame = (self._display_frame + 1) % 10_000
         self._health()
         self._sync_aperture_drawer()
         self._sync_header_controls()
@@ -1297,6 +1726,24 @@ class ChatScreen(Screen):
         self.query_one("#inline_feedback_status_panel", Static).update(self.main_inline_feedback_status_panel())
         self.query_one("#composer_hint_panel", Static).update(self.main_composer_hint_panel())
         self.query_one("#runtime_chyron_panel", Static).update(self.main_runtime_chyron_panel())
+
+    def _refresh_composer_surfaces(self) -> None:
+        self.query_one("#action_bus_panel", Static).update(self.main_action_bus_panel())
+        self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
+        self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
+        self.query_one("#composer_hint_panel", Static).update(self.main_composer_hint_panel())
+
+    def _invalidate_transcript_cache(self) -> None:
+        self._transcript_cache_session_id = None
+        self._transcript_cache_panels = ()
+
+    def _mark_graph_dirty(self) -> None:
+        self._graph_health_dirty = True
+        self._invalidate_transcript_cache()
+        self._preview_generation += 1
+        self._preview_rerun_requested = False
+        if self._preview_task is not None and not self._preview_task.done() and not self._preview_running:
+            self._preview_task.cancel()
 
     def _model_status(self) -> dict[str, Any]:
         app = self.app
@@ -1372,6 +1819,7 @@ class ChatScreen(Screen):
             if latest_session is not None:
                 snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, latest_session["id"]))
                 app.apply_session_snapshot(snapshot)
+                self._mark_graph_dirty()
                 app.ui_state.last_feedback = f"Resumed {snapshot['session_title']}."
                 self._write_forensic(f"[INFO] Resumed session :: {snapshot['session_title']}")
                 self.refresh_panels()
@@ -1393,6 +1841,7 @@ class ChatScreen(Screen):
         )
         snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, session["id"]))
         app.apply_session_snapshot(snapshot)
+        self._mark_graph_dirty()
         app.ui_state.last_feedback = "Live dialogue surface armed. Ask a question with Ctrl+S or ingest a document with F9."
         self._write_forensic(f"[INFO] Armed session :: {snapshot['session_title']}")
         self.refresh_panels()
@@ -1456,6 +1905,8 @@ class ChatScreen(Screen):
     def _health(self) -> dict[str, Any]:
         app = self.app
         assert isinstance(app, EdenTuiApp)
+        if not self._graph_health_dirty and app.ui_state.current_graph_health is not None:
+            return app.ui_state.current_graph_health
         if not app.ui_state.experiment_id:
             health = {
                 "memes": 0,
@@ -1470,9 +1921,11 @@ class ChatScreen(Screen):
                 "isolated_count": 0.0,
             }
             app.ui_state.current_graph_health = health
+            self._graph_health_dirty = False
             return health
         health = app.runtime.graph_health(app.ui_state.experiment_id)
         app.ui_state.current_graph_health = health
+        self._graph_health_dirty = False
         return health
 
     def _active_items(self) -> list[dict[str, Any]]:
@@ -1655,18 +2108,6 @@ class ChatScreen(Screen):
             return cleaned.split(":", 1)[1].strip()
         return cleaned
 
-    def _marble_band(self, *, accent: str, width: int | None = None, background: str = MARBLE_DARK) -> Text:
-        width = width or max(28, min(72, (self.size.width or 120) // 2))
-        glyphs = ("░", "▒", "▓", "·", "◦", "◌", "╱", "╲", "·", "░")
-        palette = (accent, ICE, AMBER, VIOLET, NEON, accent)
-        shift = 0 if self.app.runtime.settings.low_motion else self._display_frame
-        band = Text()
-        for index in range(width):
-            glyph = " " if index % 13 in {0, 1} else glyphs[(index * 3 + shift) % len(glyphs)]
-            color = palette[(index + shift) % len(palette)]
-            band.append(glyph, style=f"{color} on {background}")
-        return band
-
     def main_aperture_panel(self) -> Panel:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -1694,9 +2135,9 @@ class ChatScreen(Screen):
         behavior_mass = sum(float(item.get("selection", 0.0)) for item in active_items if item.get("domain") == "behavior")
         knowledge_mass = sum(float(item.get("selection", 0.0)) for item in active_items if item.get("domain") != "behavior")
         lead = "knowledge-led" if knowledge_mass > behavior_mass * 1.15 else "behavior-led" if behavior_mass > knowledge_mass * 1.15 else "balanced"
-        focus_index = self._display_frame % len(active_items)
+        focus_index = 0
         focus_item = active_items[focus_index]
-        pulse = ("▶", "▸", "•", "▹")[0 if app.runtime.settings.low_motion else self._display_frame % 4]
+        pulse = "▶"
         ingest = app.ui_state.last_ingest_result or {}
         knowledge_memes = [item for item in active_items if item.get("node_kind") != "memode" and item.get("domain") != "behavior"]
         behavior_memes = [item for item in active_items if item.get("node_kind") != "memode" and item.get("domain") == "behavior"]
@@ -1755,7 +2196,7 @@ class ChatScreen(Screen):
             selection = float(item.get("selection", 0.0))
             regard = float(item.get("regard", 0.0))
             activation = float(item.get("activation", 0.0))
-            indicator = pulse if index == focus_index % max(1, min(len(active_items), 5)) else " "
+            indicator = pulse if index == focus_index else " "
             line_style = f"bold {NEON}" if indicator.strip() else TEXT
             body.append(
                 f"{indicator} {safe_excerpt(item.get('label', 'untitled'), limit=28):<28} "
@@ -1801,10 +2242,10 @@ class ChatScreen(Screen):
         behavior_items = [item for item in active_items if item.get("domain") == "behavior"]
         knowledge_items = [item for item in active_items if item.get("domain") != "behavior"]
         memode_items = [item for item in active_items if item.get("node_kind") == "memode"]
-        focus_item = active_items[self._display_frame % len(active_items)]
+        focus_item = active_items[0]
         scan_width = max(18, min(52, (self.size.width or 120) - 26))
-        sweep = self._display_frame % scan_width
-        rail = "".join("█" if index == sweep else "═" if abs(index - sweep) < 2 else "─" for index in range(scan_width))
+        sweep = scan_width // 2
+        rail = "".join("█" if index == sweep else "▓" if abs(index - sweep) < 2 else "▒" if index % 3 == 0 else "░" for index in range(scan_width))
         anchors = sorted(active_items, key=lambda item: float(item.get("regard", 0.0)), reverse=True)[:3]
         hottest = sorted(active_items, key=lambda item: float(item.get("activation", 0.0)), reverse=True)[:3]
         body = Text.from_markup(
@@ -1962,8 +2403,6 @@ class ChatScreen(Screen):
             phase_index = 3
         if app.ui_state.last_response:
             phase_index = 6
-        if not app.runtime.settings.low_motion:
-            phase_index = (phase_index + self._display_frame) % len(AdamSigil.LOOP)
         rendered_steps = " > ".join(
             step.upper() if index == phase_index else step for index, step in enumerate(AdamSigil.LOOP)
         )
@@ -1991,80 +2430,75 @@ class ChatScreen(Screen):
     def main_chat_exchange_panel(self):
         app = self.app
         assert isinstance(app, EdenTuiApp)
-        transcript: list[Panel] = []
-        for turn in self._all_turns():
-            feedback_entries = app.runtime.store.list_feedback_for_turn(turn["id"])
-            latest_feedback = feedback_entries[-1] if feedback_entries else None
-            if latest_feedback is not None:
-                verdict = str(latest_feedback.get("verdict", "skip")).upper()
-                adam_title = f"Adam / T{turn['turn_index']} / {verdict}"
-                adam_border = NEON if verdict == "ACCEPT" else ICE if verdict == "EDIT" else EMBER if verdict == "REJECT" else AMBER
-            elif turn["id"] == app.ui_state.last_turn_id:
-                adam_title = f"Adam / T{turn['turn_index']} / AWAITING REVIEW"
-                adam_border = ROSE
-            else:
-                adam_title = f"Adam / T{turn['turn_index']}"
-                adam_border = AMBER
-            brian_text = self._display_operator_text(turn.get("user_text") or "") or " "
-            adam_text, _ = app.runtime.sanitize_operator_response(
-                turn.get("membrane_text") or turn.get("response_text") or "",
-                response_char_cap=1600,
-            )
-            adam_text = adam_text or " "
-            transcript.append(
-                Panel(
-                    Group(
-                        Text(brian_text, style=TEXT),
-                        self._marble_band(accent=AMBER, background=SHADE_ALT),
-                    ),
-                    title=f"Brian / T{turn['turn_index']}",
-                    border_style=MUTED,
-                    style=f"on #26140b",
+        turns = self._all_turns()
+        if self._transcript_cache_session_id != app.ui_state.session_id:
+            self._invalidate_transcript_cache()
+        if not self._transcript_cache_panels:
+            transcript: list[Panel] = []
+            for turn in turns:
+                feedback_entries = app.runtime.store.list_feedback_for_turn(turn["id"])
+                latest_feedback = feedback_entries[-1] if feedback_entries else None
+                if latest_feedback is not None:
+                    verdict = str(latest_feedback.get("verdict", "skip")).upper()
+                    adam_title = f"Adam / T{turn['turn_index']} / {verdict}"
+                    adam_border = NEON if verdict == "ACCEPT" else ICE if verdict == "EDIT" else EMBER if verdict == "REJECT" else AMBER
+                elif turn["id"] == app.ui_state.last_turn_id:
+                    adam_title = f"Adam / T{turn['turn_index']} / AWAITING REVIEW"
+                    adam_border = ROSE
+                else:
+                    adam_title = f"Adam / T{turn['turn_index']}"
+                    adam_border = AMBER
+                brian_text = self._display_operator_text(turn.get("user_text") or "") or " "
+                adam_text, _ = app.runtime.sanitize_operator_response(
+                    turn.get("membrane_text") or turn.get("response_text") or "",
+                    response_char_cap=1600,
                 )
-            )
-            transcript.append(
-                Panel(
-                    Group(
-                        Text(adam_text, style=TEXT),
-                        self._marble_band(accent=ROSE, background=MARBLE_LIGHT),
-                    ),
-                    title=adam_title,
-                    border_style=adam_border,
-                    style=f"on {MARBLE_LIGHT}",
-                )
-            )
-            if feedback_entries:
-                feedback_lines: list[str] = []
-                for entry in feedback_entries:
-                    verdict = str(entry.get("verdict", "skip")).upper()
-                    explanation = (entry.get("explanation") or "").strip()
-                    corrected = (entry.get("corrected_text") or "").strip()
-                    feedback_lines.append(f"{verdict} @ {entry.get('created_at', 'n/a')}")
-                    feedback_lines.append(f"why: {explanation or 'none'}")
-                    if corrected:
-                        feedback_lines.append(f"edit: {corrected}")
+                adam_text = adam_text or " "
                 transcript.append(
                     Panel(
-                        Group(
-                            Text("\n".join(feedback_lines), style=TEXT),
-                            self._marble_band(accent=ICE, background=MARBLE_DARK),
-                        ),
-                        title=f"Review / T{turn['turn_index']}",
-                        border_style=ICE,
-                        style=f"on {MARBLE_DARK}",
+                        Text(brian_text, style=TEXT),
+                        title=f"Brian / T{turn['turn_index']}",
+                        border_style=MUTED,
+                        style=f"on {CHIARO_BRONZE}",
                     )
                 )
+                transcript.append(
+                    Panel(
+                        Text(adam_text, style=TEXT),
+                        title=adam_title,
+                        border_style=adam_border,
+                        style=f"on {CHIARO_WINE}",
+                    )
+                )
+                if feedback_entries:
+                    feedback_lines: list[str] = []
+                    for entry in feedback_entries:
+                        verdict = str(entry.get("verdict", "skip")).upper()
+                        explanation = (entry.get("explanation") or "").strip()
+                        corrected = (entry.get("corrected_text") or "").strip()
+                        feedback_lines.append(f"{verdict} @ {entry.get('created_at', 'n/a')}")
+                        feedback_lines.append(f"why: {explanation or 'none'}")
+                        if corrected:
+                            feedback_lines.append(f"edit: {corrected}")
+                    transcript.append(
+                        Panel(
+                            Text("\n".join(feedback_lines), style=TEXT),
+                            title=f"Review / T{turn['turn_index']}",
+                            border_style=ICE,
+                            style=f"on {CHIARO_SLATE}",
+                        )
+                    )
+            self._transcript_cache_session_id = app.ui_state.session_id
+            self._transcript_cache_panels = tuple(transcript)
+        transcript = list(self._transcript_cache_panels)
         operator_live = self._composer_text().strip()
         if operator_live:
             transcript.append(
                 Panel(
-                    Group(
-                        Text(operator_live, style=TEXT),
-                        self._marble_band(accent=VIOLET, background=SHADE_ALT),
-                    ),
+                    Text(operator_live, style=TEXT),
                     title="Brian / Draft",
                     border_style=ROSE,
-                    style=f"on #24111d",
+                    style=f"on {CHIARO_WINE}",
                 )
             )
         if not transcript:
@@ -2331,6 +2765,9 @@ class ChatScreen(Screen):
             return
         self._preview_generation += 1
         generation = self._preview_generation
+        if self._preview_running:
+            self._preview_rerun_requested = True
+            return
         if self._preview_task is not None and not self._preview_task.done():
             self._preview_task.cancel()
         self._preview_task = asyncio.create_task(self._refresh_preview(generation))
@@ -2338,33 +2775,44 @@ class ChatScreen(Screen):
     async def _refresh_preview(self, generation: int) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
-        await asyncio.sleep(0.22)
+        await asyncio.sleep(0.55)
         if generation != self._preview_generation or not app.ui_state.session_id:
             return
-        user_text = self._composer_text().strip()
-        preview = await asyncio.to_thread(
-            partial(
-                app.runtime.preview_turn,
-                session_id=app.ui_state.session_id,
-                user_text=user_text,
-                previous_budget=app.ui_state.current_budget,
+        self._preview_running = True
+        try:
+            user_text = self._composer_text().strip()
+            preview = await asyncio.to_thread(
+                partial(
+                    app.runtime.preview_turn,
+                    session_id=app.ui_state.session_id,
+                    user_text=user_text,
+                    previous_budget=app.ui_state.current_budget,
+                )
             )
-        )
-        if generation != self._preview_generation:
-            return
-        app.ui_state.current_profile = preview.profile
-        app.ui_state.current_budget = preview.budget
-        if user_text:
-            app.ui_state.preview_active_set = preview.active_set
-            app.ui_state.preview_trace = preview.trace
-        else:
-            app.ui_state.preview_active_set = app.ui_state.last_active_set
-            app.ui_state.preview_trace = app.ui_state.last_trace
-        self.refresh_panels()
+            if generation != self._preview_generation:
+                return
+            app.ui_state.current_profile = preview.profile
+            app.ui_state.current_budget = preview.budget
+            if user_text:
+                app.ui_state.preview_active_set = preview.active_set
+                app.ui_state.preview_trace = preview.trace
+            else:
+                app.ui_state.preview_active_set = app.ui_state.last_active_set
+                app.ui_state.preview_trace = app.ui_state.last_trace
+            self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
+            self.query_one("#active_aperture_panel", Static).update(self.main_aperture_panel())
+            self.query_one("#thinking_panel", Static).update(self.main_thinking_panel())
+            self.query_one("#composer_hint_panel", Static).update(self.main_composer_hint_panel())
+            self.query_one("#runtime_chyron_panel", Static).update(self.main_runtime_chyron_panel())
+        finally:
+            self._preview_running = False
+            if self._preview_rerun_requested and generation != self._preview_generation:
+                self._preview_rerun_requested = False
+                self._preview_task = asyncio.create_task(self._refresh_preview(self._preview_generation))
 
     @on(TextArea.Changed, "#composer_input")
     def handle_composer_changed(self, _event) -> None:
-        self.refresh_panels()
+        self._refresh_composer_surfaces()
         self._schedule_preview_refresh()
 
     async def _submit_inline_feedback_from_fields(self) -> None:
@@ -2429,6 +2877,7 @@ class ChatScreen(Screen):
         app.ui_state.preview_trace = outcome.trace
         app.ui_state.current_budget = outcome.budget
         app.ui_state.current_profile = outcome.profile
+        self._mark_graph_dirty()
         app.ui_state.last_feedback = f"Saved turn T{outcome.turn['turn_index']} from Brian."
         self._write_forensic(
             f"[INFO] Turn T{outcome.turn['turn_index']} stored :: active_set={len(outcome.active_set)} pressure={outcome.budget.get('pressure_level', 'n/a')}"
@@ -2463,6 +2912,7 @@ class ChatScreen(Screen):
         else:
             app.ui_state.last_feedback = f"{feedback['verdict'].upper()} recorded at {feedback['created_at']}."
             self._reset_inline_feedback_inputs()
+            self._mark_graph_dirty()
             await self._sync_conversation_log()
             self._schedule_preview_refresh()
             self.focus_composer()
@@ -2486,6 +2936,7 @@ class ChatScreen(Screen):
             )
         )
         app.ui_state.last_ingest_result = result
+        self._mark_graph_dirty()
         app.ui_state.last_feedback = (
             f"Ingested {result['title']} into the memgraph with "
             f"{result['meme_count']} memes / {result['memode_count']} memodes"
@@ -2557,6 +3008,23 @@ class ChatScreen(Screen):
     async def handle_deck(self) -> None:
         await self.app.push_screen(DeckModal(self))
 
+    async def handle_archive(self) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        payload = await self.app.push_screen_wait(ConversationAtlasModal(preferred_session_id=app.ui_state.session_id))
+        if not payload or payload.get("action") != "resume" or not payload.get("session_id"):
+            return
+        snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, payload["session_id"]))
+        app.apply_session_snapshot(snapshot)
+        self._mark_graph_dirty()
+        app.ui_state.last_feedback = f"Atlas resumed {snapshot['session_title']}."
+        self._write_forensic(f"[INFO] Atlas resumed session :: {snapshot['session_title']}")
+        self._set_text_area("#composer_input", "")
+        self._reset_inline_feedback_inputs()
+        self.refresh_panels()
+        self._scroll_chat_to_end()
+        self._schedule_preview_refresh()
+
     async def handle_ingest(self) -> None:
         await self.app.push_screen(IngestModal(self))
 
@@ -2584,8 +3052,6 @@ class ChatScreen(Screen):
             return False
         composer = self.focus_composer()
         composer.insert(character)
-        self.refresh_panels()
-        self._schedule_preview_refresh()
         event.stop()
         return True
 
@@ -2616,6 +3082,7 @@ class ChatScreen(Screen):
         )
         snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, session["id"]))
         app.apply_session_snapshot(snapshot)
+        self._mark_graph_dirty()
         app.ui_state.last_feedback = "Opened a new session."
         self._set_text_area("#composer_input", "")
         self._reset_inline_feedback_inputs()
@@ -2685,6 +3152,7 @@ class ChatScreen(Screen):
                 return
             snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, latest_session["id"]))
             app.apply_session_snapshot(snapshot)
+            self._mark_graph_dirty()
             app.ui_state.last_feedback = f"Resumed {snapshot['session_title']}."
             self._write_forensic(f"[INFO] Resumed session :: {snapshot['session_title']}")
             self._set_text_area("#composer_input", "")
@@ -2714,6 +3182,7 @@ class ChatScreen(Screen):
         )
         snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, session["id"]))
         app.apply_session_snapshot(snapshot)
+        self._mark_graph_dirty()
         app.ui_state.last_feedback = f"Opened a new {action} experiment session."
         self._write_forensic(f"[INFO] Opened {action} experiment :: {session['title']}")
         self._set_text_area("#composer_input", "")
@@ -2785,6 +3254,8 @@ class ChatScreen(Screen):
             self.run_worker(self.handle_observatory(), exclusive=True, group="observatory")
         elif normalized == "export":
             self.run_worker(self.handle_export(), exclusive=True, group="export")
+        elif normalized == "archive":
+            self.run_worker(self.handle_archive(), exclusive=True, group="archive")
         elif normalized == "deck":
             self.run_worker(self.handle_deck(), exclusive=True, group="deck")
         elif normalized == "help":
@@ -2794,6 +3265,14 @@ class ChatScreen(Screen):
     def handle_runtime_action_changed(self, _event: Select.Changed) -> None:
         self.query_one("#action_bus_panel", Static).update(self.main_action_bus_panel())
         self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
+
+    @on(events.DescendantFocus)
+    @on(events.DescendantBlur)
+    def handle_focus_surface_change(self, _event: events.Event) -> None:
+        if not self.is_mounted:
+            return
+        self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
+        self.query_one("#composer_hint_panel", Static).update(self.main_composer_hint_panel())
 
     def on_key(self, event) -> None:
         if event.key == "escape":
@@ -2925,7 +3404,7 @@ class EdenTuiApp(App):
     }}
     #chat_deck, #startup_cockpit_stack {{
         border: tall {AMBER};
-        background: {PANEL};
+        background: {CHIARO_SHADOW};
         padding: 0 1;
     }}
     #startup_cockpit_stack {{
@@ -2955,17 +3434,17 @@ class EdenTuiApp(App):
         min-height: 14;
         margin-bottom: 1;
         border: tall {ROSE};
-        background: {MARBLE_DARK};
+        background: {CHIARO_SHADOW};
         padding: 0 1;
         scrollbar-gutter: stable;
         scrollbar-size-vertical: 2;
-        scrollbar-color: {VIOLET};
+        scrollbar-color: {AMBER};
         scrollbar-color-hover: {ICE};
-        scrollbar-color-active: {NEON};
-        scrollbar-background: #261232;
-        scrollbar-background-hover: #311741;
-        scrollbar-background-active: #1b3144;
-        scrollbar-corner-color: {MARBLE_DARK};
+        scrollbar-color-active: {TEXT};
+        scrollbar-background: #17101a;
+        scrollbar-background-hover: #1d1420;
+        scrollbar-background-active: #231b27;
+        scrollbar-corner-color: {CHIARO_SHADOW};
     }}
     #chat_tape:focus {{
         border: tall {ICE};
@@ -2992,7 +3471,7 @@ class EdenTuiApp(App):
     }}
     #inline_feedback_surface {{
         border: tall {ROSE};
-        background: {MARBLE_DARK};
+        background: {CHIARO_WINE};
         padding: 0 1;
         height: 16;
         margin-bottom: 1;
@@ -3012,21 +3491,21 @@ class EdenTuiApp(App):
     }}
     #composer_input {{
         height: 6;
-        background: #11070d;
+        background: {CHIARO_SHADOW};
         border: tall {AMBER};
         color: {TEXT};
         scrollbar-gutter: stable;
         scrollbar-size-vertical: 2;
-        scrollbar-color: {ICE};
-        scrollbar-color-hover: {ROSE};
-        scrollbar-color-active: {NEON};
-        scrollbar-background: #251225;
-        scrollbar-background-hover: #331833;
-        scrollbar-background-active: #183344;
+        scrollbar-color: {AMBER};
+        scrollbar-color-hover: {ICE};
+        scrollbar-color-active: {TEXT};
+        scrollbar-background: #181015;
+        scrollbar-background-hover: #20161c;
+        scrollbar-background-active: #281d24;
     }}
     #composer_input:focus {{
         border: tall {NEON};
-        background: #170a12;
+        background: #14090d;
     }}
     #runtime_action_menu:focus, #header_ingest_btn:focus, #header_aperture_btn:focus {{
         border: tall {ICE};
@@ -3042,31 +3521,31 @@ class EdenTuiApp(App):
     }}
     #inline_feedback_explanation_input {{
         height: 4;
-        background: #12070f;
+        background: #14080f;
         border: tall {ROSE};
         color: {TEXT};
         scrollbar-gutter: stable;
         scrollbar-size-vertical: 2;
         scrollbar-color: {ROSE};
         scrollbar-color-hover: {ICE};
-        scrollbar-color-active: {NEON};
-        scrollbar-background: #2a1226;
-        scrollbar-background-hover: #3b1836;
-        scrollbar-background-active: #183344;
+        scrollbar-color-active: {TEXT};
+        scrollbar-background: #22131b;
+        scrollbar-background-hover: #2b1822;
+        scrollbar-background-active: #331d29;
     }}
     #inline_feedback_corrected_input {{
         height: 4;
-        background: #0b0b15;
+        background: #0d1019;
         border: tall {ICE};
         color: {TEXT};
         scrollbar-gutter: stable;
         scrollbar-size-vertical: 2;
         scrollbar-color: {ICE};
         scrollbar-color-hover: {VIOLET};
-        scrollbar-color-active: {NEON};
-        scrollbar-background: #17142a;
-        scrollbar-background-hover: #201d37;
-        scrollbar-background-active: #183344;
+        scrollbar-color-active: {TEXT};
+        scrollbar-background: #141923;
+        scrollbar-background-hover: #19202b;
+        scrollbar-background-active: #1f2733;
     }}
     #inline_feedback_status_panel {{
         height: 4;
@@ -3104,21 +3583,35 @@ class EdenTuiApp(App):
         border: tall {AMBER};
         color: {TEXT};
     }}
-    #deck_shell, #session_config_shell, #ingest_shell {{
+    #deck_shell, #session_config_shell, #ingest_shell, #atlas_shell {{
         padding: 1 1;
     }}
-    .deck_column, .session_config_column, .ingest_column {{
+    .deck_column, .session_config_column, .ingest_column, .atlas_column {{
         width: 1fr;
         padding: 0 1;
     }}
-    #deck_summary, #review_summary, #session_config_header, #session_config_summary, #ingest_summary {{
+    .atlas_records_column {{
+        width: 1.3fr;
+    }}
+    #deck_summary, #review_summary, #session_config_header, #session_config_summary, #ingest_summary, #atlas_summary {{
         margin: 1 2;
     }}
     #deck_status_panel {{
         height: 1fr;
     }}
-    #session_config_shell, #ingest_shell {{
+    #session_config_shell, #ingest_shell, #atlas_shell {{
         padding: 1 1;
+    }}
+    #atlas_records_table {{
+        height: 1fr;
+        min-height: 18;
+        background: #0c070a;
+        border: tall {AMBER};
+        color: {TEXT};
+    }}
+    #atlas_preview_panel, #atlas_projection_panel, #atlas_taxonomy_panel, #atlas_status_panel, #atlas_editor_hint {{
+        height: 1fr;
+        min-height: 8;
     }}
     """
     BINDINGS = [
@@ -3134,6 +3627,7 @@ class EdenTuiApp(App):
         ("f7", "show_review", "Review"),
         ("f8", "toggle_aperture", "Aperture"),
         ("f9", "open_ingest", "Ingest"),
+        ("f10", "show_archive", "Archive"),
     ]
 
     def __init__(self, runtime: EdenRuntime) -> None:
@@ -3202,6 +3696,12 @@ class EdenTuiApp(App):
     async def action_open_ingest(self) -> None:
         if isinstance(self.screen, ChatScreen):
             await self.screen.handle_ingest()
+
+    async def action_show_archive(self) -> None:
+        if isinstance(self.screen, ChatScreen):
+            await self.screen.handle_archive()
+        elif isinstance(self.screen, StartupScreen):
+            self.screen.handle_startup_archive()
 
 
 def run_tui(runtime: EdenRuntime) -> None:
