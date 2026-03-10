@@ -812,3 +812,85 @@ Remaining uncertainties:
 - If a future run needs tracked artifacts under `exports/<id>/`, it must use `git add -f` or a dedicated allowlist exception.
 Next shortest proof path:
 - Run one additional export workflow and confirm the generated files are still ignored.
+## [2026-03-10T13:15:12Z] PRE-FLIGHT
+Operator task:
+- Produce a thorough observatory status brief for ChatGPT DeepResearch, grounded in code/spec evidence, and curate a zip bundle of relevant spec documents plus Codex notes into Downloads.
+Task checksum:
+- Need accurate current-state vs target-state language for the browser observatory, especially graph labeling, right-panel readability, and the incomplete attractor basin surface.
+Repo situation:
+- Working tree is dirty at `.DS_Store` only. No observatory code/spec edits are planned unless a documentation correction becomes necessary.
+Relevant spec surfaces read:
+- `docs/PROJECT_CHARTER.md`
+- `docs/CANONICAL_ONTOLOGY.md`
+- `docs/OBSERVATORY_SPEC.md`
+- `docs/OBSERVATORY_INTERACTION_SPEC.md`
+- `docs/OBSERVATORY_GEOMETRY_SPEC.md`
+- `docs/IMPLEMENTATION_TRUTH_TABLE.md`
+- `docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts in force:
+- TUI remains the primary runtime; browser observatory is an observability/export instrument.
+- Memes are first-class; memodes are derived structures with provenance.
+- Observatory claims require separation between implemented behavior, instrumented surfaces, conceptual intent, and unknowns.
+Files/modules likely in scope:
+- `eden/observatory/exporters.py`
+- `eden/observatory/service.py`
+- `tests/test_observatory_server.py`
+- `tests/test_observatory_measurements.py`
+- `exports/*/graph_knowledge_base.html`
+- `exports/*/behavioral_attractor_basin.html`
+- `/Users/brianray/Adam/codex_notes_garden.md`
+- `/Users/brianray/Downloads/` deliverables
+Status register:
+- Implemented:
+- Instrumented:
+- Conceptual:
+- Unknown:
+Risks / invariants:
+- Do not overstate the current GUI; the specs promise more than the current HTML ergonomics deliver.
+- Keep the package bounded to documents that help external UI research without dumping irrelevant repo bulk.
+Evidence plan:
+- Inspect exporter code that emits the graph and basin HTML/JSON.
+- Review observatory tests for validated behavior.
+- Open current generated artifacts to confirm the UI complaints against the actual output.
+- Produce a brief plus a curated zip in Downloads.
+Shortest proof path:
+- Read `eden/observatory/exporters.py` graph and basin renderers plus observatory tests.
+- Verify generated artifacts under `exports/` and package the selected docs.
+## [2026-03-10T13:22:16Z] POST-FLIGHT
+Files changed:
+- `/Users/brianray/Adam/codex_notes_garden.md`
+- `/Users/brianray/Downloads/eden_observatory_research_packet_2026-03-10/README_PACKET.md`
+- `/Users/brianray/Downloads/eden_observatory_research_packet_2026-03-10/brief/EDEN_observatory_status_brief_2026-03-10.md`
+- `/Users/brianray/Downloads/eden_observatory_research_packet_2026-03-10/...` curated copied docs, notes, code, sample export, and screenshots
+- `/Users/brianray/Downloads/eden_observatory_research_packet_2026-03-10_final.zip`
+Specs changed:
+- None
+Natural-language contracts added/revised/preserved:
+- Preserved the TUI-primary / observatory-secondary contract.
+- Preserved the distinction between implemented observatory data paths and underimplemented browser presentation.
+- Preserved the ontology boundary: memes first-class, memodes derived, measurement events as the observatory provenance bridge.
+Behavior implemented or modified:
+- No repo runtime behavior changed.
+- Produced an external research packet for UI/DeepResearch handoff with a paste-ready observatory brief, relevant specs, current observatory code/tests, one sample export, and current screenshots.
+Evidence produced (tests / traces / commands / exports):
+- `./.venv/bin/pytest -q tests/test_observatory_measurements.py tests/test_observatory_server.py` -> `8 passed in 3.75s`
+- Browser inspection of `graph_knowledge_base.html` and `behavioral_attractor_basin.html` from export `b178bed2-731e-4f8b-b5f8-a93d1300b2f7`
+- Screenshots captured:
+  - `/Users/brianray/Downloads/eden_observatory_research_packet_2026-03-10/screenshots/raw_capture_graph_surface.png`
+  - `/Users/brianray/Downloads/eden_observatory_research_packet_2026-03-10/screenshots/raw_capture_attractor_basin.png`
+- Verified packet contents with `find /Users/brianray/Downloads/eden_observatory_research_packet_2026-03-10 -maxdepth 3 -type f | sort`
+- Verified final zip contents with `unzip -l /Users/brianray/Downloads/eden_observatory_research_packet_2026-03-10_final.zip`
+Status register changes:
+- Implemented:
+  - External observatory research packet assembled and zipped for operator handoff.
+- Instrumented: None
+- Conceptual: None
+- Unknown:
+  - Whether the target UI should consolidate on Three.js across both surfaces or split graph and basin rendering across different stacks.
+Truth-table / limitations updates:
+- None; no repo capability status changed.
+Remaining uncertainties:
+- The current basin screenshot is explained by both UI immaturity and the sampled export having `turn_count = 1`; a richer multi-turn export was not generated in this turn.
+- The graph and basin surfaces were audited from generated artifacts and source, not redesigned here.
+Next shortest proof path:
+- Feed the final zip and brief into DeepResearch, then decide whether the next build step is a design-spike document, a dedicated frontend architecture spike, or direct observatory UI implementation.
