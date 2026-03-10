@@ -5,23 +5,23 @@
 | Blank Eden bootstrap | Implemented | runtime + TUI path; validated in tests and demo |
 | Seeded Eden bootstrap code path | Implemented | ingests `assets/seed_canon/`; heavy-path validation started on real canon files |
 | Fixed-pane amber TUI | Implemented | preserved and refocused around a dialogue-first primary chat surface |
-| Live session dialogue boot | Implemented | app opens directly into a resumed-or-created session with the top action bus, visible transcript/composer, and secondary telemetry panels |
+| Live session dialogue boot | Implemented | app opens directly into a resumed-or-created session; wide terminals keep dialogue + telemetry visible, while compact terminals fall back to a dialogue-first composer/transcript view |
 | `python -m eden` default entry path | Implemented | no subcommand required for the normal TUI path; flags remain optional overrides |
 | Repo-root `python3 app.py` launcher | Implemented | root launcher re-execs the repo-local `.venv` interpreter and then dispatches into `eden.app:main` |
 | Local repo-managed MLX model storage | Implemented | default MLX model target is `models/qwen3.5-35b-a3b-mlx-mxfp4` under repo root |
 | Local MLX shard-readiness tracking | Implemented | live contract surfaces distinguish metadata-only, partial, and ready model states |
 | Repo-local Qwen 3.5 MLX backend | Implemented | repo-local 4-shard model completed and real MLX generation succeeded |
 | Multiline composer | Implemented | `TextArea`-based; covered by TUI smoke test |
-| Composer focus recovery | Implemented | `Esc` returns focus to the composer and printable keys outside editable widgets are routed there automatically |
+| Composer focus recovery | Implemented | `Esc` returns focus to the composer, compact aperture view also collapses back to dialogue, and printable keys outside editable widgets are routed there automatically |
 | Dialogue-first chat layout | Implemented | primary left dialogue deck keeps transcript + inline review + composer visible; right telemetry stack now uses full-width memgraph/aperture/thinking/event slices plus a thin runtime chyron |
 | Scrolling dialogue tape | Implemented | prime transcript now renders the persisted session inside a focusable scroll container instead of a bounded fixed pane |
 | Static chiaroscuro transcript shading | Implemented | chat cards now use static shaded panel treatments instead of animated decorative glyph bands inside the message surface |
 | Event-driven prime-screen refresh | Implemented | removed the 450ms whole-screen repaint loop; transcript and graph-health surfaces now cache and refresh on state changes |
 | Operator-facing answer sanitization | Implemented | membrane now strips `Answer` / `Basis` / `Next Step` scaffolding and keeps model reasoning separate from Adam's visible reply |
-| Aperture pull-down drawer | Implemented | `F8` opens a full-width readable active-set scan above the dialogue/telemetry split |
-| Inline reply review | Implemented | typed `A` / `E` / `R` / `S` plus `Y` confirmation now live directly under Adam's latest answer and write through the graph-backed feedback path |
+| Aperture pull-down drawer | Implemented | `F8` opens a full-width readable active-set scan on wide terminals and a compact aperture-only swap view on small terminals |
+| Inline reply review | Implemented | typed `A` / `E` / `R` / `S` plus `Y` confirmation now live directly under Adam's latest answer; `Review` keeps focus in the composer and explains the missing prerequisite if no Adam reply exists yet |
 | Conversation log artifact | Implemented | active session transcript is written to markdown under `exports/conversations/` and surfaced via the action bus + merged runtime/event chyron |
-| Conversation atlas archive surface | Implemented | modal archive browser exposes all saved sessions through sort/filter plus virtual folder/tag projections stored in session metadata |
+| Conversation atlas archive surface | Implemented | modal archive browser exposes all saved sessions through sort/filter plus virtual folder/tag projections stored in session metadata; the `F10`/binding path now opens it through the same worker-safe flow as the action bus |
 | Fixed local-MLX runtime contract | Implemented | the live TUI no longer exposes backend selection on the primary surface; local MLX is the normal runtime contract |
 | Deck + Review secondary surfaces | Implemented | detailed budget / thinking / history remain in `Deck`; explicit feedback remains in `Review` |
 | Dedicated model thinking panel | Implemented | MLX/Qwen reasoning is kept on and surfaced separately from the final answer via Deck |
@@ -47,6 +47,7 @@
 | Observatory index page | Implemented | `observatory_index.html` |
 | Robust observatory server lifecycle | Implemented | host/port args, reuse, free-port fallback, tests |
 | Observatory open without forced synchronous export | Implemented | TUI observatory actions now start/open the server immediately and reuse existing artifacts when present |
+| Export location feedback | Implemented | TUI export action reports the artifact directory path in the session feedback surface after generation |
 | Geometry diagnostics | Implemented | ringness, radiality, linearity, communities, triadic closure, spectral summaries, mirror/chirality/translation proxies |
 | Large-graph geometry fallback | Implemented | seeded-scale graphs use sparse-safe approximations instead of SciPy / dense full-graph linear algebra |
 | Large-graph local geometry cap | Implemented | geometry export now limits per-memode local reports to keep seeded exports tractable |
@@ -67,7 +68,7 @@
 
 Validated in this patch:
 
-- `.venv/bin/pytest -q` -> `34 passed`
+- `.venv/bin/pytest -q` -> `35 passed`
 - CLI observatory fallback from occupied requested port to actual port `8877`
 - live observatory preview / commit / revert succeeded against a real experiment
 - mock demo export wrote graph, basin, geometry, measurement, and index artifacts

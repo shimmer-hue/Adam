@@ -15,5 +15,6 @@ exports/context/
 exports/.eden_observatory.json
 exports/*/graph_knowledge_base.html
 exports/*/graph_knowledge_base.json
+exports/*/
 models/
 data/cannonical_secondary_sources/

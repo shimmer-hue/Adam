@@ -700,3 +700,115 @@ Remaining uncertainties:
 The atlas now works and is tested, but very large catalogs may need pagination, cached counts, or richer facet widgets later.
 Next shortest proof path:
 Launch the TUI, open `Conversation Atlas` from the action bus or `F10`, assign real folder/tag metadata to several sessions, then judge whether you want the next patch to focus on nested shelves, saved searches, or richer transcript preview/replay.
+
+## [2026-03-09 10:10:00 EDT] PRE-FLIGHT
+Operator task:
+Walk the live TUI as a first-time operator, execute the main keyboard journeys, fix discoverability/focus/layout defects, and write operator-facing usage docs from verified behavior.
+Task checksum:
+adam-tui-user-journey-audit-20260309
+Repo situation:
+Dirty worktree includes prior atlas work plus exported conversation markdown updates. Live 80x24 TUI audit already exposed a first-run layout failure: top chrome dominates the screen, F6-F10 hints are clipped, and the composer path is not legible without trial-and-error.
+Relevant spec surfaces read:
+docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, relevant live-layout/runtime sections in eden/tui/app.py.
+Natural-language contracts in force:
+TUI is the primary runtime surface; claims must be grounded in executed journeys; keyboard-only recovery must remain possible; terminology may stay poetic only if the operator can still act without guesswork.
+Files/modules likely in scope:
+eden/tui/app.py, tests/test_tui_smoke.py, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, docs/USER_JOURNEYS.md, docs/HOW_TO_USE_ADAM_TUI.md, docs/UX_AUDIT_AND_REPAIRS.md, docs/FIRST_RUN_QUICKSTART.md, codex_notes_garden.md.
+Status register:
+- Implemented:
+Live chat surface, action bus, aperture drawer, ingest modal, observatory/export actions, deck, inline review, conversation atlas.
+- Instrumented:
+Forensic/event bus and transcript export surfaces already report state changes, but first-run intent is not yet reliably legible at common terminal sizes.
+- Conceptual:
+Any larger redesign of the screen hierarchy beyond surgical discoverability/layout repairs.
+- Unknown:
+How many of the secondary journeys remain legible without fixes when exercised end-to-end on the live app.
+Risks / invariants:
+Do not break chat flow, atlas, ingest, or transcript/export behavior while compressing the prime screen. Keep first-action guidance visible inside the live surface, not only in help text.
+Evidence plan:
+Run the live TUI in PTY, execute Journeys 1 and 2 first, patch the smallest layout/help/focus defects, re-run, then continue through ingest, aperture, observatory, export, deck/review/archive, and keyboard-only flow. Add smoke coverage for repaired guidance/focus behavior and write docs from the verified final state.
+Shortest proof path:
+Repair the 80x24 launch path so the composer and send guidance are visible, prove send/focus recovery in smoke tests plus live PTY runs, then complete the remaining journeys and document only the behaviors re-run successfully.
+
+## [2026-03-09 10:28:48 EDT] POST-FLIGHT
+Files changed:
+eden/tui/app.py, tests/test_tui_smoke.py, docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md, docs/USER_JOURNEYS.md, docs/HOW_TO_USE_ADAM_TUI.md, docs/UX_AUDIT_AND_REPAIRS.md, docs/FIRST_RUN_QUICKSTART.md, codex_notes_garden.md
+Specs changed:
+docs/TUI_SPEC.md, docs/IMPLEMENTATION_TRUTH_TABLE.md, docs/KNOWN_LIMITATIONS.md
+Natural-language contracts added/revised/preserved:
+Preserved the dialogue-first TUI contract while adding an explicit compact-terminal contract: small terminals now prioritize transcript/composer/chyron legibility over simultaneous telemetry visibility. Revised the review contract so `F7` only promises an inline review surface when an Adam reply actually exists. Revised the export contract so the operator is told where artifacts were written.
+Behavior implemented or modified:
+Added responsive compact-mode layout logic to the live chat screen, including compact aperture view swap plus `Esc` recovery back to dialogue. Tightened first-action copy in the stage note, empty transcript panel, and composer hint. Fixed the `F10`/binding archive path to launch through a worker-safe modal flow. Ensured bootstrap/session-resume/new-session/archive-resume flows return focus to the composer. Guarded `Review` when there is no reply yet. Export status now includes the artifact directory path.
+Evidence produced (tests / traces / commands / exports):
+Live PTY runs at `80x24` before and after repair; pilot-driven live app runs at `80x24`, `120x30`, and `140x40`; observatory URL opened from the TUI and returned `HTTP 200`; export action wrote browser artifacts under `exports/<experiment_id>/`; transcript log action opened a markdown file under `exports/conversations/...`; `./.venv/bin/python -m py_compile eden/tui/app.py tests/test_tui_smoke.py tests/test_runtime_e2e.py`; `./.venv/bin/pytest -q tests/test_tui_smoke.py` -> `3 passed`; `./.venv/bin/pytest -q` -> `35 passed`
+Status register changes:
+- Implemented:
+Compact first-run TUI path, compact `F8` aperture swap view, worker-safe `F10` archive binding, no-reply review guard, export-directory feedback, composer-focus return after session transitions, operator docs grounded in executed journeys.
+- Instrumented:
+UX audit evidence now includes live PTY and pilot-driven journey traces plus exported artifact directories from the pass.
+- Conceptual:
+Fully responsive footer hotkey legend, richer large-library atlas ergonomics, and a broader content-quality audit of real MLX ingest/retrieval remain outside this patch.
+- Unknown:
+Very large archive/session libraries and long-duration operator use on real MLX sessions still need broader ergonomic validation.
+Truth-table / limitations updates:
+Updated docs/TUI_SPEC.md for compact-mode chat behavior, compact aperture semantics, no-reply review behavior, and export path feedback. Updated docs/IMPLEMENTATION_TRUTH_TABLE.md for compact boot, `Esc` recovery, archive binding, review guard, and export-location feedback. Updated docs/KNOWN_LIMITATIONS.md to record the remaining narrow-footer clipping and the compact-mode dialogue-over-telemetry tradeoff.
+Remaining uncertainties:
+The core journeys are now verified, but the stock footer still clips later hotkeys on narrow terminals and the atlas has only been exercised against a small saved-session set. Real MLX retrieval quality after ingest was not re-audited here.
+Next shortest proof path:
+Run the same operator journeys on a real local-MLX session with a substantive source document, then decide whether the next patch should target footer responsiveness, atlas scaling, or retrieval-quality affordances.
+
+## [2026-03-10T13:08:34Z] PRE-FLIGHT
+Operator task:
+- Identify what is generating large GitHub line-count spikes from working tree changes and add ignore rules to prevent it.
+Task checksum:
+- Root cause candidate: unignored runtime artifacts under `exports/`.
+Repo situation:
+- Working tree already contains local edits from prior active changes plus many untracked/ignored-generated artifacts.
+Relevant spec surfaces read:
+- AGENTS.md runtime contract; no ontology or turn-loop specs were changed.
+Natural-language contracts in force:
+- No ontology/turn-loop changes for this task; only artifact-control behavior in VCS handling.
+Files/modules likely in scope:
+- `.gitignore`
+- `exports/` output directories
+Status register:
+- Implemented: none
+- Instrumented: none
+- Conceptual: none
+- Unknown: whether ignore coverage includes all future export artifacts
+Risks / invariants:
+- Broad `exports/*/` ignore may hide newly generated artifacts intended for commit in a later workflow.
+- Existing tracked files in `exports/` remain tracked and visible.
+Evidence plan:
+- Measure current untracked export line volume.
+- Add `.gitignore` entries.
+- Re-check `git ls-files -o --exclude-standard exports` and `git status --short`.
+Shortest proof path:
+- `git ls-files -o --exclude-standard exports | wc -l`
+- `git status --short`
+
+## [2026-03-10T13:08:34Z] POST-FLIGHT
+Files changed:
+- `.gitignore`
+Specs changed:
+- None (no normative contract doc needed for `.gitignore` hygiene adjustment)
+Natural-language contracts added/revised/preserved:
+- Preserved all prior contracts; only added VCS hygiene to avoid export artifacts in working tree churn.
+Behavior implemented or modified:
+- Added `exports/*/` to `.gitignore` to suppress new runtime export directories under `exports/` from untracked-file noise.
+Evidence produced (tests / traces / commands / exports):
+- `git ls-files -o --exclude-standard exports | wc -l` returned `0` after ignore rule.
+- `git status --short` shows previous docs/code edits plus the `.gitignore` change, with no new untracked `exports/*` entries.
+Status register changes:
+- Implemented:
+  - Git ignore hygiene fix for generated export artifacts.
+- Instrumented: None
+- Conceptual: None
+- Unknown:
+  - Whether all future exporter variants require additional exclusions (no evidence yet for formats outside current run set).
+Truth-table / limitations updates:
+- Not applicable.
+Remaining uncertainties:
+- If a future run needs tracked artifacts under `exports/<id>/`, it must use `git add -f` or a dedicated allowlist exception.
+Next shortest proof path:
+- Run one additional export workflow and confirm the generated files are still ignored.

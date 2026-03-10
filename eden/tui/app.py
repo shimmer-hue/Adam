@@ -1709,9 +1709,10 @@ class ChatScreen(Screen):
         self.set_interval(0.6, self._poll_logs)
         self.refresh_panels()
         self.run_worker(self._bootstrap_live_surface(), exclusive=True, group="bootstrap")
-        self.call_after_refresh(lambda: self.query_one("#composer_input", TextArea).focus())
+        self.call_after_refresh(self.focus_composer)
 
     def refresh_panels(self) -> None:
+        self._sync_responsive_layout()
         self._health()
         self._sync_aperture_drawer()
         self._sync_header_controls()
@@ -1732,6 +1733,86 @@ class ChatScreen(Screen):
         self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
         self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
         self.query_one("#composer_hint_panel", Static).update(self.main_composer_hint_panel())
+
+    def _is_compact_layout(self) -> bool:
+        return (self.size.width or 0) < 100 or (self.size.height or 0) < 30
+
+    def _sync_responsive_layout(self) -> None:
+        compact = self._is_compact_layout()
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        topbar = self.query_one("#runtime_topbar", Horizontal)
+        action_bus = self.query_one("#runtime_action_bus", Vertical)
+        action_panel = self.query_one("#action_bus_panel", Static)
+        status_strip = self.query_one("#runtime_status_strip", Static)
+        chat_primary = self.query_one("#chat_primary", Vertical)
+        chat_secondary = self.query_one("#chat_secondary", Vertical)
+        chat_deck = self.query_one("#chat_deck", Vertical)
+        chat_tape = self.query_one("#chat_tape", VerticalScroll)
+        composer = self.query_one("#composer_input", TextArea)
+        composer_hint = self.query_one("#composer_hint_panel", Static)
+        chyron = self.query_one("#runtime_chyron_panel", Static)
+        signal_field = self.query_one("#signal_field", SignalField)
+        aperture_panel = self.query_one("#active_aperture_panel", Static)
+        thinking_panel = self.query_one("#thinking_panel", Static)
+
+        if compact:
+            action_panel.display = False
+            status_strip.display = False
+            topbar.styles.height = 6
+            action_bus.styles.width = "1fr"
+            action_bus.styles.min_width = 0
+            chat_deck.styles.min_height = 0
+            chat_primary.styles.width = "1fr"
+            chat_primary.styles.min_width = 0
+            chat_secondary.styles.width = "1fr"
+            chat_secondary.styles.min_width = 0
+            chat_tape.styles.min_height = 4
+            chat_tape.styles.margin_bottom = 0
+            composer.styles.height = 4
+            composer_hint.styles.height = 4
+            chyron.styles.height = 4
+            chyron.styles.min_height = 4
+            aperture_panel.styles.min_height = 0
+            if app.ui_state.aperture_drawer_open:
+                chat_primary.display = False
+                chat_secondary.display = True
+                signal_field.display = False
+                thinking_panel.display = False
+                aperture_panel.styles.height = "1fr"
+            else:
+                chat_primary.display = True
+                chat_secondary.display = False
+                signal_field.display = True
+                thinking_panel.display = True
+                aperture_panel.styles.height = 16
+        else:
+            action_panel.display = True
+            status_strip.display = True
+            chat_primary.display = True
+            chat_secondary.display = True
+            signal_field.display = True
+            thinking_panel.display = True
+            topbar.styles.height = 11
+            action_bus.styles.width = 56
+            action_bus.styles.min_width = 56
+            chat_deck.styles.min_height = 28
+            chat_primary.styles.width = "55%"
+            chat_primary.styles.min_width = 70
+            chat_secondary.styles.width = "45%"
+            chat_secondary.styles.min_width = 54
+            chat_tape.styles.min_height = 14
+            chat_tape.styles.margin_bottom = 1
+            composer.styles.height = 6
+            composer_hint.styles.height = 5
+            chyron.styles.height = 6
+            chyron.styles.min_height = 6
+            aperture_panel.styles.height = 16
+            aperture_panel.styles.min_height = 14
+
+    def on_resize(self, _event: events.Resize) -> None:
+        if self.is_mounted:
+            self.refresh_panels()
 
     def _invalidate_transcript_cache(self) -> None:
         self._transcript_cache_session_id = None
@@ -1823,6 +1904,7 @@ class ChatScreen(Screen):
                 app.ui_state.last_feedback = f"Resumed {snapshot['session_title']}."
                 self._write_forensic(f"[INFO] Resumed session :: {snapshot['session_title']}")
                 self.refresh_panels()
+                self.focus_composer()
                 self._scroll_chat_to_end()
                 self._schedule_preview_refresh()
                 return
@@ -1845,6 +1927,7 @@ class ChatScreen(Screen):
         app.ui_state.last_feedback = "Live dialogue surface armed. Ask a question with Ctrl+S or ingest a document with F9."
         self._write_forensic(f"[INFO] Armed session :: {snapshot['session_title']}")
         self.refresh_panels()
+        self.focus_composer()
         self._scroll_chat_to_end()
         self._schedule_preview_refresh()
 
@@ -1960,6 +2043,10 @@ class ChatScreen(Screen):
         app = self.app
         assert isinstance(app, EdenTuiApp)
         drawer = self.query_one("#aperture_drawer_panel", Static)
+        if self._is_compact_layout():
+            drawer.display = False
+            drawer.styles.height = 0
+            return
         drawer.display = app.ui_state.aperture_drawer_open
         if app.ui_state.aperture_drawer_open:
             drawer.styles.height = max(16, int((self.size.height or 40) * 0.4))
@@ -2090,15 +2177,15 @@ class ChatScreen(Screen):
             if app.ui_state.last_ingest_result:
                 return (
                     "start",
-                    f"Corpus is armed with {safe_excerpt(app.ui_state.last_ingest_result.get('title', 'recent ingest'), limit=42)}. Ask Adam about it now or load another document.",
+                    f"Document armed: {safe_excerpt(app.ui_state.last_ingest_result.get('title', 'recent ingest'), limit=32)}. Ask below or press F9 to ingest again.",
                 )
-            return ("start", "Start here: ask Adam a question or press F9 to ingest a document with a framing note.")
+            return ("start", "Start here: type below, press Ctrl+S to send, or press F9 to ingest first.")
         if draft:
-            return ("ask", "Draft is loaded. Press Ctrl+S to send this turn into the loop.")
+            return ("ask", "Draft ready. Press Ctrl+S to send.")
         if feedback_state == "pending":
-            return ("review", "Adam has replied. Review the turn in the inline strip below, then continue or start a fresh session.")
+            return ("review", "Adam replied. Review below or press F7.")
         if turns:
-            return ("continue", "Conversation is active. Keep going here, or press F5 when you want a clean new session.")
+            return ("continue", "Conversation active. Keep typing below, or press F5 for a clean session.")
         return ("start", "Session is armed. Begin when ready.")
 
     def _display_operator_text(self, text: str) -> str:
@@ -2505,7 +2592,7 @@ class ChatScreen(Screen):
             transcript.append(
                 Panel(
                     Text(
-                        "The dialogue tape is armed. Ask Adam a question here, or press F9 to ingest a document before the first turn.",
+                        "Start here: type in the composer below and press Ctrl+S to send. Press F9 first if you want to ingest a document with a framing note.",
                         style=MUTED,
                     ),
                     title="Adam Dialogue",
@@ -2598,13 +2685,23 @@ class ChatScreen(Screen):
         draft = self._composer_text().strip()
         state = "draft-loaded" if draft else "idle"
         stage, _ = self._conversation_stage()
-        text = Text.from_markup(
-            f"[bold {AMBER}]Message composer[/]\n"
-            f"state={state} chars={len(draft)} backend={self._active_backend_label()} convo={stage}\n"
-            "Type below to talk to Adam. Esc returns focus here. Printable keys outside menus jump here automatically.\n"
-            "Tab can reach the dialogue tape; Up/Down/PageUp/PageDown scroll it when focused.\n"
-            "Ctrl+S send | F9 ingest | F8 aperture | F5 new session | Shift+Tab header controls | F7 review"
-        )
+        stage_note = self._conversation_stage()[1]
+        compact = self._is_compact_layout()
+        if compact:
+            text = Text.from_markup(
+                f"[bold {AMBER}]Message composer[/]\n"
+                f"state={state} chars={len(draft)} convo={stage}\n"
+                f"{stage_note}\n"
+                "Esc returns here | Ctrl+S send | F9 ingest | F5 new | F6 deck | F10 atlas"
+            )
+        else:
+            text = Text.from_markup(
+                f"[bold {AMBER}]Message composer[/]\n"
+                f"state={state} chars={len(draft)} backend={self._active_backend_label()} convo={stage}\n"
+                "Type below to talk to Adam. Esc returns focus here. Printable keys outside menus jump here automatically.\n"
+                "Tab can reach the dialogue tape; Up/Down/PageUp/PageDown scroll it when focused.\n"
+                "Ctrl+S send | F9 ingest | F8 aperture | F5 new session | Shift+Tab header controls | F7 review | F10 atlas"
+            )
         return Panel(text, title="Message Input", border_style=NEON if self.app.focused and getattr(self.app.focused, 'id', None) == "composer_input" else AMBER, style=f"on {SHADE_ALT}")
 
     def deck_summary_panel(self) -> Panel:
@@ -2957,9 +3054,10 @@ class ChatScreen(Screen):
         paths = await asyncio.to_thread(
             partial(app.runtime.export_observability, experiment_id=app.ui_state.experiment_id, session_id=app.ui_state.session_id)
         )
+        export_dir = Path(next(iter(paths.values()))).parent if paths else app.runtime.export_dir_for_experiment(app.ui_state.experiment_id)
         names = [Path(paths[key]).name for key in ("graph_html", "basin_html", "geometry_html") if key in paths]
-        app.ui_state.last_feedback = f"Exports generated: {', '.join(names)}"
-        self._write_forensic(f"[INFO] Exports generated :: {', '.join(names)}")
+        app.ui_state.last_feedback = f"Exports generated in {export_dir}: {', '.join(names)}"
+        self._write_forensic(f"[INFO] Exports generated :: {export_dir}")
         self.refresh_panels()
 
     async def handle_observatory(self) -> None:
@@ -2999,9 +3097,14 @@ class ChatScreen(Screen):
         self.query_one("#inline_feedback_verdict_input", Input).focus()
 
     async def handle_review(self) -> None:
-        self.focus_inline_feedback()
         app = self.app
         assert isinstance(app, EdenTuiApp)
+        if not app.ui_state.last_turn_id:
+            self.focus_composer()
+            app.ui_state.last_feedback = "No Adam reply is available to review yet. Send a turn first."
+            self.refresh_panels()
+            return
+        self.focus_inline_feedback()
         app.ui_state.last_feedback = "Reply review is inline below Adam's latest answer. Type A, E, R, or S, then confirm with Y."
         self.refresh_panels()
 
@@ -3022,6 +3125,7 @@ class ChatScreen(Screen):
         self._set_text_area("#composer_input", "")
         self._reset_inline_feedback_inputs()
         self.refresh_panels()
+        self.focus_composer()
         self._scroll_chat_to_end()
         self._schedule_preview_refresh()
 
@@ -3032,12 +3136,23 @@ class ChatScreen(Screen):
         app = self.app
         assert isinstance(app, EdenTuiApp)
         app.ui_state.aperture_drawer_open = not app.ui_state.aperture_drawer_open
-        app.ui_state.last_feedback = (
-            "Aperture drawer opened for a wide scan."
-            if app.ui_state.aperture_drawer_open
-            else "Aperture drawer collapsed back to the compact dialogue view."
-        )
+        if self._is_compact_layout():
+            app.ui_state.last_feedback = (
+                "Compact aperture view opened. Press F8 or Esc to return to dialogue."
+                if app.ui_state.aperture_drawer_open
+                else "Returned to dialogue view."
+            )
+        else:
+            app.ui_state.last_feedback = (
+                "Aperture drawer opened for a wide scan."
+                if app.ui_state.aperture_drawer_open
+                else "Aperture drawer collapsed back to the compact dialogue view."
+            )
         self.refresh_panels()
+        if self._is_compact_layout() and app.ui_state.aperture_drawer_open:
+            self.query_one("#header_aperture_btn", Button).focus()
+        elif not app.ui_state.aperture_drawer_open:
+            self.focus_composer()
 
     def _route_printable_to_composer(self, event) -> bool:
         character = getattr(event, "character", None)
@@ -3087,6 +3202,7 @@ class ChatScreen(Screen):
         self._set_text_area("#composer_input", "")
         self._reset_inline_feedback_inputs()
         self.refresh_panels()
+        self.focus_composer()
         self._scroll_chat_to_end()
         self._schedule_preview_refresh()
 
@@ -3158,6 +3274,7 @@ class ChatScreen(Screen):
             self._set_text_area("#composer_input", "")
             self._reset_inline_feedback_inputs()
             self.refresh_panels()
+            self.focus_composer()
             self._scroll_chat_to_end()
             self._schedule_preview_refresh()
             return
@@ -3188,6 +3305,7 @@ class ChatScreen(Screen):
         self._set_text_area("#composer_input", "")
         self._reset_inline_feedback_inputs()
         self.refresh_panels()
+        self.focus_composer()
         self._scroll_chat_to_end()
         self._schedule_preview_refresh()
 
@@ -3276,8 +3394,12 @@ class ChatScreen(Screen):
 
     def on_key(self, event) -> None:
         if event.key == "escape":
+            message = "Composer focused."
+            if self._is_compact_layout() and self.app.ui_state.aperture_drawer_open:
+                self.app.ui_state.aperture_drawer_open = False
+                message = "Returned to dialogue view."
             self.focus_composer()
-            self.app.ui_state.last_feedback = "Composer focused."
+            self.app.ui_state.last_feedback = message
             self.refresh_panels()
             event.stop()
             return
@@ -3699,7 +3821,7 @@ class EdenTuiApp(App):
 
     async def action_show_archive(self) -> None:
         if isinstance(self.screen, ChatScreen):
-            await self.screen.handle_archive()
+            self.screen.run_worker(self.screen.handle_archive(), exclusive=True, group="archive")
         elif isinstance(self.screen, StartupScreen):
             self.screen.handle_startup_archive()
 

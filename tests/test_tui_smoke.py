@@ -84,6 +84,9 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         assert runtime.graph_health(app.ui_state.experiment_id)["feedback"] == 1
         transcript_text = transcript_path.read_text(encoding="utf-8")
         assert "ACCEPT" in transcript_text
+        await app.action_export_all()
+        await pilot.pause(0.4)
+        assert "Exports generated in" in app.ui_state.last_feedback
         call_count = 0
         original_graph_health = runtime.graph_health
 
@@ -111,7 +114,7 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
     async with app.run_test() as pilot:
         await pilot.pause(1.0)
         assert isinstance(app.screen, ChatScreen)
-        app.screen._execute_runtime_action("archive")
+        await app.action_show_archive()
         await pilot.pause(0.5)
         assert isinstance(app.screen, ConversationAtlasModal)
         modal = app.screen
@@ -132,3 +135,53 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         assert isinstance(app.screen, ChatScreen)
         assert app.ui_state.session_id == first_session["id"]
         assert app.ui_state.session_title == "Atlas One"
+
+
+@pytest.mark.asyncio
+async def test_tui_compact_layout_keeps_first_action_and_escape_recovery(runtime) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+        assert app.screen._is_compact_layout() is True
+        assert getattr(app.focused, "id", None) == "composer_input"
+        assert app.screen.query_one("#action_bus_panel").display is False
+        assert app.screen.query_one("#runtime_status_strip").display is False
+        assert app.screen.query_one("#chat_secondary").display is False
+
+        hint = app.screen.main_composer_hint_panel().renderable
+        assert "Start here:" in hint.plain
+        assert "Ctrl+S" in hint.plain
+        assert "F10 atlas" in hint.plain
+
+        await pilot.press("tab")
+        await pilot.pause(0.2)
+        assert getattr(app.focused, "id", None) == "runtime_action_menu"
+        await pilot.press("enter")
+        await pilot.pause(0.2)
+        assert getattr(app.focused, "id", None) == "composer_input"
+        assert "No Adam reply is available to review yet" in app.ui_state.last_feedback
+        await pilot.press("tab")
+        await pilot.pause(0.2)
+        assert getattr(app.focused, "id", None) == "runtime_action_menu"
+        await pilot.press("escape")
+        await pilot.pause(0.2)
+        assert getattr(app.focused, "id", None) == "composer_input"
+
+        app.screen.toggle_aperture_drawer()
+        await pilot.pause(0.2)
+        assert app.ui_state.aperture_drawer_open is True
+        assert app.screen.query_one("#chat_primary").display is False
+        assert app.screen.query_one("#chat_secondary").display is True
+
+        await pilot.press("escape")
+        await pilot.pause(0.2)
+        assert app.ui_state.aperture_drawer_open is False
+        assert app.screen.query_one("#chat_primary").display is True
+        assert app.screen.query_one("#chat_secondary").display is False
+        assert getattr(app.focused, "id", None) == "composer_input"
+
+        await app.action_show_review()
+        await pilot.pause(0.2)
+        assert getattr(app.focused, "id", None) == "composer_input"
+        assert "No Adam reply is available to review yet" in app.ui_state.last_feedback

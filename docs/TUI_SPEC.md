@@ -86,6 +86,7 @@ Wide aperture drawer:
 - occupies the top band of the screen when open
 - renders a wider natural-language scan of the active set, persistent anchors, and live heat
 - collapses back to the compact telemetry stack when closed
+- on compact terminals, `F8` switches the live surface into an aperture-focused view instead of opening the wide top drawer; `Esc` returns to the dialogue composer
 
 Secondary surfaces:
 
@@ -133,8 +134,10 @@ Secondary surfaces:
 - the memgraph bus keeps an always-visible legend for its glyph vocabulary so the operator can read it as a tool rather than decorative telemetry
 - the aperture is rendered as both a compact but more verbose bus-to-active-set read and a full-width pull-down readable scan with natural-language summaries plus a ranked queue
 - the prime surface keeps transcript, reply review, composer, memgraph, aperture, thinking, and the merged runtime/event chyron visible while the operator types; Deck still carries the detailed trace and budget surfaces
+- on compact terminals, the prime surface prioritizes transcript + composer + chyron and hides the right telemetry stack until the operator explicitly opens aperture/deeper surfaces
 - feedback is integrated directly into the primary dialogue bay through an inline reply-review strip under Adam's latest answer
 - inline review uses typed `A` / `E` / `R` / `S` codes plus `Y` confirmation, but still reuses the graph-backed feedback path and therefore updates regard, reward, risk, and edit channels
+- `Review` only jumps into the inline strip when Adam has already replied; otherwise the composer keeps focus and the status line explains that there is nothing to review yet
 - conversation logs are written as markdown artifacts under `exports/conversations/` for the active session and surfaced on-screen plus via `Open Conversation Log`
 - the conversation atlas treats saved sessions as a relational transcript library: all logs remain under the single export root while folder/tag organization is stored as session metadata and projected in the atlas
 - conversation boundaries are explicit through the live contract, transcript state, and inline review flow: ask or ingest, review when Adam answers, and end by opening a new session
@@ -142,6 +145,7 @@ Secondary surfaces:
 - latest-session resume restores the latest persisted session surface without forcing a new session flow first
 - keyboard-only navigation is supported through top action-bus focus, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the function-key bindings
 - corpus ingest supports a framing prompt whose phrases are graph-indexed as persistent document-conditioning material
+- export actions report the artifact directory path in the status surface so the operator can find the generated files without guesswork
 
 ## Budget panel contents
 
