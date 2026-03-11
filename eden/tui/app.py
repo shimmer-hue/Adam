@@ -110,6 +110,27 @@ class UiState:
     current_profile: dict[str, Any] | None = None
     current_graph_health: dict[str, Any] | None = None
     conversation_log_path: str | None = None
+    action_progress: dict[str, Any] | None = None
+    last_action_summary: str | None = None
+
+
+def _format_elapsed(seconds: float) -> str:
+    bounded = max(0.0, seconds)
+    if bounded < 60:
+        return f"{bounded:.1f}s"
+    total_seconds = int(bounded)
+    minutes, secs = divmod(total_seconds, 60)
+    hours, mins = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h{mins:02d}m{secs:02d}s"
+    return f"{mins}m{secs:02d}s"
+
+
+def _progress_bar(step: int, total: int, *, width: int = 12) -> str:
+    bounded_total = max(total, 1)
+    bounded_step = max(0, min(step, bounded_total))
+    filled = min(width, math.floor((bounded_step / bounded_total) * width))
+    return "[" + ("#" * filled) + ("-" * (width - filled)) + "]"
 
 
 class HelpModal(ModalScreen[None]):
@@ -1662,6 +1683,7 @@ class ChatScreen(Screen):
         self._graph_health_dirty = True
         self._event_lines: list[str] = []
         self._last_runtime_action_dispatch: tuple[str, float] | None = None
+        self._suppress_runtime_action_change = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -2404,12 +2426,83 @@ class ChatScreen(Screen):
         selected_value = str(self.query_one("#runtime_action_menu", Select).value or "review")
         selected = ACTION_MENU_LABELS.get(selected_value, selected_value.replace("_", " "))
         log_state = "ready" if app.ui_state.conversation_log_path else "pending"
-        text = Text.from_markup(
-            f"[bold {AMBER}]Action Bus[/]\n"
-            f"menu={selected} | aperture={'open' if app.ui_state.aperture_drawer_open else 'closed'} | review={'armed' if self._feedback_loop_state()[0] == 'pending' else 'clear'} | transcript={log_state}\n"
-            "Menu stays full width; quick actions sit below it."
+        action_progress = app.ui_state.action_progress or {}
+        text = Text()
+        text.append("Action Bus\n", style=f"bold {AMBER}")
+        text.append(
+            f"menu_focus={selected} | aperture={'open' if app.ui_state.aperture_drawer_open else 'closed'} "
+            f"| review={'armed' if self._feedback_loop_state()[0] == 'pending' else 'clear'} | transcript={log_state}\n",
+            style=TEXT,
         )
+        if action_progress:
+            started_at = float(action_progress.get("started_at", monotonic()))
+            elapsed = _format_elapsed(monotonic() - started_at)
+            step = int(action_progress.get("step", 0))
+            total = int(action_progress.get("total", 1))
+            text.append(
+                f"action={action_progress.get('label', 'unknown')} | phase={action_progress.get('phase', 'running')} | elapsed={elapsed}\n",
+                style=TEXT,
+            )
+            text.append(
+                f"progress={_progress_bar(step, total)} {step}/{total} | {safe_excerpt(str(action_progress.get('detail', 'working')), limit=108)}",
+                style=MUTED,
+            )
+        else:
+            last_summary = app.ui_state.last_action_summary or app.ui_state.last_feedback or "No action has run yet."
+            text.append("action=idle | observatory is repeatable via F3 or menu\n", style=TEXT)
+            text.append(f"last={safe_excerpt(last_summary, limit=132)}", style=MUTED)
         return Panel(text, title="Action Bus", border_style=AMBER, style=f"on {SHADE_ALT}")
+
+    def _set_runtime_action_progress(
+        self,
+        *,
+        action: str,
+        label: str,
+        phase: str,
+        step: int,
+        total: int,
+        detail: str,
+        feedback: str | None = None,
+    ) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        current = app.ui_state.action_progress or {}
+        started_at = current.get("started_at", monotonic()) if current.get("action") == action else monotonic()
+        app.ui_state.action_progress = {
+            "action": action,
+            "label": label,
+            "phase": phase,
+            "step": step,
+            "total": total,
+            "detail": detail,
+            "started_at": started_at,
+        }
+        if feedback:
+            app.ui_state.last_feedback = feedback
+        self.refresh_panels()
+
+    def _clear_runtime_action_progress(self, *, summary: str | None = None) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        app.ui_state.action_progress = None
+        if summary:
+            app.ui_state.last_action_summary = summary
+        self.refresh_panels()
+
+    def _runtime_action_running(self, action: str) -> bool:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        progress = app.ui_state.action_progress or {}
+        return progress.get("action") == action
+
+    def _reset_runtime_action_menu(self) -> None:
+        if not self.is_mounted:
+            return
+        menu = self.query_one("#runtime_action_menu", Select)
+        if str(menu.value or "review") == "review":
+            return
+        self._suppress_runtime_action_change = True
+        menu.value = "review"
 
     def main_action_status_panel(self) -> Panel:
         app = self.app
@@ -2859,6 +2952,8 @@ class ChatScreen(Screen):
                 line += f" | {payload}"
             self._record_event_line(line)
         self._seen_log_count = len(events)
+        if app.ui_state.action_progress is not None and self.is_mounted:
+            self.query_one("#action_bus_panel", Static).update(self.main_action_bus_panel())
 
     def _composer_text(self) -> str:
         return self.query_one("#composer_input", TextArea).text
@@ -3083,33 +3178,83 @@ class ChatScreen(Screen):
     async def handle_observatory(self) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
-        status = await asyncio.to_thread(partial(app.runtime.start_observatory, reuse_existing=True))
-        app.ui_state.observatory_status = status
-        experiment_id = app.ui_state.experiment_id
-        session_id = app.ui_state.session_id
-        if experiment_id is None:
-            latest = app.runtime.store.get_latest_experiment()
-            experiment_id = latest["id"] if latest is not None else None
-            session_id = None
-        if experiment_id is not None:
-            await asyncio.to_thread(partial(app.runtime.export_observability, experiment_id=experiment_id, session_id=session_id))
-        target_url = _observatory_target_url(app.runtime, status, experiment_id)
-        launch = await asyncio.to_thread(partial(open_browser_url, target_url))
-        if launch.ok:
-            app.ui_state.last_feedback = (
-                f"Observatory {'reused' if status['reused_existing'] else 'started'} at {target_url}"
+        summary = "Observatory action cancelled before completion."
+        try:
+            self._set_runtime_action_progress(
+                action="observatory",
+                label="Open Browser Observatory",
+                phase="Ensuring observatory server",
+                step=1,
+                total=3,
+                detail="Checking for a reusable local observatory server.",
+                feedback="Observatory: ensuring the local server is available.",
             )
-            self._write_forensic(
-                f"[INFO] Observatory {'reused' if status['reused_existing'] else 'started'} :: {target_url} via {launch.method}"
+            status = await asyncio.to_thread(partial(app.runtime.start_observatory, reuse_existing=True))
+            app.ui_state.observatory_status = status
+
+            experiment_id = app.ui_state.experiment_id
+            session_id = app.ui_state.session_id
+            if experiment_id is None:
+                latest = app.runtime.store.get_latest_experiment()
+                experiment_id = latest["id"] if latest is not None else None
+                session_id = None
+
+            export_detail = (
+                f"Refreshing observability artifacts for experiment {safe_excerpt(experiment_id, limit=20)}."
+                if experiment_id is not None
+                else "No active experiment; skipping export and using the server root."
             )
-        else:
-            app.ui_state.last_feedback = (
-                f"Observatory ready at {target_url}, but browser launch failed: {launch.detail}"
+            self._set_runtime_action_progress(
+                action="observatory",
+                label="Open Browser Observatory",
+                phase="Exporting observatory payloads",
+                step=2,
+                total=3,
+                detail=export_detail,
+                feedback=(
+                    f"Observatory: exporting payloads for {safe_excerpt(experiment_id, limit=20)}."
+                    if experiment_id is not None
+                    else "Observatory: no active experiment, opening the server root."
+                ),
             )
-            self._write_forensic(
-                f"[WARN] Observatory ready but browser launch failed :: {target_url} :: {launch.detail}"
+            if experiment_id is not None:
+                await asyncio.to_thread(
+                    partial(app.runtime.export_observability, experiment_id=experiment_id, session_id=session_id)
+                )
+
+            target_url = _observatory_target_url(app.runtime, status, experiment_id)
+            self._set_runtime_action_progress(
+                action="observatory",
+                label="Open Browser Observatory",
+                phase="Opening browser",
+                step=3,
+                total=3,
+                detail=f"Launching the system browser for {safe_excerpt(target_url, limit=88)}.",
+                feedback="Observatory: launching the browser.",
             )
-        self.refresh_panels()
+            launch = await asyncio.to_thread(partial(open_browser_url, target_url))
+            if launch.ok:
+                summary = f"Observatory {'reused' if status['reused_existing'] else 'started'} at {target_url}"
+                app.ui_state.last_feedback = summary
+                self._write_forensic(
+                    f"[INFO] Observatory {'reused' if status['reused_existing'] else 'started'} :: {target_url} via {launch.method}"
+                )
+            else:
+                summary = f"Observatory ready at {target_url}, but browser launch failed: {launch.detail}"
+                app.ui_state.last_feedback = summary
+                self._write_forensic(
+                    f"[WARN] Observatory ready but browser launch failed :: {target_url} :: {launch.detail}"
+                )
+        except asyncio.CancelledError:
+            app.ui_state.last_feedback = summary
+            self._write_forensic("[WARN] Observatory action cancelled.")
+            raise
+        except Exception as exc:
+            summary = f"Observatory failed: {exc}"
+            app.ui_state.last_feedback = summary
+            self._write_forensic(f"[WARN] Observatory action failed :: {exc}")
+        finally:
+            self._clear_runtime_action_progress(summary=summary)
 
     async def handle_conversation_log(self) -> None:
         app = self.app
@@ -3387,6 +3532,8 @@ class ChatScreen(Screen):
         self.run_worker(self._ensure_backend_ready(prepare=True), exclusive=True, group="prepare_mlx")
 
     def _execute_runtime_action(self, action: str) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
         normalized = (action or "review").strip().lower()
         self._last_runtime_action_dispatch = (normalized, monotonic())
         if normalized in {"blank", "seeded", "resume"}:
@@ -3406,6 +3553,25 @@ class ChatScreen(Screen):
         elif normalized == "prepare_mlx":
             self.handle_prepare_mlx()
         elif normalized == "observatory":
+            if self._runtime_action_running("observatory"):
+                progress = app.ui_state.action_progress or {}
+                elapsed = _format_elapsed(monotonic() - float(progress.get("started_at", monotonic())))
+                app.ui_state.last_feedback = (
+                    f"Observatory action already running: {progress.get('phase', 'working')} ({elapsed} elapsed)."
+                )
+                self.refresh_panels()
+                self.call_after_refresh(self._reset_runtime_action_menu)
+                return
+            self._set_runtime_action_progress(
+                action="observatory",
+                label="Open Browser Observatory",
+                phase="Queued launch",
+                step=0,
+                total=3,
+                detail="Waiting for the observatory worker to begin.",
+                feedback="Observatory queued: preparing browser observability surfaces.",
+            )
+            self.call_after_refresh(self._reset_runtime_action_menu)
             self.run_worker(self.handle_observatory(), exclusive=True, group="observatory")
         elif normalized == "export":
             self.run_worker(self.handle_export(), exclusive=True, group="export")
@@ -3420,6 +3586,9 @@ class ChatScreen(Screen):
     def handle_runtime_action_changed(self, _event: Select.Changed) -> None:
         self.query_one("#action_bus_panel", Static).update(self.main_action_bus_panel())
         self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
+        if self._suppress_runtime_action_change:
+            self._suppress_runtime_action_change = False
+            return
         action = str(self.query_one("#runtime_action_menu", Select).value or "review")
         if self._recent_runtime_action_dispatch(action):
             return
@@ -3427,6 +3596,8 @@ class ChatScreen(Screen):
 
     def _recent_runtime_action_dispatch(self, action: str) -> bool:
         normalized = (action or "review").strip().lower()
+        if self._runtime_action_running(normalized):
+            return False
         if self._last_runtime_action_dispatch is None:
             return False
         last_action, dispatched_at = self._last_runtime_action_dispatch

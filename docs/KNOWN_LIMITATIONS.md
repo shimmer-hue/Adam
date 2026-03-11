@@ -31,3 +31,4 @@
 - Static observatory exports must be HTTP-served. Direct `file://` opening is not a supported runtime path for the v1 bundle.
 - Browser view presets live in `localStorage` only. They are origin-local, non-authoritative, and intentionally absent from the measurement ledger and graph payload planes.
 - The checked-in frontend bundle is treated as runtime contract surface. Runtime warns on stale build metadata, and CI should fail until `npm --prefix web/observatory run build` refreshes `build-meta.json`.
+- The Action Bus observatory progress meter reports phase progress and accurate elapsed time only. It does not claim an ETA because server reuse, export cost, and host browser launch timing are not predictable enough to support a truthful remaining-time estimate.

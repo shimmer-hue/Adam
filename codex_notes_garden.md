@@ -1318,3 +1318,76 @@ Remaining uncertainties:
 - None specific to this crash path. Future concurrency work should continue to treat the single shared SQLite connection as a serialized resource.
 Next shortest proof path:
 - Start the TUI, select `Open Browser Observatory`, and confirm the menu selection no longer crashes while the observatory starts/exports in the background.
+
+## [2026-03-11 10:28:39 EDT] PRE-FLIGHT
+Operator task:
+Repair the repeated `Open Browser Observatory` action path and make the Action Bus show real observatory action progress instead of only the selected menu label.
+Task checksum:
+Observed operator report: selecting `Open Browser Observatory` again appears to do nothing; the Action Bus still reads `menu=Open Browser Observatory`, which reflects menu state rather than in-flight action state. Likely repeat-dispatch gap: selecting the same `Select` value again does not emit `Select.Changed`.
+Repo situation:
+Working tree is already dirty with prior observatory launcher, menu-dispatch, and GraphStore concurrency repairs. Unrelated `.DS_Store` is still modified. The current TUI contract and observatory server/export path are otherwise green under pytest.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`, repo `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+The TUI is the primary runtime surface. Action Bus text must remain an operator-readable contract surface, not a misleading reflection of stale widget state. `Open Browser Observatory` must be repeatable and should surface observatory startup/export/browser-launch phases without claiming speculative ETA.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Immediate action-menu dispatch on `Select.Changed`.
+  - Observatory launcher/export/browser-open path with explicit success/failure feedback.
+- Instrumented:
+  - Browser launcher fallback reporting.
+- Conceptual:
+  - Action Bus progress semantics for long-running observatory work.
+- Unknown:
+  - Whether repeat selection failure is entirely due to unchanged `Select` value or whether browser launch also intermittently fails on the host.
+Risks / invariants:
+Do not regress keyboard execution or compact-layout behavior. Do not claim accurate remaining time; only accurate elapsed time is defensible. Keep the menu usable for repeated observatory launches.
+Evidence plan:
+Add explicit runtime action-progress state plus phase-based progress display, reset the runtime action menu to a neutral value after dispatch without triggering a second action, and add TUI tests for repeat observatory launch plus Action Bus progress text. Then rerun focused and full pytest.
+Shortest proof path:
+Patch `ChatScreen` to track active action metadata, render it in `main_action_bus_panel()`, suppress programmatic menu resets, and verify with `tests/test_tui_smoke.py` plus full `./.venv/bin/pytest -q`.
+
+## [2026-03-11 10:34:41 EDT] POST-FLIGHT
+Files changed:
+- `/Users/brianray/Adam/eden/tui/app.py`
+- `/Users/brianray/Adam/tests/test_tui_smoke.py`
+- `/Users/brianray/Adam/docs/TUI_SPEC.md`
+- `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+- `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+- `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+- `/Users/brianray/Adam/docs/TUI_SPEC.md`
+- `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+- `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+- Revised the TUI contract so the Action Bus distinguishes `menu_focus` from active observatory work.
+- Preserved the immediate-dispatch action-menu contract while making `Open Browser Observatory` repeatable through a neutral post-dispatch menu reset.
+- Added an explicit boundary that the Action Bus observatory meter reports phase progress plus accurate elapsed time, not ETA.
+Behavior implemented or modified:
+- Added runtime action-progress state to `UiState`.
+- `Open Browser Observatory` now surfaces `Queued launch`, `Ensuring observatory server`, `Exporting observatory payloads`, and `Opening browser` phases with a phase bar and elapsed time in the Action Bus.
+- The runtime action menu resets back to `Review Last Reply` after observatory dispatch so re-selecting Observatory later emits a fresh `Select.Changed` event instead of silently doing nothing on the same selected value.
+- Re-selecting Observatory while it is already running no longer silently no-ops; the TUI reports that the observatory action is already running and keeps the first worker alive.
+- Added cancellation-safe observatory cleanup so action-progress state clears even if the worker is cancelled.
+Evidence produced (tests / traces / commands / exports):
+- `python -m compileall /Users/brianray/Adam/eden/tui/app.py /Users/brianray/Adam/tests/test_tui_smoke.py` -> success
+- `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py /Users/brianray/Adam/tests/test_browser_open.py` -> `9 passed in 20.23s`
+- `./.venv/bin/pytest -q` -> `48 passed in 26.23s`
+Status register changes:
+- Implemented:
+  - Repeatable TUI observatory dispatch with explicit Action Bus progress and accurate elapsed-time reporting.
+- Instrumented:
+  - Action Bus observatory phase surface now exposes queued/server/export/browser-launch progress as a real runtime status signal.
+- Conceptual:
+  - Accurate remaining-time estimate for observatory launch remains intentionally unimplemented.
+- Unknown:
+  - Host OS browser acceptance after a successful launcher call is still outside EDEN's direct proof surface; EDEN can report the attempted URL and launch method but not prove the browser foregrounded.
+Truth-table / limitations updates:
+- Added the TUI observatory action-progress surface to `IMPLEMENTATION_TRUTH_TABLE.md`.
+- Added the no-ETA boundary to `KNOWN_LIMITATIONS.md`.
+Remaining uncertainties:
+- The Action Bus now makes the in-flight observatory path legible, but if the host browser ignores both `webbrowser.open(...)` and the OS fallback, EDEN can only report the attempted launch path and failure detail.
+Next shortest proof path:
+- Start the TUI, select `Open Browser Observatory`, and confirm the Action Bus shows the observatory phases plus elapsed time and that the menu returns to `Review Last Reply` after dispatch so a later Observatory selection re-runs cleanly.

@@ -56,6 +56,7 @@
 | Frontend build freshness guard | Implemented | `build-meta.json` emitted at build time, runtime warning via `/api/status`, CI check script in `scripts/check_observatory_build_meta.py` |
 | Robust observatory server lifecycle | Implemented | host/port args, reuse, free-port fallback, tests |
 | Observatory open without forced synchronous export | Implemented | TUI observatory actions now start/open the server immediately and reuse existing artifacts when present |
+| TUI observatory action progress surface | Implemented | Action Bus now separates menu focus from active observatory work, shows phase-progress plus accurate elapsed time, and resets the menu after dispatch so repeat observatory launches remain selectable |
 | Export location feedback | Implemented | TUI export action reports the artifact directory path in the session feedback surface after generation |
 | Geometry diagnostics | Implemented | ringness, radiality, linearity, communities, triadic closure, spectral summaries, mirror/chirality/translation proxies |
 | Large-graph geometry fallback | Implemented | seeded-scale graphs use sparse-safe approximations instead of SciPy / dense full-graph linear algebra |

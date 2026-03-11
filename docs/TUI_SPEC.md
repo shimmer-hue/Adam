@@ -126,6 +126,8 @@ Secondary surfaces:
 - shell flags remain optional overrides; the normal runtime contract is repo-local MLX
 - the action bus exposes keyboard-focusable menu + quick buttons, while Live Contract reports model readiness, active session, and focus state
 - choosing an action from the top action `Select` executes it immediately; `Enter` on a focused action menu executes the currently selected action and duplicate dispatch is suppressed
+- the Action Bus now separates menu focus from active work: `menu_focus` reflects the current `Select` value, while long-running observatory work surfaces a phase-based progress bar plus accurate elapsed time
+- `Open Browser Observatory` resets the runtime menu back to its neutral review focus after dispatch so repeat observatory launches stay selectable instead of getting stuck on the same `Select` value
 - multiline composition is first-class
 - `Esc` returns focus to the composer, and printable keys pressed outside editable widgets are routed back into the composer automatically
 - the dialogue tape is scrollable and can be navigated by focusing it, then using `Up`, `Down`, `PageUp`, `PageDown`, `Home`, or `End`
@@ -147,6 +149,7 @@ Secondary surfaces:
 - keyboard-only navigation is supported through top action-bus focus, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the function-key bindings
 - corpus ingest supports a framing prompt whose phrases are graph-indexed as persistent document-conditioning material
 - export actions report the artifact directory path in the status surface so the operator can find the generated files without guesswork
+- observatory launch status is explicitly phased in the Action Bus (`queued`, `ensuring server`, `exporting payloads`, `opening browser`); elapsed time is real elapsed time, not an ETA claim
 
 ## Budget panel contents
 
