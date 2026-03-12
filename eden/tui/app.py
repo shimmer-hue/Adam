@@ -20,28 +20,118 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, Select, Static, TextArea
 
 from ..browser import open_browser_url
+from ..inference import request_from_dict
 from ..runtime import EdenRuntime
 from ..utils import safe_excerpt
 
 
-AMBER = "#ffd98a"
-TEXT = "#fff1d2"
-MUTED = "#e6ab5a"
-BG = "#12080a"
-PANEL = "#211014"
-SHADE = "#1a0d12"
-SHADE_ALT = "#27121c"
-NEON = "#84ffd0"
-ICE = "#8ddcff"
-ROSE = "#ff7ad7"
-EMBER = "#ffae57"
-VIOLET = "#a890ff"
-MARBLE_DARK = "#160a14"
-MARBLE_LIGHT = "#351629"
-CHIARO_SHADOW = "#10070a"
-CHIARO_BRONZE = "#21100f"
-CHIARO_WINE = "#22101a"
-CHIARO_SLATE = "#101622"
+@dataclass(frozen=True, slots=True)
+class LookPalette:
+    label: str
+    amber: str
+    text: str
+    muted: str
+    bg: str
+    panel: str
+    shade: str
+    shade_alt: str
+    neon: str
+    ice: str
+    rose: str
+    ember: str
+    violet: str
+    marble_dark: str
+    marble_light: str
+    chiaro_shadow: str
+    chiaro_bronze: str
+    chiaro_wine: str
+    chiaro_slate: str
+
+
+LOOK_PALETTES: dict[str, LookPalette] = {
+    "amber_dark": LookPalette(
+        label="Amber Dark",
+        amber="#ffd98a",
+        text="#fff1d2",
+        muted="#e6ab5a",
+        bg="#12080a",
+        panel="#211014",
+        shade="#1a0d12",
+        shade_alt="#27121c",
+        neon="#84ffd0",
+        ice="#8ddcff",
+        rose="#ff7ad7",
+        ember="#ffae57",
+        violet="#a890ff",
+        marble_dark="#160a14",
+        marble_light="#351629",
+        chiaro_shadow="#10070a",
+        chiaro_bronze="#21100f",
+        chiaro_wine="#22101a",
+        chiaro_slate="#101622",
+    ),
+    "typewriter_light": LookPalette(
+        label="Typewriter Light",
+        amber="#6f5335",
+        text="#2b2217",
+        muted="#756451",
+        bg="#f4eddc",
+        panel="#eadfc7",
+        shade="#efe4cf",
+        shade_alt="#e5d8c1",
+        neon="#2f6d5e",
+        ice="#486276",
+        rose="#9a4e47",
+        ember="#8d5d2c",
+        violet="#6b608f",
+        marble_dark="#d8ccb5",
+        marble_light="#fbf7ef",
+        chiaro_shadow="#f7f0e1",
+        chiaro_bronze="#ede0ca",
+        chiaro_wine="#ead8cd",
+        chiaro_slate="#dde4e7",
+    ),
+}
+
+LOOK_OPTIONS = [(palette.label, key) for key, palette in LOOK_PALETTES.items()]
+LOOK_LABELS = {key: palette.label for key, palette in LOOK_PALETTES.items()}
+LOOK_CLASSES = {key: f"look-{key.replace('_', '-')}" for key in LOOK_PALETTES}
+
+
+def _normalize_ui_look(value: Any) -> str:
+    normalized = str(value or "amber_dark").strip().lower()
+    return normalized if normalized in LOOK_PALETTES else "amber_dark"
+
+
+def _apply_look_palette(look: str) -> LookPalette:
+    palette = LOOK_PALETTES[_normalize_ui_look(look)]
+    globals().update(
+        {
+            "AMBER": palette.amber,
+            "TEXT": palette.text,
+            "MUTED": palette.muted,
+            "BG": palette.bg,
+            "PANEL": palette.panel,
+            "SHADE": palette.shade,
+            "SHADE_ALT": palette.shade_alt,
+            "NEON": palette.neon,
+            "ICE": palette.ice,
+            "ROSE": palette.rose,
+            "EMBER": palette.ember,
+            "VIOLET": palette.violet,
+            "MARBLE_DARK": palette.marble_dark,
+            "MARBLE_LIGHT": palette.marble_light,
+            "CHIARO_SHADOW": palette.chiaro_shadow,
+            "CHIARO_BRONZE": palette.chiaro_bronze,
+            "CHIARO_WINE": palette.chiaro_wine,
+            "CHIARO_SLATE": palette.chiaro_slate,
+        }
+    )
+    return palette
+
+
+_apply_look_palette("amber_dark")
+TYPEWRITER_LIGHT = LOOK_PALETTES["typewriter_light"]
 
 ACTION_MENU_OPTIONS = [
     ("Toggle Aperture Drawer", "toggle_aperture"),
@@ -114,6 +204,16 @@ class UiState:
     last_action_summary: str | None = None
 
 
+def _sync_node_look(node: Any) -> str:
+    app = getattr(node, "app", None)
+    runtime = getattr(app, "runtime", None)
+    look = _normalize_ui_look(getattr(getattr(runtime, "settings", None), "ui_look", "amber_dark"))
+    for class_name in LOOK_CLASSES.values():
+        node.remove_class(class_name)
+    node.add_class(LOOK_CLASSES[look])
+    return look
+
+
 def _format_elapsed(seconds: float) -> str:
     bounded = max(0.0, seconds)
     if bounded < 60:
@@ -136,7 +236,7 @@ def _progress_bar(step: int, total: int, *, width: int = 12) -> str:
 class HelpModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         help_text = Text.from_markup(
-            "[bold #ffbf66]EDEN Controls[/]\n\n"
+            f"[bold {AMBER}]EDEN Controls[/]\n\n"
             "EDEN boots directly into a live dialogue surface.\n"
             "The top action bus keeps the menu plus quick ingest/aperture controls visible.\n"
             "F8 opens a full-width aperture drawer for a wider active-set scan.\n"
@@ -146,7 +246,7 @@ class HelpModal(ModalScreen[None]):
             "The runtime loop and session/event state ride in the merged bottom chyron so they stay visible without stealing panel width.\n"
             "Use Action Bus -> Open Conversation Log to open the saved markdown transcript for the live session.\n"
             "Use Action Bus -> Open Conversation Atlas to browse saved sessions through folder and tag projections.\n"
-            "Open Utilities Deck for detailed budget, thinking, history, ingest, and launch utilities.\n"
+            "Open Utilities Deck for detailed budget, thinking, history, ingest, launch utilities, and the UI look selector.\n"
             "Review Last Reply jumps focus to the inline reply-review strip.\n\n"
             "[bold]F1[/] help overlay\n"
             "[bold]Ctrl+S[/] send current input\n"
@@ -177,6 +277,9 @@ class HelpModal(ModalScreen[None]):
         )
         yield Static(Panel(help_text, title="Help", border_style=AMBER), id="help_panel")
 
+    def on_mount(self) -> None:
+        _sync_node_look(self)
+
     def on_key(self, event) -> None:
         if event.key in {"escape", "f1"}:
             self.dismiss(None)
@@ -190,12 +293,14 @@ class SessionConfigModal(ModalScreen[dict[str, Any] | None]):
         title_text: str,
         action_label: str,
         show_title_input: bool = True,
+        session_title_history: list[str] | None = None,
     ) -> None:
         super().__init__()
         self.defaults = defaults
         self.title_text = title_text
         self.action_label = action_label
         self.show_title_input = show_title_input
+        self.session_title_history = session_title_history or []
 
     def compose(self) -> ComposeResult:
         summary = Text.from_markup(
@@ -206,49 +311,99 @@ class SessionConfigModal(ModalScreen[dict[str, Any] | None]):
         with Horizontal(id="session_config_shell"):
             with Vertical(classes="session_config_column"):
                 if self.show_title_input:
-                    yield Input(value=self.defaults.get("title", "Operator Session"), id="session_title_input", placeholder="session title")
-                yield Select(
-                    [("MANUAL", "manual"), ("RUNTIME_AUTO", "runtime_auto"), ("ADAM_AUTO", "adam_auto")],
-                    value=self.defaults.get("mode", "manual"),
-                    allow_blank=False,
-                    id="mode_select",
-                    prompt="Inference mode",
-                )
-                yield Select(
-                    [("Tight", "tight"), ("Balanced", "balanced"), ("Wide", "wide")],
-                    value=self.defaults.get("budget_mode", "balanced"),
-                    allow_blank=False,
-                    id="budget_mode_select",
-                    prompt="Budget mode",
-                )
-                yield Select(
-                    [("Off", "false"), ("On", "true")],
-                    value="true" if self.defaults.get("low_motion") else "false",
-                    allow_blank=False,
-                    id="low_motion_select",
-                    prompt="Low motion",
-                )
-                yield Select(
-                    [("Off", "false"), ("On", "true")],
-                    value="true" if self.defaults.get("debug", True) else "false",
-                    allow_blank=False,
-                    id="debug_select",
-                    prompt="Debug verbosity",
-                )
+                    with Vertical(classes="field_stack", id="session_title_field"):
+                        yield Static("Operator Session", classes="field_label", id="session_title_label")
+                        with Horizontal(id="session_title_row"):
+                            yield Input(
+                                value=self.defaults.get("title", "Operator Session"),
+                                id="session_title_input",
+                                placeholder="Type a session title",
+                            )
+                            yield Select(
+                                [(title, title) for title in self.session_title_history],
+                                value=Select.NULL,
+                                allow_blank=True,
+                                id="session_title_history_select",
+                                prompt="Recent titles",
+                                disabled=not self.session_title_history,
+                            )
+                with Vertical(classes="field_stack", id="session_mode_field"):
+                    yield Static("Mode", classes="field_label", id="session_mode_label")
+                    yield Select(
+                        [("MANUAL", "manual"), ("RUNTIME_AUTO", "runtime_auto"), ("ADAM_AUTO", "adam_auto")],
+                        value=self.defaults.get("mode", "manual"),
+                        allow_blank=False,
+                        id="mode_select",
+                        prompt="Inference mode",
+                    )
+                with Vertical(classes="field_stack", id="session_budget_mode_field"):
+                    yield Static("Budget Mode", classes="field_label", id="session_budget_mode_label")
+                    yield Select(
+                        [("Tight", "tight"), ("Balanced", "balanced"), ("Wide", "wide")],
+                        value=self.defaults.get("budget_mode", "balanced"),
+                        allow_blank=False,
+                        id="budget_mode_select",
+                        prompt="Budget mode",
+                    )
+                with Vertical(classes="field_stack", id="session_low_motion_field"):
+                    yield Static("Low Motion", classes="field_label", id="session_low_motion_label")
+                    yield Select(
+                        [("Off", "false"), ("On", "true")],
+                        value="true" if self.defaults.get("low_motion") else "false",
+                        allow_blank=False,
+                        id="low_motion_select",
+                        prompt="Low motion",
+                    )
+                with Vertical(classes="field_stack", id="session_debug_field"):
+                    yield Static("Debug", classes="field_label", id="session_debug_label")
+                    yield Select(
+                        [("Off", "false"), ("On", "true")],
+                        value="true" if self.defaults.get("debug", True) else "false",
+                        allow_blank=False,
+                        id="debug_select",
+                        prompt="Debug verbosity",
+                    )
                 yield Static(id="session_config_summary")
             with Vertical(classes="session_config_column"):
-                yield Input(value=str(self.defaults.get("temperature", 0.4)), id="temperature_input", placeholder="temperature")
-                yield Input(value=str(self.defaults.get("max_output_tokens", 480)), id="max_tokens_input", placeholder="max output tokens")
-                yield Input(value=str(self.defaults.get("top_p", 0.9)), id="top_p_input", placeholder="top_p")
-                yield Input(value=str(self.defaults.get("repetition_penalty", 1.05)), id="repetition_penalty_input", placeholder="repetition penalty")
-                yield Input(value=str(self.defaults.get("retrieval_depth", 12)), id="retrieval_depth_input", placeholder="retrieval depth")
-                yield Input(value=str(self.defaults.get("max_context_items", 8)), id="max_context_items_input", placeholder="max context items")
-                yield Input(value=str(self.defaults.get("response_char_cap", 1600)), id="response_char_cap_input", placeholder="response char cap")
-                with Horizontal():
+                with Vertical(classes="field_stack", id="temperature_field"):
+                    yield Static("Temperature", classes="field_label", id="temperature_label")
+                    yield Input(value=str(self.defaults.get("temperature", 0.4)), id="temperature_input", placeholder="temperature")
+                with Vertical(classes="field_stack", id="max_tokens_field"):
+                    yield Static("Max Output Tokens", classes="field_label", id="max_tokens_label")
+                    yield Input(value=str(self.defaults.get("max_output_tokens", 480)), id="max_tokens_input", placeholder="max output tokens")
+                with Vertical(classes="field_stack", id="top_p_field"):
+                    yield Static("Top-P", classes="field_label", id="top_p_label")
+                    yield Input(value=str(self.defaults.get("top_p", 0.9)), id="top_p_input", placeholder="top_p")
+                with Vertical(classes="field_stack", id="repetition_penalty_field"):
+                    yield Static("Repetition Penalty", classes="field_label", id="repetition_penalty_label")
+                    yield Input(
+                        value=str(self.defaults.get("repetition_penalty", 1.05)),
+                        id="repetition_penalty_input",
+                        placeholder="repetition penalty",
+                    )
+                with Vertical(classes="field_stack", id="retrieval_depth_field"):
+                    yield Static("Retrieval Depth", classes="field_label", id="retrieval_depth_label")
+                    yield Input(value=str(self.defaults.get("retrieval_depth", 12)), id="retrieval_depth_input", placeholder="retrieval depth")
+                with Vertical(classes="field_stack", id="max_context_items_field"):
+                    yield Static("Max Context Items", classes="field_label", id="max_context_items_label")
+                    yield Input(
+                        value=str(self.defaults.get("max_context_items", 8)),
+                        id="max_context_items_input",
+                        placeholder="max context items",
+                    )
+                with Vertical(classes="field_stack", id="response_char_cap_field"):
+                    yield Static("Response Character Cap", classes="field_label", id="response_char_cap_label")
+                    yield Input(
+                        value=str(self.defaults.get("response_char_cap", 1600)),
+                        id="response_char_cap_input",
+                        placeholder="response char cap",
+                    )
+                with Horizontal(id="session_action_row"):
                     yield Button(self.action_label, id="session_confirm_btn", variant="primary")
                     yield Button("Cancel", id="session_cancel_btn")
 
     def on_mount(self) -> None:
+        _sync_node_look(self)
         self._refresh_summary()
 
     @on(Button.Pressed, "#session_confirm_btn")
@@ -258,6 +413,24 @@ class SessionConfigModal(ModalScreen[dict[str, Any] | None]):
     @on(Button.Pressed, "#session_cancel_btn")
     def handle_cancel(self) -> None:
         self.dismiss(None)
+
+    @on(Select.Changed, "#session_title_history_select")
+    def handle_title_history_select(self, event: Select.Changed) -> None:
+        if not self.show_title_input or event.value == Select.NULL:
+            return
+        title = str(event.value or "").strip()
+        title_input = self.query_one("#session_title_input", Input)
+        if title and title_input.value != title:
+            title_input.value = title
+
+    @on(Input.Changed, "#session_title_input")
+    def handle_title_input_change(self, event: Input.Changed) -> None:
+        if not self.show_title_input:
+            return
+        history = self.query_one("#session_title_history_select", Select)
+        current = history.value
+        if current != Select.NULL and str(current) != event.value:
+            history.value = Select.NULL
 
     @on(Select.Changed)
     @on(Input.Changed)
@@ -269,7 +442,7 @@ class SessionConfigModal(ModalScreen[dict[str, Any] | None]):
             self.dismiss(None)
 
     def _payload(self) -> dict[str, Any]:
-        return {
+        raw_payload = {
             "title": (
                 self.query_one("#session_title_input", Input).value.strip()
                 if self.show_title_input
@@ -288,6 +461,9 @@ class SessionConfigModal(ModalScreen[dict[str, Any] | None]):
             "max_context_items": self._int_value("#max_context_items_input", 8),
             "response_char_cap": self._int_value("#response_char_cap_input", 1600),
         }
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        return request_from_dict(raw_payload, app.runtime.settings).to_dict()
 
     def _refresh_summary(self) -> None:
         payload = self._payload()
@@ -351,6 +527,7 @@ class FeedbackModal(ModalScreen[None]):
         yield Static(id="review_status")
 
     def on_mount(self) -> None:
+        _sync_node_look(self)
         self._refresh()
         self.query_one("#review_explanation_input", TextArea).focus()
 
@@ -411,7 +588,7 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
     def compose(self) -> ComposeResult:
         yield Static(id="atlas_summary")
         with Horizontal(id="atlas_shell"):
-            with Vertical(classes="atlas_column"):
+            with Vertical(classes="atlas_column", id="atlas_filter_column"):
                 yield Input(placeholder="Search title, experiment, folder, tag, or excerpt", id="atlas_search_input")
                 yield Select(
                     ARCHIVE_SORT_OPTIONS,
@@ -430,23 +607,25 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
                 yield Input(placeholder="Optional facet filter for the current lens", id="atlas_filter_input")
                 yield Static(id="atlas_taxonomy_panel")
                 yield Static(id="atlas_status_panel")
-            with Vertical(classes="atlas_column atlas_records_column"):
+            with Vertical(classes="atlas_column", id="atlas_main_column"):
                 yield DataTable(zebra_stripes=True, cursor_type="row", id="atlas_records_table")
-                yield Static(id="atlas_projection_panel")
-            with Vertical(classes="atlas_column"):
                 yield Static(id="atlas_preview_panel")
-                yield Input(placeholder="Folder path, e.g. projects/atlas", id="atlas_folder_input")
-                yield Input(placeholder="Tags, comma-separated", id="atlas_tags_input")
-                with Horizontal():
+                with Vertical(classes="field_stack", id="atlas_folder_field"):
+                    yield Static("Folder", classes="field_label", id="atlas_folder_label")
+                    yield Input(placeholder="Folder path, e.g. projects/atlas", id="atlas_folder_input")
+                with Vertical(classes="field_stack", id="atlas_tags_field"):
+                    yield Static("Tags", classes="field_label", id="atlas_tags_label")
+                    yield Input(placeholder="Tags, comma-separated", id="atlas_tags_input")
+                with Horizontal(id="atlas_taxonomy_actions"):
                     yield Button("Save Taxonomy", id="atlas_save_btn", variant="primary")
                     yield Button("Open Transcript", id="atlas_open_btn")
-                with Horizontal():
+                with Horizontal(id="atlas_session_actions"):
                     yield Button("Resume Session", id="atlas_resume_btn")
                     yield Button("Refresh", id="atlas_refresh_btn")
                     yield Button("Close", id="atlas_close_btn")
-                yield Static(id="atlas_editor_hint")
 
     def on_mount(self) -> None:
+        _sync_node_look(self)
         table = self.query_one("#atlas_records_table", DataTable)
         table.add_columns("Session", "Experiment", "Mode", "Turns", "Folder", "Tags", "Updated")
         self._refresh_panels()
@@ -630,16 +809,6 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
         )
         return Panel(body, title="Atlas Status", border_style=ICE)
 
-    def _projection_panel(self) -> Panel:
-        lens = self._current_lens()
-        counts = self._counts_for_lens(lens if lens != "all_texts" else "folder")[:8]
-        header = "Current projection counts" if lens != "all_texts" else "Folder shelves beneath all_texts"
-        lines = [f"[bold {AMBER}]{header}[/]"]
-        lines.extend(f"{name} -> {count}" for name, count in counts)
-        if not counts:
-            lines.append("No saved sessions yet.")
-        return Panel(Text.from_markup("\n".join(lines)), title="Projection Map", border_style=AMBER)
-
     def _preview_panel(self) -> Panel:
         record = self._selected_record()
         preview = self._selected_preview
@@ -677,20 +846,11 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
         )
         return Panel(body, title="Session Preview", border_style=AMBER)
 
-    def _editor_hint_panel(self) -> Panel:
-        body = Text.from_markup(
-            "[bold #ffbf66]Editor[/]\n"
-            "Assign one folder path and any number of tags. The same conversation still lives under all_texts while also appearing through those relational lenses."
-        )
-        return Panel(body, title="Metadata Editor", border_style=ROSE)
-
     def _refresh_panels(self) -> None:
         self.query_one("#atlas_summary", Static).update(self._summary_panel())
         self.query_one("#atlas_taxonomy_panel", Static).update(self._taxonomy_panel())
         self.query_one("#atlas_status_panel", Static).update(self._status_panel())
-        self.query_one("#atlas_projection_panel", Static).update(self._projection_panel())
         self.query_one("#atlas_preview_panel", Static).update(self._preview_panel())
-        self.query_one("#atlas_editor_hint", Static).update(self._editor_hint_panel())
 
     @on(Input.Changed, "#atlas_search_input")
     @on(Input.Changed, "#atlas_filter_input")
@@ -805,12 +965,21 @@ class DeckModal(ModalScreen[None]):
                     yield Button("New Session", id="deck_new_session_btn")
                     yield Button("Conversation Atlas", id="deck_archive_btn")
                 with Horizontal():
+                    yield Select(
+                        LOOK_OPTIONS,
+                        value=self.chat_screen.current_ui_look(),
+                        allow_blank=False,
+                        id="deck_look_select",
+                        prompt="Look",
+                    )
+                with Horizontal():
                     yield Button("Low Motion", id="deck_motion_btn")
                     yield Button("Debug", id="deck_debug_btn")
                     yield Button("Close", id="deck_close_btn")
                 yield Static(id="deck_status_panel")
 
     def on_mount(self) -> None:
+        _sync_node_look(self)
         self._refresh()
         self.set_interval(1.0, self._refresh)
 
@@ -858,6 +1027,11 @@ class DeckModal(ModalScreen[None]):
     @on(Button.Pressed, "#deck_motion_btn")
     async def handle_motion(self) -> None:
         await self.chat_screen.toggle_motion()
+        self._refresh()
+
+    @on(Select.Changed, "#deck_look_select")
+    async def handle_look(self, event: Select.Changed) -> None:
+        await self.chat_screen.set_ui_look(str(event.value or "amber_dark"), active_modal=self)
         self._refresh()
 
     @on(Button.Pressed, "#deck_debug_btn")
@@ -912,6 +1086,7 @@ class IngestModal(ModalScreen[None]):
                 yield Static(Panel(guidance, title="Guidance", border_style=AMBER), id="ingest_guidance_panel")
 
     def on_mount(self) -> None:
+        _sync_node_look(self)
         prompt = self.query_one("#ingest_prompt_input", TextArea)
         prompt.load_text(
             "Brief Adam before ingest: what is this document, how should it be read, and what should persist in recall?"
@@ -942,6 +1117,7 @@ class AdamSigil(Static):
     LOOP = ("capture", "retrieve", "scope", "trace", "prune", "prompt", "model", "membrane", "feedback")
 
     def on_mount(self) -> None:
+        _sync_node_look(self)
         self.border_title = "Runtime Loop"
         self._frame = 0
         self.set_interval(0.35, self._tick)
@@ -1028,6 +1204,7 @@ class AdamSigil(Static):
 
 class SignalField(Static):
     def on_mount(self) -> None:
+        _sync_node_look(self)
         self._frame = 0
         self.set_interval(0.55, self._tick)
         self._tick()
@@ -1357,6 +1534,7 @@ class StartupScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
+        _sync_node_look(self)
         app = self.app
         assert isinstance(app, EdenTuiApp)
         app.runtime.update_runtime_launch_profile(backend="mlx", model_path=None)
@@ -1517,11 +1695,13 @@ class StartupScreen(Screen):
             await app.push_screen(ChatScreen())
             return
         defaults = app.runtime.default_session_profile_request().to_dict()
+        session_title_history = await asyncio.to_thread(partial(app.runtime.recent_session_titles, limit=20))
         payload = await app.push_screen_wait(
             SessionConfigModal(
                 defaults,
                 title_text="Session Inference Profile",
                 action_label="Start Session",
+                session_title_history=session_title_history,
             )
         )
         if payload is None:
@@ -1748,6 +1928,7 @@ class ChatScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
+        _sync_node_look(self)
         self.set_interval(0.6, self._poll_logs)
         self.refresh_panels()
         self.run_worker(self._bootstrap_live_surface(), exclusive=True, group="bootstrap")
@@ -2823,10 +3004,11 @@ class ChatScreen(Screen):
         model_status = self._model_status()
         text = Text.from_markup(
             f"[bold {AMBER}]Deck / Detailed Surfaces[/]\n"
-            "Budget, deeper reasoning, history, ingest, and launch controls live here; the prime surface keeps dialogue first while telemetry stays visible.\n\n"
+            "Budget, deeper reasoning, history, ingest, launch controls, and TUI look selection live here; the prime surface keeps dialogue first while telemetry stays visible.\n\n"
             f"runtime={app.runtime.settings.model_backend}\n"
             f"model={model_status.get('label', 'n/a')}\n"
             f"cache={model_status.get('stage', 'n/a')}\n"
+            f"look={LOOK_LABELS.get(self.current_ui_look(), 'Amber Dark')}\n"
             f"session={app.ui_state.session_title or app.ui_state.session_id or 'none'}"
         )
         return Panel(text, title="Operator Deck", border_style=AMBER)
@@ -2896,6 +3078,7 @@ class ChatScreen(Screen):
         text = Text.from_markup(
             f"[bold {AMBER}]Deck Status[/]\n"
             f"observatory={(app.ui_state.observatory_status or {}).get('url', 'offline')}\n"
+            f"look={LOOK_LABELS.get(self.current_ui_look(), 'Amber Dark')}\n"
             f"low_motion={app.runtime.settings.low_motion} debug={app.runtime.settings.debug}\n"
             f"feedback={safe_excerpt(app.ui_state.last_feedback, limit=180)}"
         )
@@ -3359,11 +3542,13 @@ class ChatScreen(Screen):
         defaults = app.runtime.default_session_profile_request().to_dict()
         if app.ui_state.session_id:
             defaults.update(await asyncio.to_thread(partial(app.runtime.session_profile_request, app.ui_state.session_id)))
+        session_title_history = await asyncio.to_thread(partial(app.runtime.recent_session_titles, limit=20))
         payload = await app.push_screen_wait(
             SessionConfigModal(
                 defaults,
                 title_text="New Session Inference Profile",
                 action_label="Open Session",
+                session_title_history=session_title_history,
             )
         )
         if payload is None:
@@ -3460,11 +3645,13 @@ class ChatScreen(Screen):
             self._schedule_preview_refresh()
             return
         defaults = app.runtime.default_session_profile_request().to_dict()
+        session_title_history = await asyncio.to_thread(partial(app.runtime.recent_session_titles, limit=20))
         payload = await app.push_screen_wait(
             SessionConfigModal(
                 defaults,
                 title_text=f"{action.title()} Experiment Session",
                 action_label="Open Session",
+                session_title_history=session_title_history,
             )
         )
         if payload is None:
@@ -3492,6 +3679,20 @@ class ChatScreen(Screen):
 
     def begin_surface_launch(self, action: str) -> None:
         self.run_worker(self._launch_surface_worker(action), exclusive=True, group=f"surface_{action}")
+
+    def current_ui_look(self) -> str:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        return app.current_ui_look()
+
+    async def set_ui_look(self, look: str, *, active_modal: ModalScreen[Any] | None = None) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        updated = await asyncio.to_thread(partial(app.runtime.update_ui_appearance, look=look))
+        normalized = _normalize_ui_look(updated.get("look"))
+        app.apply_ui_look(normalized, extra_nodes=[self, active_modal] if active_modal is not None else [self])
+        app.ui_state.last_feedback = f"look={LOOK_LABELS.get(normalized, normalized)}"
+        self.refresh_panels()
 
     async def toggle_motion(self) -> None:
         app = self.app
@@ -3895,8 +4096,51 @@ class EdenTuiApp(App):
     Static, Input, RichLog, Select, TextArea {{
         margin-bottom: 1;
     }}
+    .field_label {{
+        margin-bottom: 0;
+        color: {MUTED};
+        text-style: bold;
+    }}
+    .field_stack Input,
+    .field_stack Select {{
+        margin-bottom: 0;
+    }}
     #runtime_top_controls Select {{
         margin-bottom: 0;
+    }}
+    #deck_look_select {{
+        width: 1fr;
+        margin-bottom: 0;
+    }}
+    #session_title_row {{
+        height: 3;
+    }}
+    #session_action_row {{
+        height: 3;
+    }}
+    #session_title_input {{
+        width: 1fr;
+    }}
+    #session_title_history_select {{
+        width: 24;
+        min-width: 20;
+        margin-bottom: 0;
+    }}
+    #session_title_row Input,
+    #session_title_row Select,
+    #session_action_row Button,
+    #atlas_taxonomy_actions Button,
+    #atlas_session_actions Button {{
+        margin-bottom: 0;
+    }}
+    #session_title_row Input {{
+        margin-right: 1;
+    }}
+    #session_title_row Select,
+    #session_action_row Button:last-child,
+    #atlas_taxonomy_actions Button:last-child,
+    #atlas_session_actions Button:last-child {{
+        margin-right: 0;
     }}
     #runtime_quick_action_row Button {{
         margin-bottom: 0;
@@ -3932,8 +4176,13 @@ class EdenTuiApp(App):
         width: 1fr;
         padding: 0 1;
     }}
-    .atlas_records_column {{
-        width: 1.3fr;
+    #atlas_filter_column {{
+        width: 30;
+        min-width: 30;
+    }}
+    #atlas_main_column {{
+        width: 1fr;
+        min-width: 70;
     }}
     #deck_summary, #review_summary, #session_config_header, #session_config_summary, #ingest_summary, #atlas_summary {{
         margin: 1 2;
@@ -3951,9 +4200,133 @@ class EdenTuiApp(App):
         border: tall {AMBER};
         color: {TEXT};
     }}
-    #atlas_preview_panel, #atlas_projection_panel, #atlas_taxonomy_panel, #atlas_status_panel, #atlas_editor_hint {{
+    #atlas_preview_panel {{
+        min-height: 12;
+    }}
+    #atlas_taxonomy_panel, #atlas_status_panel {{
         height: 1fr;
         min-height: 8;
+    }}
+    #atlas_taxonomy_actions,
+    #atlas_session_actions {{
+        height: 3;
+    }}
+    #atlas_taxonomy_actions Button,
+    #atlas_session_actions Button {{
+        width: 1fr;
+    }}
+    .look-typewriter-light {{
+        background: {TYPEWRITER_LIGHT.bg};
+        color: {TYPEWRITER_LIGHT.text};
+    }}
+    .look-typewriter-light Header, .look-typewriter-light Footer {{
+        background: {TYPEWRITER_LIGHT.shade_alt};
+        color: {TYPEWRITER_LIGHT.text};
+    }}
+    .look-typewriter-light #runtime_frame,
+    .look-typewriter-light #startup_frame,
+    .look-typewriter-light #startup_shell,
+    .look-typewriter-light #chat_shell {{
+        background: {TYPEWRITER_LIGHT.bg};
+        color: {TYPEWRITER_LIGHT.text};
+    }}
+    .look-typewriter-light #chat_deck,
+    .look-typewriter-light #startup_cockpit_stack {{
+        border: tall {TYPEWRITER_LIGHT.amber};
+        background: {TYPEWRITER_LIGHT.chiaro_shadow};
+    }}
+    .look-typewriter-light #chat_tape {{
+        border: tall {TYPEWRITER_LIGHT.rose};
+        background: {TYPEWRITER_LIGHT.marble_light};
+        scrollbar-color: {TYPEWRITER_LIGHT.amber};
+        scrollbar-color-hover: {TYPEWRITER_LIGHT.ice};
+        scrollbar-color-active: {TYPEWRITER_LIGHT.text};
+        scrollbar-background: #ece2d2;
+        scrollbar-background-hover: #e4d8c5;
+        scrollbar-background-active: #dbceb7;
+        scrollbar-corner-color: {TYPEWRITER_LIGHT.marble_light};
+    }}
+    .look-typewriter-light #chat_tape:focus {{
+        border: tall {TYPEWRITER_LIGHT.ice};
+    }}
+    .look-typewriter-light #inline_feedback_surface {{
+        border: tall {TYPEWRITER_LIGHT.rose};
+        background: {TYPEWRITER_LIGHT.chiaro_wine};
+    }}
+    .look-typewriter-light #composer_input {{
+        background: {TYPEWRITER_LIGHT.marble_light};
+        border: tall {TYPEWRITER_LIGHT.amber};
+        color: {TYPEWRITER_LIGHT.text};
+        scrollbar-color: {TYPEWRITER_LIGHT.amber};
+        scrollbar-color-hover: {TYPEWRITER_LIGHT.ice};
+        scrollbar-color-active: {TYPEWRITER_LIGHT.text};
+        scrollbar-background: #e8dece;
+        scrollbar-background-hover: #dfd3c0;
+        scrollbar-background-active: #d5c6b1;
+    }}
+    .look-typewriter-light #composer_input:focus {{
+        border: tall {TYPEWRITER_LIGHT.neon};
+        background: {TYPEWRITER_LIGHT.shade};
+    }}
+    .look-typewriter-light #runtime_action_menu:focus,
+    .look-typewriter-light #header_ingest_btn:focus,
+    .look-typewriter-light #header_aperture_btn:focus {{
+        border: tall {TYPEWRITER_LIGHT.ice};
+    }}
+    .look-typewriter-light #review_explanation_input,
+    .look-typewriter-light #review_corrected_input,
+    .look-typewriter-light #ingest_prompt_input,
+    .look-typewriter-light Input,
+    .look-typewriter-light Select {{
+        background: {TYPEWRITER_LIGHT.marble_light};
+        border: tall {TYPEWRITER_LIGHT.amber};
+        color: {TYPEWRITER_LIGHT.text};
+    }}
+    .look-typewriter-light .field_label {{
+        color: {TYPEWRITER_LIGHT.muted};
+    }}
+    .look-typewriter-light #inline_feedback_explanation_input {{
+        background: #f0dfd6;
+        border: tall {TYPEWRITER_LIGHT.rose};
+        color: {TYPEWRITER_LIGHT.text};
+        scrollbar-color: {TYPEWRITER_LIGHT.rose};
+        scrollbar-color-hover: {TYPEWRITER_LIGHT.ice};
+        scrollbar-color-active: {TYPEWRITER_LIGHT.text};
+        scrollbar-background: #ead6cd;
+        scrollbar-background-hover: #e1cac1;
+        scrollbar-background-active: #d8bdb5;
+    }}
+    .look-typewriter-light #inline_feedback_corrected_input {{
+        background: {TYPEWRITER_LIGHT.chiaro_slate};
+        border: tall {TYPEWRITER_LIGHT.ice};
+        color: {TYPEWRITER_LIGHT.text};
+        scrollbar-color: {TYPEWRITER_LIGHT.ice};
+        scrollbar-color-hover: {TYPEWRITER_LIGHT.violet};
+        scrollbar-color-active: {TYPEWRITER_LIGHT.text};
+        scrollbar-background: #d4dbdf;
+        scrollbar-background-hover: #c9d2d7;
+        scrollbar-background-active: #bcc8cd;
+    }}
+    .look-typewriter-light Button {{
+        background: {TYPEWRITER_LIGHT.panel};
+        color: {TYPEWRITER_LIGHT.text};
+        border: tall {TYPEWRITER_LIGHT.amber};
+    }}
+    .look-typewriter-light #header_ingest_btn {{
+        background: #dce5d5;
+    }}
+    .look-typewriter-light #header_aperture_btn {{
+        background: #d9dff0;
+    }}
+    .look-typewriter-light RichLog {{
+        background: {TYPEWRITER_LIGHT.marble_light};
+        border: tall {TYPEWRITER_LIGHT.amber};
+        color: {TYPEWRITER_LIGHT.text};
+    }}
+    .look-typewriter-light #atlas_records_table {{
+        background: {TYPEWRITER_LIGHT.marble_light};
+        border: tall {TYPEWRITER_LIGHT.amber};
+        color: {TYPEWRITER_LIGHT.text};
     }}
     """
     BINDINGS = [
@@ -3978,6 +4351,21 @@ class EdenTuiApp(App):
         self.repo_root = Path(__file__).resolve().parents[2]
         self.ui_state = UiState()
 
+    def current_ui_look(self) -> str:
+        return _normalize_ui_look(self.runtime.settings.ui_look)
+
+    def apply_ui_look(self, look: str | None = None, *, extra_nodes: list[Any] | None = None) -> None:
+        normalized = _normalize_ui_look(look or self.runtime.settings.ui_look)
+        self.runtime.settings.ui_look = normalized
+        _apply_look_palette(normalized)
+        for class_name in LOOK_CLASSES.values():
+            self.remove_class(class_name)
+        self.add_class(LOOK_CLASSES[normalized])
+        for node in extra_nodes or []:
+            if node is not None:
+                _sync_node_look(node)
+        self.refresh(layout=True)
+
     def apply_session_snapshot(self, snapshot: dict[str, Any]) -> None:
         self.ui_state.experiment_id = snapshot["experiment_id"]
         self.ui_state.experiment_name = snapshot.get("experiment_name")
@@ -3998,6 +4386,7 @@ class EdenTuiApp(App):
         self.ui_state.last_ingest_result = None
 
     async def on_mount(self) -> None:
+        self.apply_ui_look(self.runtime.ui_appearance().get("look"))
         await self.push_screen(ChatScreen())
 
     async def action_show_help(self) -> None:

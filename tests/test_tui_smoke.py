@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from textual.widgets import Button, Input, Select, TextArea
+from textual.widgets import Button, Input, Select, Static, TextArea
 
 from eden.browser import BrowserOpenResult
-from eden.tui.app import ChatScreen, ConversationAtlasModal, EdenTuiApp
+from eden.tui.app import ChatScreen, ConversationAtlasModal, DeckModal, EdenTuiApp, SessionConfigModal
 
 
 @pytest.mark.asyncio
@@ -105,12 +105,117 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
 
 
 @pytest.mark.asyncio
-async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime) -> None:
+async def test_tui_deck_can_switch_to_typewriter_light_look(runtime) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test() as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        await app.action_show_deck()
+        await pilot.pause(0.3)
+        assert isinstance(app.screen, DeckModal)
+
+        look_select = app.screen.query_one("#deck_look_select", Select)
+        look_select.value = "typewriter_light"
+        await pilot.pause(0.3)
+
+        assert app.current_ui_look() == "typewriter_light"
+        assert runtime.settings.ui_look == "typewriter_light"
+        assert runtime.ui_appearance()["look"] == "typewriter_light"
+        assert runtime.store.read_config("tui_appearance") == {"look": "typewriter_light"}
+        assert app.ui_state.last_feedback == "look=Typewriter Light"
+
+        deck_status = app.screen.chat_screen.deck_status_panel().renderable
+        assert "look=Typewriter Light" in deck_status.plain
+
+
+@pytest.mark.asyncio
+async def test_session_config_modal_labels_history_and_clamped_summary(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    runtime.start_session(experiment["id"], title="Operator Session")
+    runtime.start_session(experiment["id"], title="Field Notes")
+    runtime.start_session(experiment["id"], title="FIELD NOTES")
+    runtime.start_session(experiment["id"], title="Atlas Draft")
+
+    app = EdenTuiApp(runtime)
+    async with app.run_test() as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        await app.action_new_session()
+        await pilot.pause(0.5)
+        assert isinstance(app.screen, SessionConfigModal)
+        modal = app.screen
+
+        expected_labels = {
+            "#session_title_label": "Operator Session",
+            "#session_mode_label": "Mode",
+            "#session_budget_mode_label": "Budget Mode",
+            "#session_low_motion_label": "Low Motion",
+            "#session_debug_label": "Debug",
+            "#temperature_label": "Temperature",
+            "#max_tokens_label": "Max Output Tokens",
+            "#top_p_label": "Top-P",
+            "#repetition_penalty_label": "Repetition Penalty",
+            "#retrieval_depth_label": "Retrieval Depth",
+            "#max_context_items_label": "Max Context Items",
+            "#response_char_cap_label": "Response Character Cap",
+        }
+        for selector, expected in expected_labels.items():
+            assert modal.query_one(selector, Static).render().plain == expected
+
+        history_select = modal.query_one("#session_title_history_select", Select)
+        history_values = [value for _, value in history_select._options if value != Select.NULL]
+        assert history_values == ["Atlas Draft", "FIELD NOTES", "Operator Session"]
+
+        history_select.value = "FIELD NOTES"
+        await pilot.pause(0.2)
+        title_input = modal.query_one("#session_title_input", Input)
+        assert title_input.value == "FIELD NOTES"
+
+        title_input.value = "Fresh Session"
+        await pilot.pause(0.2)
+        assert history_select.value == Select.NULL
+
+        modal.query_one("#temperature_input", Input).value = "3.7"
+        modal.query_one("#max_tokens_input", Input).value = "10"
+        modal.query_one("#top_p_input", Input).value = "2.4"
+        modal.query_one("#repetition_penalty_input", Input).value = "-4"
+        modal.query_one("#retrieval_depth_input", Input).value = "99"
+        modal.query_one("#max_context_items_input", Input).value = "2"
+        modal.query_one("#response_char_cap_input", Input).value = "5000"
+        await pilot.pause(0.3)
+
+        summary_panel = modal.query_one("#session_config_summary", Static).render()
+        summary_text = summary_panel._renderable.renderable.plain
+        assert "temperature=1.50" in summary_text
+        assert "top_p=1.00" in summary_text
+        assert "repetition_penalty=0.00" in summary_text
+        assert "retrieval_depth=32" in summary_text
+        assert "max_context_items=4" in summary_text
+        assert "max_output_tokens=128" in summary_text
+        assert "response_char_cap=3200" in summary_text
+
+        modal.query_one("#session_confirm_btn", Button).press()
+        await pilot.pause(0.5)
+        assert isinstance(app.screen, ChatScreen)
+        assert app.ui_state.session_title == "Fresh Session"
+
+
+@pytest.mark.asyncio
+async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime, monkeypatch) -> None:
     experiment = runtime.initialize_experiment("blank")
     first_session = runtime.start_session(experiment["id"], title="Atlas One")
     runtime.chat(session_id=first_session["id"], user_text="Describe conversation atlas one.")
     second_session = runtime.start_session(experiment["id"], title="Atlas Two")
     runtime.chat(session_id=second_session["id"], user_text="Describe conversation atlas two.")
+    opened_urls: list[str] = []
+
+    def capture_open(url: str) -> BrowserOpenResult:
+        opened_urls.append(url)
+        return BrowserOpenResult(ok=True, method="mock")
+
+    monkeypatch.setattr("eden.tui.app.open_browser_url", capture_open)
 
     app = EdenTuiApp(runtime)
     async with app.run_test() as pilot:
@@ -120,11 +225,24 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         await pilot.pause(0.5)
         assert isinstance(app.screen, ConversationAtlasModal)
         modal = app.screen
+        center_ids = [child.id for child in modal.query_one("#atlas_main_column").children if child.id]
+        assert center_ids == [
+            "atlas_records_table",
+            "atlas_preview_panel",
+            "atlas_folder_field",
+            "atlas_tags_field",
+            "atlas_taxonomy_actions",
+            "atlas_session_actions",
+        ]
+        assert modal.query_one_optional("#atlas_projection_panel") is None
+        assert modal.query_one_optional("#atlas_editor_hint") is None
         search = modal.query_one("#atlas_search_input", Input)
         search.value = "Atlas One"
         await pilot.pause(0.3)
         assert len(modal._filtered_records) == 1
         assert modal._selected_record()["id"] == first_session["id"]
+        assert modal._selected_preview is not None
+        assert modal._selected_preview["session_title"] == "Atlas One"
         modal.query_one("#atlas_folder_input", Input).value = "library/notes"
         modal.query_one("#atlas_tags_input", Input).value = "research, archive, research"
         await modal._save_metadata_worker()
@@ -132,6 +250,17 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         record = next(item for item in runtime.conversation_archive_records() if item["id"] == first_session["id"])
         assert record["folder"] == "library/notes"
         assert record["tags"] == ["research", "archive"]
+        modal.query_one("#atlas_open_btn", Button).press()
+        await pilot.pause(0.3)
+        assert opened_urls
+        refreshed_record = next(item for item in runtime.conversation_archive_records() if item["id"] == first_session["id"])
+        assert refreshed_record["conversation_log_exists"] is True
+        transcript_path = Path(refreshed_record["conversation_log_path"])
+        assert transcript_path.exists()
+        modal.query_one("#atlas_refresh_btn", Button).press()
+        await pilot.pause(0.3)
+        assert len(modal._filtered_records) == 1
+        assert modal._selected_record()["id"] == first_session["id"]
         modal.query_one("#atlas_resume_btn", Button).press()
         await pilot.pause(0.5)
         assert isinstance(app.screen, ChatScreen)

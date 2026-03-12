@@ -1747,3 +1747,151 @@ Remaining uncertainties:
 - `J16b` proves unsupported `file://` failure in Chromium. Firefox/WebKit smoke intentionally remains limited to read-only honesty journeys.
 Next shortest proof path:
 - If the React observatory later surfaces compare/coordinate controls or mutation flows, upgrade J06 and J10-J14 from browser gap proofs to positive browser journeys with preview/commit/revert assertions and rerun the same artifact-validated Playwright stack.
+## [2026-03-12T17:24:30Z] POST-FLIGHT
+Files changed:
+- `eden/config.py`
+- `eden/runtime.py`
+- `eden/app.py`
+- `eden/tui/app.py`
+- `tests/test_tui_smoke.py`
+- `docs/TUI_SPEC.md`
+- `docs/IMPLEMENTATION_TRUTH_TABLE.md`
+- `docs/KNOWN_LIMITATIONS.md`
+- `codex_notes_garden.md`
+Specs changed:
+- `docs/TUI_SPEC.md`
+- `docs/IMPLEMENTATION_TRUTH_TABLE.md`
+- `docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+- Preserved the dialogue-first TUI contract and keyboard-first deck/control flow.
+- Revised the design contract so amber-dark remains the default look while Deck exposes a persisted `Typewriter Light` operator look.
+- Preserved the limitation boundary that terminal rendering remains constrained by Textual/Rich; the light look is appearance-only and not a knowledge/runtime mutation.
+Behavior implemented or modified:
+- Added a persisted app-level `ui_look` runtime setting backed by `config_store` key `tui_appearance`.
+- `build_runtime()` now restores the persisted look on launch.
+- `Deck` now exposes a `Look` selector with `Amber Dark` and `Typewriter Light`.
+- Switching looks updates both Rich-rendered panel colors and Textual CSS surfaces so the light mode reads as paper/ink/typewriter rather than a generic bright palette.
+- Deck status/summary surfaces now report the active look.
+Evidence produced (tests / traces / commands / exports):
+- `./.venv/bin/pytest -q tests/test_tui_smoke.py` -> `8 passed`
+- `./.venv/bin/pytest -q tests/test_runtime_e2e.py tests/test_cli_entry.py` -> `6 passed`
+- `./.venv/bin/pytest -q` -> `52 passed`
+Status register changes:
+- Implemented:
+  - Persisted TUI look selection with `Amber Dark` default plus `Typewriter Light` alternative.
+  - Deck control-surface exposure for look selection.
+  - TUI smoke proof for look switching and persisted appearance state.
+- Instrumented:
+  - None newly added.
+- Conceptual:
+  - None for this task.
+- Unknown:
+  - No remaining code-path unknowns from this turn; visual taste is subjective, but the palette/control behavior is now proved.
+Truth-table / limitations updates:
+- `IMPLEMENTATION_TRUTH_TABLE.md` now records fixed-pane operator looks instead of an amber-only surface.
+- `KNOWN_LIMITATIONS.md` now states explicitly that `Typewriter Light` is appearance-only and non-authoritative.
+Remaining uncertainties:
+- The exact perceived “typewriter” feel still depends on terminal font choice outside the repo; the palette and panel treatment are implemented, but EDEN does not control the operator’s terminal font renderer.
+Next shortest proof path:
+- If you want stronger typewriter character, add a tiny screenshot-based manual audit on this Mac for terminal/profile combinations and tune the light palette from that evidence rather than guessing further in code.
+
+## [2026-03-12T17:14:26Z] PRE-FLIGHT
+Operator task:
+Add a light TUI look to Adam, expose it in the control menu with the other operator controls, and make the light mode feel like a typewriter surface rather than a generic bright palette.
+Task checksum:
+User request anchored to current TUI behavior and control surfaces in `eden/tui/app.py` plus `docs/TUI_SPEC.md` design contract.
+Repo situation:
+Worktree already dirty from prior observatory audit turn (`.DS_Store`, observatory audit/docs/test artifacts). Do not revert unrelated changes. Current TUI has no explicit look selector; palette is largely hard-coded across Rich panel rendering and Textual CSS.
+Relevant spec surfaces read:
+- `docs/TUI_SPEC.md` (secondary surfaces / design contract)
+- `docs/IMPLEMENTATION_TRUTH_TABLE.md` (status surface to update if capability changes)
+- `docs/KNOWN_LIMITATIONS.md` (rendering limitations surface)
+Natural-language contracts in force:
+- TUI remains the primary runtime interface.
+- Dialogue-first layout and keyboard-first control surfaces stay intact.
+- Spec/code drift on design contract must be resolved in the same turn if a new look becomes implemented.
+Files/modules likely in scope:
+- `eden/tui/app.py`
+- `eden/config.py`
+- `eden/runtime.py`
+- `eden/app.py`
+- `tests/test_tui_smoke.py`
+- `docs/TUI_SPEC.md`
+- `docs/IMPLEMENTATION_TRUTH_TABLE.md`
+- `docs/KNOWN_LIMITATIONS.md`
+Status register:
+- Implemented:
+  - Deck modal exposes low-motion/debug controls.
+  - TUI palette system is effectively amber-on-dark only.
+- Instrumented:
+  - TUI smoke tests cover boot, deck-adjacent controls, observatory launch, and compact-layout behavior.
+- Conceptual:
+  - Alternative looks/themes in the TUI control surface.
+- Unknown:
+  - Whether current Textual surface can support a coherent light/typewriter look without breaking readability or focus states.
+Risks / invariants:
+- Do not break keyboard-first flow or session/profile semantics.
+- A look change should be an app/runtime appearance setting, not a graph/runtime knowledge mutation.
+- Textual CSS and Rich panel rendering must stay visually coherent; partial recolor would look dishonest.
+Evidence plan:
+- Add deterministic TUI smoke coverage for the new look control and palette switch.
+- Run targeted pytest for `tests/test_tui_smoke.py`.
+- Update TUI spec and status/limitations docs if the look ships.
+Shortest proof path:
+- Introduce a narrow persisted UI look setting, add a deck selector, apply a light/typewriter palette through CSS + panel colors, prove selection and persistence in TUI smoke, then update docs and flight log.
+
+## [2026-03-12T16:30:58-04:00] PRE-FLIGHT
+Operator task:
+Implement the Session Start and Conversation Atlas TUI refactor plan without changing runtime behavior, archive semantics, graph mutation behavior, or schema.
+Task checksum:
+session-atlas-refactor-v1
+Repo situation:
+Working tree dirty before edits; preserve unrelated changes. Relevant implementation concentrated in eden/tui/app.py, eden/runtime.py, tests/test_tui_smoke.py, docs/TUI_SPEC.md.
+Relevant spec surfaces read:
+AGENTS.md; docs/TUI_SPEC.md.
+Natural-language contracts in force:
+TUI remains the primary runtime surface; session-start modal carries title plus inference controls; Conversation Atlas is a relational transcript library over folder/tag metadata; no schema or graph-semantic drift.
+Files/modules likely in scope:
+eden/tui/app.py; eden/runtime.py; tests/test_tui_smoke.py; docs/TUI_SPEC.md.
+Status register:
+- Implemented:
+Current SessionConfigModal and ConversationAtlasModal behavior in eden/tui/app.py; archive metadata persistence via eden/runtime.py.
+- Instrumented:
+Existing TUI smoke coverage for atlas save/resume and live session flows.
+- Conceptual:
+Labeled session-start stacks, composite title input/history control, two-column atlas work-column flow.
+- Unknown:
+Whether Textual widget composition needs CSS adjustments beyond the planned modal containers until the refactor is exercised in tests.
+Risks / invariants:
+Do not change session creation/update semantics, archive metadata shape, transcript path behavior, or graph mutation paths. Keep summary values aligned with clamped request values only; do not invent auto-mode runtime resolution at modal time.
+Evidence plan:
+Patch runtime helper + modal layout/CSS + tests + TUI spec, then run ./.venv/bin/pytest -q.
+Shortest proof path:
+Implement the read-only title-history helper, refactor modal widget trees and CSS, extend smoke tests for labels/history/layout, run pytest, then append POST-FLIGHT with exact evidence.
+
+## [2026-03-12T16:44:44-04:00] POST-FLIGHT
+Files changed:
+eden/runtime.py; eden/tui/app.py; tests/test_tui_smoke.py; docs/TUI_SPEC.md; codex_notes_garden.md.
+Specs changed:
+docs/TUI_SPEC.md.
+Natural-language contracts added/revised/preserved:
+Preserved session/graph/archive semantics. Revised TUI contract for labeled session-start controls, persisted-title history selector, clamped Profile Summary, and two-column Conversation Atlas work flow.
+Behavior implemented or modified:
+Added read-only recent session title helper over persisted session catalog; SessionConfigModal now renders labeled field stacks plus input+history selector and summarizes clamped request values; ConversationAtlasModal now uses filter rail + main work column with preview, taxonomy inputs, taxonomy actions, and session actions in linear operator order.
+Evidence produced (tests / traces / commands / exports):
+./.venv/bin/python -m py_compile eden/tui/app.py eden/runtime.py tests/test_tui_smoke.py; ./.venv/bin/pytest -q tests/test_tui_smoke.py -> 9 passed; ./.venv/bin/pytest -q -> 53 passed.
+Status register changes:
+- Implemented:
+Session-start labeling/history selector/clamped summary and atlas two-column work flow, backed by code plus passing smoke/full test runs.
+- Instrumented:
+Extended TUI smoke coverage for modal labels/history/clamp behavior and atlas layout/actions.
+- Conceptual:
+None added.
+- Unknown:
+No unresolved runtime-semantic unknowns from this turn.
+Truth-table / limitations updates:
+No updates required; capability status did not change beyond TUI layout/ergonomics and no new caveat surfaced.
+Remaining uncertainties:
+Working tree remains dirty with pre-existing unrelated edits outside this refactor scope.
+Next shortest proof path:
+Manual visual pass in the live TUI to confirm spacing and panel proportions on the target terminal size using the provided screenshot baseline.

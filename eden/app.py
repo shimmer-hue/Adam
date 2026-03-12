@@ -17,12 +17,14 @@ from .tui.app import run_tui
 def build_runtime(args) -> EdenRuntime:
     store = GraphStore(DB_PATH)
     launch_profile = store.read_config("runtime_launch_profile") or {}
+    appearance = store.read_config("tui_appearance") or {}
     backend = getattr(args, "backend", None) or launch_profile.get("backend") or "mlx"
     explicit_model_path = getattr(args, "model_path", None) or launch_profile.get("model_path")
     model_path = explicit_model_path or (str(DEFAULT_MLX_MODEL_DIR) if backend == "mlx" else None)
     settings = RuntimeSettings(
         model_backend=backend,
         model_path=model_path,
+        ui_look=str(appearance.get("look") or "amber_dark"),
         observatory_host=getattr(args, "host", "127.0.0.1"),
         observatory_port=getattr(args, "port", 8741),
     )

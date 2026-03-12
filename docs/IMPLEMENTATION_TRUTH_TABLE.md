@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | Blank Eden bootstrap | Implemented | runtime + TUI path; validated in tests and demo |
 | Seeded Eden bootstrap code path | Implemented | ingests `assets/seed_canon/`; heavy-path validation started on real canon files |
-| Fixed-pane amber TUI | Implemented | preserved and refocused around a dialogue-first primary chat surface |
+| Fixed-pane operator looks | Implemented | amber-dark remains the default dialogue-first surface, and Deck now exposes a persisted `Typewriter Light` alternative proved by `tests/test_tui_smoke.py` |
 | Live session dialogue boot | Implemented | app opens directly into a resumed-or-created session; wide terminals keep dialogue + telemetry visible, while compact terminals fall back to a dialogue-first composer/transcript view |
 | `python -m eden` default entry path | Implemented | no subcommand required for the normal TUI path; flags remain optional overrides |
 | Repo-root `python3 app.py` launcher | Implemented | root launcher re-execs the repo-local `.venv` interpreter and then dispatches into `eden.app:main` |

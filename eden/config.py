@@ -50,6 +50,7 @@ class RuntimeSettings:
     model_path: str | None = str(DEFAULT_MLX_MODEL_DIR)
     max_context_items: int = 8
     retrieval_depth: int = 12
+    ui_look: str = "amber_dark"
     low_motion: bool = False
     debug: bool = True
     observatory_host: str = "127.0.0.1"

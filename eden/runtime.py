@@ -37,6 +37,7 @@ CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 ANSWER_LABEL_RE = re.compile(r"(?im)^\s*(final answer|answer|adam)\s*:\s*")
 SUPPORT_SECTION_RE = re.compile(r"(?im)^\s*(basis|next step)\s*:\s*")
 RUNTIME_LAUNCH_PROFILE_KEY = "runtime_launch_profile"
+TUI_APPEARANCE_KEY = "tui_appearance"
 OPERATOR_LABEL = "Brian the operator"
 
 
@@ -71,6 +72,11 @@ def _normalize_archive_metadata(metadata: dict[str, Any] | None) -> dict[str, An
         "folder": _normalize_archive_folder(archive.get("folder")),
         "tags": _normalize_archive_tags(archive.get("tags")),
     }
+
+
+def _normalize_ui_look(value: Any) -> str:
+    normalized = str(value or "amber_dark").strip().lower()
+    return normalized if normalized in {"amber_dark", "typewriter_light"} else "amber_dark"
 
 
 @dataclass(slots=True)
@@ -176,6 +182,47 @@ class EdenRuntime:
         }
         self.store.upsert_config(RUNTIME_LAUNCH_PROFILE_KEY, payload)
         return {"backend": normalized_backend, "model_path": normalized_model_path}
+
+    def ui_appearance(self) -> dict[str, Any]:
+        stored = self.store.read_config(TUI_APPEARANCE_KEY) or {}
+        look = _normalize_ui_look(stored.get("look") or self.settings.ui_look)
+        self.settings.ui_look = look
+        return {"look": look}
+
+    def update_ui_appearance(self, *, look: str) -> dict[str, Any]:
+        normalized = _normalize_ui_look(look)
+        self.settings.ui_look = normalized
+        payload = {"look": normalized}
+        self.store.upsert_config(TUI_APPEARANCE_KEY, payload)
+        return payload
+
+    def recent_session_titles(self, *, limit: int = 20) -> list[str]:
+        if limit <= 0:
+            return []
+        titles: list[str] = []
+        seen: set[str] = set()
+        ranked_rows = sorted(
+            enumerate(self.store.list_session_catalog()),
+            key=lambda item: (
+                str(item[1].get("updated_at") or ""),
+                str(item[1].get("last_turn_at") or ""),
+                str(item[1].get("created_at") or ""),
+                item[0],
+            ),
+            reverse=True,
+        )
+        for _, row in ranked_rows:
+            title = str(row.get("title") or "").strip()
+            if not title:
+                continue
+            lowered = title.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            titles.append(title)
+            if len(titles) >= limit:
+                break
+        return titles
 
     def mlx_model_status(self) -> dict[str, Any]:
         status = local_mlx_model_status(DEFAULT_LOCAL_MLX_MODEL)

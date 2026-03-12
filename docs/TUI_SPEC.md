@@ -36,7 +36,10 @@ Live dialogue boot:
 
 Session-start modal:
 
-- session title
+- explicitly labeled session-start controls
+- session title:
+  - free typing remains allowed
+  - adjacent recent-title selector is populated from persisted session titles
 - inference mode:
   - `manual`
   - `runtime_auto`
@@ -53,6 +56,7 @@ Session-start modal:
   - `retrieval_depth`
   - `max_context_items`
   - `response_char_cap`
+  - `Profile Summary` reflects the clamped request values that will actually be persisted
   - `low_motion`
   - `debug`
 
@@ -99,7 +103,7 @@ Secondary surfaces:
   - cogitation / decision trace
   - corpus-intake guidance and status
   - `Blank Eden`, `Seeded Eden`, `Resume Latest`
-  - `New Session`, low-motion toggle, debug toggle
+  - `New Session`, low-motion toggle, debug toggle, and look selector
 - `Ingest` modal:
   - absolute document path
   - operator framing prompt that is indexed prior to later retrieval
@@ -109,15 +113,18 @@ Secondary surfaces:
 - `Conversation Atlas` modal:
   - `all_texts` root shelf over every persisted session transcript
   - relational lenses for folders, tags, experiments, and experiment modes
+  - two-column layout:
+    - left filter rail for search, sort, lens, facet filter, taxonomy projections, and atlas status
+    - main work column for session list, selected-session preview, folder/tags editor, taxonomy actions, and session actions
   - search + facet filter + sort over saved sessions
-  - selected-session preview with recent turns and feedback excerpts
-  - metadata editor for virtual `folder` path and multi-value `tags`
-  - direct `Open Transcript` and `Resume Session` actions
+  - selected-session preview with recent turns and feedback excerpts sits directly under the session list
+  - metadata editor keeps the virtual `folder` path plus multi-value `tags`, but the instructional editor panel is removed
+  - direct `Open Transcript`, `Save Taxonomy`, `Resume Session`, `Refresh`, and `Close` actions remain in the work column
 
 ## Design contract
 
 - fixed telemetry panes, but the prime dialogue tape itself scrolls
-- amber-on-dark operator grammar preserved
+- amber-on-dark remains the default operator grammar, while Deck exposes a persisted `Typewriter Light` look for paper-and-ink terminal reading
 - the prime screen now refreshes on state changes instead of a constant whole-screen repaint loop; decorative chat shading is static rather than animated
 - dialogue-first prime surface: visible transcript and composer dominate the left column; telemetry stays visible but secondary on the right
 - live-session boot is the default path; the app no longer lands on a launcher before chat opens
