@@ -36,6 +36,7 @@
 | Edit stores rationale and corrected answer separately | Implemented | persisted in `feedback_events` |
 | Persistent memes and memodes | Implemented | SQLite tables + edges + retrieval |
 | Regard math in code | Implemented | `eden/regard.py` |
+| Hum continuity artifact | Historical artifact evidence only; current runtime surface unproved | `/Users/brianray/Desktop/adam_hum_ALL.md` contains timestamped `hum:` logs and `[HUM_STATS]` / `[HUM_METRICS]` / `[HUM_TABLE]`; current repo docs and implementation scans do not prove a live first-class hum runtime path. See `docs/HUM_SPEC.md`. |
 | PDF ingest | Implemented | validated on `eden_whitepaper_v14.pdf` |
 | CSV/TXT/Markdown ingest | Implemented | validated in tests |
 | Ingest framing prompt | Implemented | document ingest modal indexes operator framing text into the memgraph as persistent document-conditioning material |

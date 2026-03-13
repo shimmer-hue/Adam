@@ -43,6 +43,7 @@
 - The memode admissibility floor is graph-theoretic, not conceptual completeness: every selected meme must participate in at least one qualifying support edge and the support subgraph must be connected.
 - Semantic clusters are derived summaries over meme-only semantic neighborhoods. They may carry manual labels, but they are never auto-promoted into memodes.
 - Regard acts over memes and memodes, not over tokens.
+- `The hum`, when referenced, names a low-bandwidth continuity artifact rather than a first-class runtime object. It is not identical to the active set, turn history, full graph, basin summary, cluster summary, or observatory payload.
 - Active-set assembly mixes behavior and knowledge but keeps their provenance visible.
 
 ## Practical memode ladder for v1.2

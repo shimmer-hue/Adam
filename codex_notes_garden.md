@@ -2007,3 +2007,59 @@ Remaining uncertainties:
 Working tree remains dirty from unrelated prior edits; live screenshot comparison still not performed in this turn.
 Next shortest proof path:
 Open the Atlas in the live TUI and confirm the lower-right buttons are visible at the target window size shown in the screenshot.
+
+## [2026-03-13T00:26:03-0400] PRE-FLIGHT
+Operator task:
+Create a hum spec under docs, anchor the term in repo truth surfaces, and implement the approved rewrite as repo documentation rather than free-floating chat prose.
+Task checksum:
+hum-spec-and-blog-rewrite-20260313
+Repo situation:
+Working tree is already dirty with unrelated `.DS_Store` and deleted `docs.zip`; preserve those changes. No repo-tracked hum spec or blog source currently exists. Historical hum evidence lives outside the repo at `/Users/brianray/Desktop/adam_hum_ALL.md`.
+Relevant spec surfaces read:
+AGENTS.md; docs/PROJECT_CHARTER.md; docs/TURN_LOOP_AND_MEMBRANE.md; docs/CANONICAL_ONTOLOGY.md; docs/REGARD_MECHANISM.md; docs/INFERENCE_PROFILES.md; docs/TUI_SPEC.md; docs/IMPLEMENTATION_TRUTH_TABLE.md; docs/KNOWN_LIMITATIONS.md; docs/OBSERVATORY_SPEC.md; docs/GRAPH_SCHEMA.md; codex_notes_garden.md; `/Users/brianray/Desktop/adam_hum_ALL.md`.
+Natural-language contracts in force:
+No governor in v1. TUI remains primary. Memes are first-class, memodes are derived, regard acts over memes and memodes rather than tokens, and active-set assembly is turn-local and bounded. Any hum language must remain subordinate to current repo truth and must not claim a current first-class runtime hum surface without proof.
+Files/modules likely in scope:
+/Users/brianray/Adam/docs/HUM_SPEC.md; /Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md; /Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md; /Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md; /Users/brianray/Adam/codex_notes_garden.md.
+Status register:
+- Implemented:
+Current EDEN continuity surfaces: direct v1 loop, persisted memgraph, bounded active set, visible membrane, explicit feedback, TUI-primary runtime, observatory exports.
+- Instrumented:
+Historical hum artifact with timestamped `hum:` entries and `[HUM_STATS]` / `[HUM_METRICS]` / `[HUM_TABLE]` summaries exists at `/Users/brianray/Desktop/adam_hum_ALL.md`.
+- Conceptual:
+Hum as low-bandwidth continuity artifact compatible with current graph/regard/feedback architecture.
+- Unknown:
+Whether the current repo still generates, foregrounds, injects, or membrane-processes a live hum channel.
+Risks / invariants:
+Do not promote hum to a first-class object or current runtime guarantee. Do not reintroduce governor rhetoric by euphemism. Keep Austin/Foucault references subordinate to mechanism rather than theory-forward. Preserve exact distinctions between hum, active set, history, graph, basin summary, cluster summary, and observatory payloads.
+Evidence plan:
+Create a dedicated hum spec with status and forbidden-claim boundaries, update ontology/truth/limitations surfaces to reflect that status, and use the approved replacement prose as the implemented documentation artifact.
+Shortest proof path:
+Patch the new spec plus linked docs, verify the resulting language stays conservative and internally consistent, then append POST-FLIGHT with the exact docs changed and note that no tests were required for docs-only work.
+
+## [2026-03-13T00:28:02-0400] POST-FLIGHT
+Files changed:
+/Users/brianray/Adam/docs/HUM_SPEC.md; /Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md; /Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md; /Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md; /Users/brianray/Adam/codex_notes_garden.md.
+Specs changed:
+/Users/brianray/Adam/docs/HUM_SPEC.md; /Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md.
+Natural-language contracts added/revised/preserved:
+Added a dedicated hum spec that treats the hum as a historical/instrumented continuity artifact rather than a proved current-runtime surface. Preserved the direct v1 loop, TUI-primary runtime, meme/memode ontology, and explicit feedback/regard semantics. Revised ontology and status surfaces so hum language cannot silently reintroduce governor rhetoric or collapse hum into active set, history, graph, basin, cluster, or observatory payload.
+Behavior implemented or modified:
+No runtime behavior changed. Documentation now includes an approved blog-replacement section for the hum, a contract boundary for how the term may be used, and synchronized truth-surface language describing hum as historical artifact evidence plus conceptual fit rather than a repo-proved first-class live channel.
+Evidence produced (tests / traces / commands / exports):
+Repo/document scan completed before edits; historical artifact `/Users/brianray/Desktop/adam_hum_ALL.md` inspected for timestamped `hum:` entries and `[HUM_STATS]` / `[HUM_METRICS]` / `[HUM_TABLE]`; post-edit readback of the new spec and linked truth surfaces completed. No tests run because this turn was docs-only.
+Status register changes:
+- Implemented:
+Added a repo-tracked hum spec and anchored the term in ontology/truth surfaces.
+- Instrumented:
+Recorded historical hum artifact evidence explicitly in `docs/HUM_SPEC.md` and `docs/IMPLEMENTATION_TRUTH_TABLE.md`.
+- Conceptual:
+Hum as low-bandwidth continuity artifact compatible with current graph/regard/feedback architecture is now explicitly specified.
+- Unknown:
+Current live hum generation/foregrounding/prompt-injection/membrane-processing path remains unproved and is now named as unknown in the spec.
+Truth-table / limitations updates:
+`docs/IMPLEMENTATION_TRUTH_TABLE.md` now includes a hum row with historical artifact evidence only / current runtime surface unproved status. `docs/KNOWN_LIMITATIONS.md` now forbids claiming live prompt/membrane/persona-reconstruction hum behavior without future proof.
+Remaining uncertainties:
+There is still no repo-tracked blog source to patch directly; the implemented revision lives as the approved prose block inside `docs/HUM_SPEC.md`. The current repo still does not prove a live first-class hum runtime surface.
+Next shortest proof path:
+If a repo-tracked external-facing article source is added later, paste the approved replacement block from `docs/HUM_SPEC.md` into that source and keep the same status register language unless new code/runtime evidence upgrades the claim.
