@@ -20,6 +20,84 @@ function makeMeasurementEvent(overrides = {}) {
   };
 }
 
+function makeWorkbenchMeta(overrides = {}) {
+  return {
+    interaction_modes: ["INSPECT", "MEASURE", "EDIT", "ABLATE", "COMPARE"],
+    evidence_legend: {
+      OPERATOR_ASSERTED: { label: "Operator asserted" },
+      OPERATOR_REFINED: { label: "Operator refined" },
+      DERIVED: { label: "Derived" },
+      AUTO_DERIVED: { label: "Auto derived" },
+    },
+    view_modes: {
+      force: "Exported force",
+      spectral: "Derived spectral",
+    },
+    layout_catalog: {
+      forceatlas2: { label: "ForceAtlas2" },
+      fruchterman_reingold: { label: "Fruchterman-Reingold" },
+      noverlap: { label: "Noverlap" },
+      radial: { label: "Radial" },
+    },
+    layout_defaults: {
+      coordinate_mode: "force",
+      heavy_graph_node_cap: 320,
+      forceatlas2: {
+        iterations: 160,
+        scalingRatio: 8,
+        gravity: 1,
+        strongGravityMode: false,
+        barnesHutOptimize: true,
+        barnesHutTheta: 1.2,
+        linLogMode: false,
+        edgeWeightInfluence: 1,
+        outboundAttractionDistribution: false,
+        adjustSizes: false,
+        preventOverlap: false,
+      },
+      fruchterman_reingold: {
+        iterations: 120,
+        gravity: 0.08,
+        speed: 0.18,
+        cooling: 0.95,
+        preventOverlap: true,
+      },
+      noverlap: {
+        maxIterations: 160,
+        margin: 4,
+        ratio: 1.2,
+        speed: 3,
+      },
+      radial: {
+        radiusStep: 1.5,
+        startAngle: 0,
+      },
+      ...overrides.layout_defaults,
+    },
+    appearance_dimensions: {
+      node_color: ["kind", "domain", "cluster", "evidence_label", "active_set_presence", "regard_balance"],
+      node_size: ["uniform", "degree", "recent_active_set_presence", "reward", "risk"],
+      edge_color: ["type", "evidence_label", "assertion_origin", "selection_state"],
+      edge_opacity: ["weight", "uniform", "measurement_history", "assertion_origin"],
+      label_modes: ["selection", "cluster", "importance", "all", "none"],
+    },
+    filter_dimensions: {
+      sessions: ["session-alpha", "session-beta"],
+      kinds: ["meme", "runtime_trace"],
+      domains: ["behavior", "governance", "selection", "knowledge"],
+      sources: ["operator_seed", "operator_asserted", "operator_refined", "auto_derived"],
+      verdicts: [],
+      evidence_labels: ["OPERATOR_ASSERTED", "OPERATOR_REFINED", "DERIVED", "AUTO_DERIVED"],
+    },
+    statistics_capabilities: {
+      rankings: ["degree", "weighted_degree", "pagerank", "betweenness"],
+      supports_modularity: true,
+      heavy_graph_node_cap: 320,
+    },
+    export_formats: ["gexf", "graphml", "nodes_csv", "edges_csv", "selection_json"],
+  };
+}
+
 function makeNormalGraph(sourceGraphHash = "graph-hash-normal-v1") {
   const measurementHistory = [{ id: "evt-baseline-001", action_type: "geometry_measurement_run" }];
   const semanticNodes = [
@@ -186,6 +264,7 @@ function makeNormalGraph(sourceGraphHash = "graph-hash-normal-v1") {
     source_graph_hash: sourceGraphHash,
     graph_modes: ["Semantic Map", "Assemblies", "Runtime", "Active Set", "Compare"],
     assembly_render_modes: ["hulls", "collapsed-meta-node", "hidden"],
+    ...makeWorkbenchMeta(),
     semantic_nodes: semanticNodes,
     semantic_edges: semanticEdges,
     runtime_nodes: semanticNodes.slice(0, 3).map((node, index) => ({
@@ -346,14 +425,58 @@ function makeTranscriptFromBasin(basin) {
       turn_id: turn.turn_id,
       turn_index: turn.turn_index,
       user_text: `Discuss ${turn.display_attractor_label}`,
+      reasoning_text: `visible step one for ${turn.turn_id}\nvisible step two for ${turn.turn_id}`,
       active_set_node_ids: turn.active_set_node_ids,
       active_set_labels: turn.active_set_labels,
       profile_name: turn.profile_name,
     })),
+    hum: {
+      present: true,
+      generated_at: "2026-03-13T18:12:22+00:00",
+      turn_window_size: basin.turns.length,
+      cross_turn_recurrence_present: basin.turns.length > 1,
+      text_surface: "seed-state: bounded continuity artifact present for the current session.",
+    },
   };
 }
 
-function makeOverview(graph, basin, measurements) {
+function makeTrace(state) {
+  const latestTurn = state.basin.turns.at(-1) ?? null;
+  return {
+    session: {
+      id: state.session_id,
+      experiment_id: state.experiment_id,
+      title: "Harness session",
+    },
+    session_id: state.session_id,
+    latest_turn_id: latestTurn?.turn_id ?? null,
+    latest_turn_index: latestTurn?.turn_index ?? null,
+    latest_turn_trace: [
+      { stage: "retrieve", weight: 0.62, note: "active-set retrieval" },
+      { stage: "assemble", weight: 0.77, note: "assembly bridge" },
+      { stage: "membrane", weight: 0.84, note: "feedback boundary" },
+    ],
+    trace_events: [
+      {
+        id: "trace-001",
+        event_type: "OBSERVATORY_MEASUREMENT",
+        created_at: "2026-03-11T12:00:05Z",
+        message: "geometry_measurement_run committed from observatory",
+        payload: { measurement_event_id: "evt-baseline-001", summary: "baseline geometry trace" },
+      },
+    ],
+    membrane_events: [
+      {
+        id: "membrane-001",
+        created_at: "2026-03-11T12:00:06Z",
+        event_type: "membrane_review",
+        payload: { verdict: "accept", explanation: "bounded continuity preserved" },
+      },
+    ],
+  };
+}
+
+function makeOverview(graph, basin, measurements, transcript = null) {
   return {
     graph_counts: graph.counts,
     basin: {
@@ -362,6 +485,7 @@ function makeOverview(graph, basin, measurements) {
       projection_method: basin.projection_method,
     },
     measurements: measurements.counts,
+    hum: transcript?.hum ?? null,
   };
 }
 
@@ -408,9 +532,9 @@ function makeNormalState(overrides = {}) {
   const measurements = { counts: makeCounts(events), events };
   const transcript = makeTranscriptFromBasin(basin);
   const geometry = makeGeometry();
-  const overview = makeOverview(graph, basin, measurements);
+  const overview = makeOverview(graph, basin, measurements, transcript);
 
-  return {
+  const state = {
     experiment_id: overrides.experiment_id ?? "exp-observatory-e2e",
     session_id: overrides.session_id ?? "session-alpha",
     status: {
@@ -426,11 +550,14 @@ function makeNormalState(overrides = {}) {
     transcript,
     geometry,
     overview,
+    trace: null,
     runtime_status: { available: true, mode: "local_mlx" },
     runtime_model: { available: true, backend: "mlx", profile: "balanced" },
     delays: { graph: 150, transcript: 150, geometry: 900, ...overrides.delays },
     failures: { ...overrides.failures },
   };
+  state.trace = makeTrace(state);
+  return state;
 }
 
 function makeSparseState() {
@@ -450,7 +577,8 @@ function makeSparseState() {
     },
   };
   state.transcript = makeTranscriptFromBasin(state.basin);
-  state.overview = makeOverview(state.graph, state.basin, state.measurements);
+  state.overview = makeOverview(state.graph, state.basin, state.measurements, state.transcript);
+  state.trace = makeTrace(state);
   return state;
 }
 
@@ -575,7 +703,10 @@ function makeHeavyState() {
       makeMeasurementEvent(),
     ],
   };
-  base.overview = makeOverview(base.graph, base.basin, base.measurements);
+  base.graph.layout_defaults.heavy_graph_node_cap = 18;
+  base.graph.statistics_capabilities.heavy_graph_node_cap = 18;
+  base.overview = makeOverview(base.graph, base.basin, base.measurements, base.transcript);
+  base.trace = makeTrace(base);
   return base;
 }
 
@@ -586,7 +717,8 @@ function makeHashMismatchState() {
   });
   state.graph.semantic_nodes[0].label = "Persistence Loop v2";
   state.graph.export_manifest_id = "manifest-graph-hash-normal-v2";
-  state.overview = makeOverview(state.graph, state.basin, state.measurements);
+  state.overview = makeOverview(state.graph, state.basin, state.measurements, state.transcript);
+  state.trace = makeTrace(state);
   return state;
 }
 

@@ -8,6 +8,7 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
 
 - hover and pin nodes or edges
 - inspect provenance, geometry context, and measurement history
+- inspect runtime causality through session trace and continuity-strip reasoning surfaces
 - no graph mutation
 
 ### `MEASURE`
@@ -15,6 +16,7 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
 - select nodes
 - compute local geometry
 - inspect before/after deltas without committing topology changes
+- preview compare state through `preview_graph_patch`
 
 ### `EDIT`
 
@@ -35,6 +37,17 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
 - compare baseline vs modified preview
 - compare slices and coordinate modes
 - keep layout interpretation separate from topology interpretation
+- expose layout snapshots and baseline/modified highlights without committing graph mutation
+
+## Precision drawer and side rails
+
+- the graph workbench keeps a search/filter rail, selection summary, coordinate-mode selector, measurement ledger panel, runtime trace panel, and Data Lab available beside the main graph surface
+- the precision drawer is the single browser control surface for:
+  - `Preview`
+  - `Commit`
+  - `Revert`
+  - action-specific fields such as rationale, evidence label, confidence, operator label, edge parameters, memode details, ablation relation masks, and motif annotation fields
+- static exports retain the same visible controls but disable mutation actions with explicit copy instead of hiding them
 
 ## Preview / commit / revert flow
 
@@ -44,6 +57,8 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
 4. Inspect:
    - local metric deltas
    - global metric deltas
+   - `compare_selection`
+   - `preview_graph_patch`
    - topology change summary
 5. Commit if warranted.
 6. Observe refreshed graph, geometry, and ledger state.
@@ -79,7 +94,16 @@ Inspector workflow:
 - cards first
 - raw JSON only as a debug tab
 - view presets stay browser-local and never enter the measurement ledger
+- layout presets, styling, filter presets, and table sorting stay browser-local and never enter the measurement ledger
 
 ## Runtime bridge
 
 Committed observatory actions emit runtime log and trace events. Subsequent retrieval and active-set assembly can then operate on the changed graph state, which makes observatory edits causally visible to later turns.
+
+Browser-visible runtime causality is exposed through `GET /api/sessions/<session_id>/trace`, which carries:
+
+- `latest_turn_trace`
+- `trace_events`
+- `membrane_events`
+
+This trace surface is read-only. It mirrors runtime causality; it does not authorize mutation.

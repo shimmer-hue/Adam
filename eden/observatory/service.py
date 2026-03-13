@@ -173,6 +173,35 @@ class ObservatoryService:
             ],
         }
 
+    def session_trace(self, *, session_id: str) -> dict[str, Any]:
+        session = self.store.get_session(session_id)
+        turns = self.store.list_all_turns(session_id)
+        latest_turn = turns[-1] if turns else None
+        latest_turn_trace = json.loads(latest_turn.get("trace_json") or "[]") if latest_turn else []
+        trace_events = [
+            {
+                **dict(row),
+                "payload": json.loads(row.get("payload_json") or "{}"),
+            }
+            for row in self.store.list_trace_events(session["experiment_id"], limit=80, session_id=session_id)
+        ]
+        membrane_events = [
+            {
+                **dict(row),
+                "payload": json.loads(row.get("payload_json") or "{}"),
+            }
+            for row in self.store.list_membrane_events(session["experiment_id"], limit=40, session_id=session_id)
+        ]
+        return {
+            "session": session,
+            "session_id": session_id,
+            "latest_turn_id": latest_turn.get("id") if latest_turn else None,
+            "latest_turn_index": int(latest_turn.get("turn_index", 0) or 0) if latest_turn else 0,
+            "latest_turn_trace": latest_turn_trace,
+            "trace_events": trace_events,
+            "membrane_events": membrane_events,
+        }
+
     def runtime_status(self) -> dict[str, Any]:
         if self.runtime_status_provider is None:
             return {"available": False}
@@ -225,6 +254,11 @@ class ObservatoryService:
         if not action_type:
             raise ValueError("action_type is required.")
         selection_ids = self._selection_ids(action, node_lookup)
+        before_nodes = {
+            str(node_id): dict(graph.nodes[node_id])
+            for node_id in graph.nodes()
+        }
+        before_edges = self._edge_payloads_from_directed(directed)
         before_global = compute_geometry_metrics(graph, directed, node_order=list(graph.nodes()))
         before_local = compute_selection_geometry(
             graph,
@@ -254,6 +288,14 @@ class ObservatoryService:
             radius=int(action.get("selection_radius", 1) or 1),
             node_order=list(after_graph.nodes()),
         )
+        preview_graph_patch = self._preview_graph_patch(
+            before_nodes=before_nodes,
+            before_edges=before_edges,
+            after_graph=after_graph,
+            after_directed=after_directed,
+            selection_before=selection_ids,
+            selection_after=after_selection_ids,
+        )
         return {
             "generated_at": now_utc(),
             "experiment_id": experiment_id,
@@ -265,7 +307,12 @@ class ObservatoryService:
                 "before": selection_ids,
                 "after": after_selection_ids,
             },
+            "compare_selection": {
+                "baseline_node_ids": selection_ids,
+                "modified_node_ids": after_selection_ids,
+            },
             "topology_change": topology_change,
+            "preview_graph_patch": preview_graph_patch,
             "global_metrics": {
                 "before": before_global,
                 "after": after_global,
@@ -811,6 +858,61 @@ class ObservatoryService:
             }
         )
         return payload
+
+    def _edge_payloads_from_directed(self, graph: nx.DiGraph) -> dict[tuple[str, str, str], dict[str, Any]]:
+        payloads: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for source, target, attrs in graph.edges(data=True):
+            edge_type = str(attrs.get("edge_type", "") or "")
+            payloads[(str(source), str(target), edge_type)] = {
+                "id": str(attrs.get("id") or f"preview::{source}::{target}::{edge_type or 'EDGE'}"),
+                "source": str(source),
+                "target": str(target),
+                "type": edge_type,
+                "weight": float(attrs.get("weight", 1.0) or 1.0),
+                "provenance": dict(attrs.get("provenance") or {}),
+            }
+        return payloads
+
+    def _preview_graph_patch(
+        self,
+        *,
+        before_nodes: dict[str, dict[str, Any]],
+        before_edges: dict[tuple[str, str, str], dict[str, Any]],
+        after_graph: nx.Graph,
+        after_directed: nx.DiGraph,
+        selection_before: list[str],
+        selection_after: list[str],
+    ) -> dict[str, Any]:
+        after_nodes = {
+            str(node_id): dict(after_graph.nodes[node_id])
+            for node_id in after_graph.nodes()
+        }
+        after_edges = self._edge_payloads_from_directed(after_directed)
+        before_node_ids = set(before_nodes)
+        after_node_ids = set(after_nodes)
+        before_edge_ids = set(before_edges)
+        after_edge_ids = set(after_edges)
+        added_nodes = [after_nodes[node_id] for node_id in sorted(after_node_ids - before_node_ids)]
+        removed_nodes = [before_nodes[node_id] for node_id in sorted(before_node_ids - after_node_ids)]
+        added_edges = [after_edges[key] for key in sorted(after_edge_ids - before_edge_ids)]
+        removed_edges = [before_edges[key] for key in sorted(before_edge_ids - after_edge_ids)]
+        return {
+            "graph_changed": bool(added_nodes or removed_nodes or added_edges or removed_edges),
+            "baseline_counts": {
+                "nodes": len(before_nodes),
+                "edges": len(before_edges),
+            },
+            "modified_counts": {
+                "nodes": len(after_nodes),
+                "edges": len(after_edges),
+            },
+            "added_nodes": added_nodes,
+            "removed_nodes": removed_nodes,
+            "added_edges": added_edges,
+            "removed_edges": removed_edges,
+            "selection_before": selection_before,
+            "selection_after": selection_after,
+        }
 
     def _exact_before_state(self, *, experiment_id: str, action: dict[str, Any]) -> dict[str, Any] | None:
         action_type = str(action.get("action_type", "")).strip()

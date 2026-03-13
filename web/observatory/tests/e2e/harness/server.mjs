@@ -71,6 +71,310 @@ function closeScenarioClients(name) {
   sseClients.delete(name);
 }
 
+async function readJsonBody(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  return raw ? JSON.parse(raw) : {};
+}
+
+function nextSyntheticId(state, prefix) {
+  state.synthetic_sequence = Number(state.synthetic_sequence ?? state.measurements?.events?.length ?? 0) + 1;
+  return `${prefix}-${String(state.synthetic_sequence).padStart(3, "0")}`;
+}
+
+function computeCounts(events) {
+  const action_types = {};
+  const evidence_labels = {};
+  for (const event of events) {
+    action_types[event.action_type] = (action_types[event.action_type] ?? 0) + 1;
+    evidence_labels[event.evidence_label] = (evidence_labels[event.evidence_label] ?? 0) + 1;
+  }
+  return { events: events.length, action_types, evidence_labels };
+}
+
+function refreshDerivedState(state) {
+  state.measurements.counts = computeCounts(state.measurements.events);
+  state.graph.counts.measurement_events = state.measurements.counts.events;
+  state.graph.counts.edges = state.graph.semantic_edges.length;
+  state.graph.counts.memodes = state.graph.assemblies.length;
+  state.overview.graph_counts = state.graph.counts;
+  state.overview.measurements = state.measurements.counts;
+  state.overview.hum = state.transcript?.hum ?? null;
+}
+
+function appendTrace(state, eventType, message, payload = {}) {
+  state.trace ??= {
+    session: { id: state.session_id, experiment_id: state.experiment_id, title: "Harness session" },
+    session_id: state.session_id,
+    latest_turn_id: state.basin.turns.at(-1)?.turn_id ?? null,
+    latest_turn_index: state.basin.turns.at(-1)?.turn_index ?? null,
+    latest_turn_trace: [],
+    trace_events: [],
+    membrane_events: [],
+  };
+  state.trace.trace_events.unshift({
+    id: nextSyntheticId(state, "trace"),
+    event_type: eventType,
+    created_at: "2026-03-11T12:20:00Z",
+    message,
+    payload,
+  });
+}
+
+function edgeIdFor(action) {
+  return action.edge_id || `edge-${String(action.source_id)}-${String(action.target_id)}-${String(action.edge_type || action.current_edge_type || "EDGE")}`;
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function buildEdge(action, existing = {}) {
+  return {
+    ...clone(existing),
+    id: existing.id || edgeIdFor(action),
+    source: action.source_id,
+    target: action.target_id,
+    type: action.edge_type || action.current_edge_type || existing.type || "SUPPORTS",
+    weight: Number(action.weight ?? existing.weight ?? 1),
+    evidence_label: action.evidence_label || existing.evidence_label || "OPERATOR_ASSERTED",
+    operator_label: action.operator_label || existing.operator_label || "Brian the operator",
+    confidence: Number(action.confidence ?? existing.confidence ?? 0.7),
+    assertion_origin: existing.assertion_origin || "operator_asserted",
+    measurement_history: clone(existing.measurement_history ?? []),
+    measurement_event_ids: clone(existing.measurement_event_ids ?? []),
+    reverted: false,
+    provenance: {
+      assertion_origin: existing.assertion_origin || "operator_asserted",
+      evidence_label: action.evidence_label || existing.evidence_label || "OPERATOR_ASSERTED",
+      confidence: Number(action.confidence ?? existing.confidence ?? 0.7),
+      rationale: action.rationale || existing.provenance?.rationale || "",
+    },
+  };
+}
+
+function findEdge(state, action) {
+  return (
+    state.graph.semantic_edges.find((edge) => edge.id === action.edge_id) ??
+    state.graph.semantic_edges.find(
+      (edge) =>
+        edge.source === action.source_id &&
+        edge.target === action.target_id &&
+        (!action.current_edge_type || edge.type === action.current_edge_type),
+    ) ??
+    null
+  );
+}
+
+function compareSelection(action) {
+  const ids = [...new Set((action.selected_node_ids ?? []).filter(Boolean))];
+  if (action.source_id) ids.push(action.source_id);
+  if (action.target_id) ids.push(action.target_id);
+  return [...new Set(ids)];
+}
+
+function previewForAction(state, action) {
+  const selectionIds = compareSelection(action);
+  const existingEdge = findEdge(state, action);
+  const patch = {
+    graph_changed: false,
+    added_nodes: [],
+    removed_nodes: [],
+    added_edges: [],
+    removed_edges: [],
+    selection_before: action.selected_node_ids ?? [],
+    selection_after: selectionIds,
+  };
+  const topology_change = {
+    graph_changed: false,
+    before_state: {},
+    proposed_state: {},
+  };
+
+  if (action.action_type === "edge_add") {
+    const edge = buildEdge(action);
+    patch.graph_changed = true;
+    patch.added_edges.push(edge);
+    topology_change.graph_changed = true;
+    topology_change.proposed_state = { edge };
+  } else if (action.action_type === "edge_update" && existingEdge) {
+    const updated = buildEdge(action, existingEdge);
+    patch.graph_changed = true;
+    patch.removed_edges.push(clone(existingEdge));
+    patch.added_edges.push(updated);
+    topology_change.graph_changed = true;
+    topology_change.before_state = { edge: clone(existingEdge) };
+    topology_change.proposed_state = { edge: updated };
+  } else if (action.action_type === "edge_remove" && existingEdge) {
+    patch.graph_changed = true;
+    patch.removed_edges.push(clone(existingEdge));
+    topology_change.graph_changed = true;
+    topology_change.before_state = { edge: clone(existingEdge) };
+    topology_change.proposed_state = { remove_edge_id: existingEdge.id };
+  } else if (action.action_type === "memode_assert") {
+    topology_change.proposed_state = { memode_id: action.memode_id || "__preview_memode__" };
+  } else if (action.action_type === "memode_update_membership") {
+    topology_change.proposed_state = { memode_id: action.memode_id, member_ids: action.member_ids ?? [] };
+  }
+
+  return {
+    action_type: action.action_type,
+    measurement_only: !patch.graph_changed,
+    selection: { before: action.selected_node_ids ?? [], after: selectionIds },
+    compare_selection: { baseline_node_ids: action.selected_node_ids ?? [], modified_node_ids: selectionIds },
+    topology_change,
+    preview_graph_patch: patch,
+    global_metrics: { delta: { nodes: patch.added_nodes.length - patch.removed_nodes.length, edges: patch.added_edges.length - patch.removed_edges.length } },
+    local_metrics: { delta: { selection_size: selectionIds.length } },
+  };
+}
+
+function applyActionCommit(state, action, preview) {
+  const before_state = {};
+  const committed_state = { summary: action.rationale || `${action.action_type} committed from harness` };
+
+  if (action.action_type === "edge_add") {
+    const edge = buildEdge(action);
+    state.graph.semantic_edges.unshift(edge);
+    committed_state.edge = clone(edge);
+  } else if (action.action_type === "edge_update") {
+    const existingEdge = findEdge(state, action);
+    if (existingEdge) {
+      before_state.edge = clone(existingEdge);
+      const updated = buildEdge(action, existingEdge);
+      Object.assign(existingEdge, updated);
+      committed_state.edge = clone(updated);
+      committed_state.before_edge = before_state.edge;
+    }
+  } else if (action.action_type === "edge_remove") {
+    const existingEdge = findEdge(state, action);
+    if (existingEdge) {
+      before_state.edge = clone(existingEdge);
+      state.graph.semantic_edges = state.graph.semantic_edges.filter((edge) => edge.id !== existingEdge.id);
+      committed_state.before_edge = before_state.edge;
+    }
+  } else if (action.action_type === "memode_assert") {
+    const memode = {
+      id: action.memode_id || nextSyntheticId(state, "memode"),
+      label: action.label || action.memode_label || "Harness memode",
+      summary: action.summary || action.rationale || "Harness memode assertion",
+      domain: action.domain || "behavior",
+      member_meme_ids: clone(action.member_ids ?? action.selected_node_ids ?? []),
+      supporting_edge_ids: state.graph.semantic_edges
+        .filter((edge) => (action.member_ids ?? action.selected_node_ids ?? []).includes(edge.source) && (action.member_ids ?? action.selected_node_ids ?? []).includes(edge.target))
+        .map((edge) => edge.id),
+      member_order: clone(action.member_ids ?? action.selected_node_ids ?? []),
+      invariance_summary: action.summary || "Harness memode assertion",
+      evidence_label: action.evidence_label || "OPERATOR_ASSERTED",
+      operator_label: action.operator_label || "Brian the operator",
+      confidence: Number(action.confidence ?? 0.8),
+      created_at: "2026-03-11T12:21:00Z",
+      measurement_history: [],
+    };
+    state.graph.assemblies.unshift(memode);
+    committed_state.memode = clone(memode);
+  } else if (action.action_type === "memode_update_membership") {
+    const memode = state.graph.assemblies.find((entry) => entry.id === action.memode_id);
+    if (memode) {
+      before_state.memode = clone(memode);
+      memode.member_meme_ids = clone(action.member_ids ?? []);
+      memode.member_order = clone(action.member_ids ?? []);
+      memode.summary = action.summary || memode.summary;
+      committed_state.memode = clone(memode);
+      committed_state.before_memode = before_state.memode;
+    }
+  } else if (action.action_type === "motif_annotation") {
+    committed_state.annotation = {
+      cluster_signature: action.cluster_signature || "cluster-loop",
+      manual_label: action.manual_label || "Annotated cluster",
+      manual_summary: action.manual_summary || action.rationale || "",
+    };
+  }
+
+  const event = {
+    id: nextSyntheticId(state, "evt"),
+    action_type: action.action_type,
+    evidence_label: action.evidence_label || "DERIVED",
+    operator_label: action.operator_label || "local_operator",
+    measurement_method: action.measurement_method || "local_geometry_preview",
+    confidence: Number(action.confidence ?? 0.7),
+    rationale: action.rationale || "",
+    created_at: "2026-03-11T12:22:00Z",
+    target_ids: selectionTargets(action),
+    before_state,
+    proposed_state: preview.topology_change?.proposed_state ?? {},
+    committed_state,
+    summary: committed_state.summary,
+  };
+  state.measurements.events.unshift(event);
+  appendTrace(
+    state,
+    preview.measurement_only ? "OBSERVATORY_MEASUREMENT" : "OBSERVATORY_EDIT",
+    `${action.action_type} committed from observatory`,
+    { measurement_event_id: event.id, summary: committed_state.summary },
+  );
+  refreshDerivedState(state);
+  return { event, committed_state };
+}
+
+function selectionTargets(action) {
+  const ids = compareSelection(action);
+  return ids;
+}
+
+function applyRevert(state, eventId) {
+  const target = state.measurements.events.find((event) => event.id === eventId);
+  if (!target) {
+    throw new Error(`Unknown event '${eventId}'.`);
+  }
+
+  const committed_state = { summary: `reverted ${eventId}` };
+  if (target.action_type === "edge_add") {
+    const edgeId = target.committed_state?.edge?.id;
+    state.graph.semantic_edges = state.graph.semantic_edges.filter((edge) => edge.id !== edgeId);
+  } else if (target.action_type === "edge_update") {
+    const beforeEdge = target.before_state?.edge ?? target.committed_state?.before_edge;
+    if (beforeEdge) {
+      const index = state.graph.semantic_edges.findIndex((edge) => edge.id === beforeEdge.id);
+      if (index >= 0) state.graph.semantic_edges[index] = clone(beforeEdge);
+    }
+  } else if (target.action_type === "edge_remove") {
+    const beforeEdge = target.before_state?.edge ?? target.committed_state?.before_edge;
+    if (beforeEdge) state.graph.semantic_edges.unshift(clone(beforeEdge));
+  } else if (target.action_type === "memode_assert") {
+    const memodeId = target.committed_state?.memode?.id;
+    state.graph.assemblies = state.graph.assemblies.filter((entry) => entry.id !== memodeId);
+  } else if (target.action_type === "memode_update_membership") {
+    const beforeMemode = target.before_state?.memode ?? target.committed_state?.before_memode;
+    if (beforeMemode) {
+      const index = state.graph.assemblies.findIndex((entry) => entry.id === beforeMemode.id);
+      if (index >= 0) state.graph.assemblies[index] = clone(beforeMemode);
+    }
+  }
+
+  const revertEvent = {
+    id: nextSyntheticId(state, "evt"),
+    action_type: "revert",
+    evidence_label: "OPERATOR_REFINED",
+    operator_label: "local_operator",
+    measurement_method: "revert",
+    confidence: 1,
+    rationale: `Reverted ${eventId}`,
+    created_at: "2026-03-11T12:23:00Z",
+    target_ids: target.target_ids ?? [],
+    before_state: clone(target.committed_state ?? {}),
+    proposed_state: { revert_event_id: eventId },
+    committed_state,
+    summary: committed_state.summary,
+    reverted_from_event_id: eventId,
+  };
+  state.measurements.events.unshift(revertEvent);
+  appendTrace(state, "OBSERVATORY_REVERT", `reverted observatory event ${eventId}`, { measurement_event_id: revertEvent.id });
+  refreshDerivedState(state);
+  return revertEvent;
+}
+
 async function handleRequest(request, response) {
   const url = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
   const pathname = url.pathname;
@@ -107,7 +411,7 @@ async function handleControl(request, response, pathname) {
   if (action === "trigger-invalidation") {
     const state = stateFor(scenario);
     const nextEvent = {
-      id: `evt-${scenario}-${String(state.measurements.events.length + 1).padStart(3, "0")}`,
+      id: nextSyntheticId(state, "evt"),
       action_type: "edge_add",
       evidence_label: "OPERATOR_ASSERTED",
       operator_label: "second_actor",
@@ -119,21 +423,19 @@ async function handleControl(request, response, pathname) {
       before_state: {},
       proposed_state: { edge_type: "SUPPORTS" },
       committed_state: { summary: "External edge commit triggered by harness." },
+      summary: "External edge commit triggered by harness.",
     };
     state.measurements.events.unshift(nextEvent);
-    state.measurements.counts.events += 1;
-    state.measurements.counts.action_types.edge_add = (state.measurements.counts.action_types.edge_add ?? 0) + 1;
-    state.measurements.counts.evidence_labels.OPERATOR_ASSERTED = (state.measurements.counts.evidence_labels.OPERATOR_ASSERTED ?? 0) + 1;
-    state.graph.counts.measurement_events = state.measurements.counts.events;
-    state.overview.measurements = state.measurements.counts;
     state.graph.semantic_nodes[0].measurement_history = [
       { id: nextEvent.id, action_type: nextEvent.action_type },
       ...(state.graph.semantic_nodes[0].measurement_history ?? []),
     ];
+    appendTrace(state, "OBSERVATORY_EDIT", "edge_add committed from observatory", { measurement_event_id: nextEvent.id });
+    refreshDerivedState(state);
     publishInvalidation(scenario, {
       experiment_id: state.experiment_id,
       session_id: state.session_id,
-      kinds: ["graph", "measurements", "overview", "transcript"],
+      kinds: ["graph", "measurements", "overview", "transcript", "trace"],
       reason: "measurement_committed",
     });
     return sendJson(response, { ok: true, scenario, event_id: nextEvent.id });
@@ -200,7 +502,11 @@ function buildBootstrap(pageName, page, state) {
       basin: `/__e2e__/api/${page.scenario}/basin`,
       measurements: `/__e2e__/api/${page.scenario}/measurements`,
       geometry: `/__e2e__/api/${page.scenario}/geometry`,
+      preview: `/__e2e__/api/${page.scenario}/preview`,
+      commit: `/__e2e__/api/${page.scenario}/commit`,
+      revert: `/__e2e__/api/${page.scenario}/revert`,
       session_turns: `/__e2e__/api/${page.scenario}/transcript`,
+      session_trace: `/__e2e__/api/${page.scenario}/trace`,
       sessions: `/__e2e__/api/${page.scenario}/sessions`,
     };
   }
@@ -231,6 +537,57 @@ async function handleApi(request, response, pathname) {
   const scenario = parts[2];
   const resource = parts.slice(3).join("/");
   const state = stateFor(scenario);
+
+  if (request.method === "POST") {
+    const body = await readJsonBody(request);
+    if (resource === "preview") {
+      return sendJson(response, previewForAction(state, body.action ?? {}));
+    }
+    if (resource === "commit") {
+      const action = body.action ?? {};
+      const preview = previewForAction(state, action);
+      const committed = applyActionCommit(state, action, preview);
+      publishInvalidation(scenario, {
+        experiment_id: state.experiment_id,
+        session_id: state.session_id,
+        kinds: ["graph", "measurements", "overview", "trace"],
+        reason: "measurement_committed",
+      });
+      return sendJson(response, {
+        event: committed.event,
+        preview,
+        committed_state: committed.committed_state,
+        payload: {
+          graph: state.graph,
+          basin: state.basin,
+          geometry: state.geometry,
+          measurements: state.measurements,
+          index: state.overview,
+        },
+      });
+    }
+    if (resource === "revert") {
+      const revertEvent = applyRevert(state, body.event_id);
+      publishInvalidation(scenario, {
+        experiment_id: state.experiment_id,
+        session_id: state.session_id,
+        kinds: ["graph", "measurements", "overview", "trace"],
+        reason: "measurement_reverted",
+      });
+      return sendJson(response, {
+        event: revertEvent,
+        committed_state: revertEvent.committed_state,
+        payload: {
+          graph: state.graph,
+          basin: state.basin,
+          geometry: state.geometry,
+          measurements: state.measurements,
+          index: state.overview,
+        },
+      });
+    }
+    return sendJson(response, { error: `Unknown API resource '${resource}'.` }, 404);
+  }
 
   if (resource === "events") {
     handleEvents(response, scenario);
@@ -276,6 +633,10 @@ async function handleApi(request, response, pathname) {
   }
   if (resource === "measurements") {
     sendJson(response, state.measurements);
+    return;
+  }
+  if (resource === "trace") {
+    sendJson(response, state.trace);
     return;
   }
   if (resource === "geometry") {

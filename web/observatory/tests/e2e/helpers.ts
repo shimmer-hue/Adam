@@ -22,6 +22,11 @@ type Recorder = {
 };
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+const HARNESS_ORIGIN = process.env.PLAYWRIGHT_TEST_BASE_URL ?? "http://127.0.0.1:4173";
+
+function resolveHarnessUrl(url: string) {
+  return new URL(url, HARNESS_ORIGIN).toString();
+}
 
 export async function attachRecorder(page: Page): Promise<Recorder> {
   const consoleMessages: string[] = [];
@@ -99,18 +104,18 @@ export async function attachRecorder(page: Page): Promise<Recorder> {
 }
 
 export async function resetScenario(request: APIRequestContext, scenario: string) {
-  const response = await request.post(`/__e2e__/control/${scenario}/reset`);
+  const response = await request.post(resolveHarnessUrl(`/__e2e__/control/${scenario}/reset`));
   expect(response.ok()).toBeTruthy();
 }
 
 export async function triggerInvalidation(request: APIRequestContext, scenario: string) {
-  const response = await request.post(`/__e2e__/control/${scenario}/trigger-invalidation`);
+  const response = await request.post(resolveHarnessUrl(`/__e2e__/control/${scenario}/trigger-invalidation`));
   expect(response.ok()).toBeTruthy();
   return response.json();
 }
 
 export async function snapshotLedger(request: APIRequestContext, url: string) {
-  const response = await request.get(url);
+  const response = await request.get(resolveHarnessUrl(url));
   expect(response.ok()).toBeTruthy();
   return response.json();
 }

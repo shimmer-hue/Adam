@@ -100,6 +100,10 @@ def test_observatory_server_exposes_live_api(runtime, tmp_path) -> None:
             graph_payload = json.loads(response.read().decode("utf-8"))
         assert graph_payload["semantic_nodes"]
         assert "cluster_summaries" in graph_payload
+        assert graph_payload["layout_families"][0]["label"] == "1. Force-Directed Layout Algorithms"
+        assert graph_payload["layout_catalog"]["kamada_kawai"]["familyId"] == "force_directed"
+        assert graph_payload["layout_catalog"]["sugiyama_layered"]["familyId"] == "hierarchical"
+        assert graph_payload["layout_defaults"]["community_clusters"]["orderBy"] == "cluster_size"
 
         with urllib.request.urlopen(f"{status['url']}api/experiments/{experiment['id']}/basin?session_id={session['id']}") as response:
             basin_payload = json.loads(response.read().decode("utf-8"))
@@ -143,6 +147,8 @@ def test_observatory_server_exposes_live_api(runtime, tmp_path) -> None:
         with urllib.request.urlopen(preview_request) as response:
             preview_payload = json.loads(response.read().decode("utf-8"))
         assert preview_payload["action_type"] == "geometry_measurement_run"
+        assert preview_payload["compare_selection"]["baseline_node_ids"] == [memes[0]["id"], memes[1]["id"]]
+        assert preview_payload["preview_graph_patch"]["graph_changed"] is False
 
         commit_request = urllib.request.Request(
             f"{status['url']}api/experiments/{experiment['id']}/commit",
@@ -170,6 +176,15 @@ def test_observatory_server_exposes_live_api(runtime, tmp_path) -> None:
         with urllib.request.urlopen(commit_request) as response:
             commit_payload = json.loads(response.read().decode("utf-8"))
         assert commit_payload["event"]["action_type"] == "edge_add"
+
+        with urllib.request.urlopen(f"{status['url']}api/sessions/{session['id']}/trace") as response:
+            trace_payload = json.loads(response.read().decode("utf-8"))
+        assert trace_payload["session_id"] == session["id"]
+        assert trace_payload["trace_events"]
+        assert any(
+            row["payload"].get("measurement_event_id") == commit_payload["event"]["id"]
+            for row in trace_payload["trace_events"]
+        )
 
         tanakh_run_request = urllib.request.Request(
             f"{status['url']}api/experiments/{experiment['id']}/tanakh-run",

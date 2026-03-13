@@ -181,6 +181,55 @@ def test_measurement_only_action_persists_without_topology_mutation(tmp_path, ru
     assert result["event"]["action_type"] == "geometry_measurement_run"
 
 
+def test_preview_graph_patch_reports_edge_add_selection_and_delta(tmp_path, runtime) -> None:
+    experiment, session, memes = _seed_session(runtime, tmp_path)
+    connected_pairs = {
+        frozenset((edge["src_id"], edge["dst_id"]))
+        for edge in runtime.store.list_edges(experiment["id"])
+        if edge["src_kind"] == "meme" and edge["dst_kind"] == "meme"
+    }
+    source_id = target_id = None
+    for index, left in enumerate(memes):
+        for right in memes[index + 1 :]:
+            if frozenset((left["id"], right["id"])) not in connected_pairs:
+                source_id = left["id"]
+                target_id = right["id"]
+                break
+        if source_id and target_id:
+            break
+    assert source_id is not None and target_id is not None
+
+    action = {
+        "action_type": "edge_add",
+        "source_id": source_id,
+        "target_id": target_id,
+        "source_kind": "meme",
+        "target_kind": "meme",
+        "edge_type": "TEST_PREVIEW_EDGE",
+        "weight": 1.25,
+        "confidence": 0.81,
+        "operator_label": "test_operator",
+        "evidence_label": "OPERATOR_ASSERTED",
+        "measurement_method": "local_geometry_preview",
+        "rationale": "preview edge add for compare rendering",
+    }
+    preview = runtime.preview_observatory_action(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        turn_id=None,
+        action=action,
+    )
+
+    patch = preview["preview_graph_patch"]
+    assert patch["graph_changed"] is True
+    assert patch["modified_counts"]["edges"] == patch["baseline_counts"]["edges"] + 1
+    assert patch["added_edges"]
+    assert patch["added_edges"][0]["source"] == source_id
+    assert patch["added_edges"][0]["target"] == target_id
+    assert preview["compare_selection"]["baseline_node_ids"] == [source_id, target_id]
+    assert preview["compare_selection"]["modified_node_ids"] == [source_id, target_id]
+
+
 def test_memode_assert_rejects_missing_support_edges(tmp_path, runtime) -> None:
     experiment, session, memes = _seed_session(runtime, tmp_path)
     isolated = _isolated_meme(runtime, experiment["id"], "Disconnected observatory meme")
@@ -357,6 +406,82 @@ def test_manual_cluster_label_persists_without_mutating_topology(tmp_path, runti
     assert after["semantic_nodes"]
     assert after["runtime_nodes"]
     assert after["assemblies"] is not None
+
+
+def test_ablation_and_motif_actions_emit_trace_and_revertible_events(tmp_path, runtime) -> None:
+    experiment, session, memes = _seed_session(runtime, tmp_path)
+    graph_payload = runtime.observatory_service.graph_payload(experiment_id=experiment["id"], session_id=session["id"])
+    cluster = graph_payload["cluster_summaries"][0]
+    support_edge = next(
+        edge
+        for edge in runtime.store.list_edges(experiment["id"])
+        if edge["src_kind"] == "meme" and edge["dst_kind"] == "meme" and edge["edge_type"] in MEMODE_SUPPORT_EDGE_ALLOWLIST
+    )
+
+    ablation = runtime.commit_observatory_action(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        turn_id=None,
+        action={
+            "action_type": "ablation_measurement_run",
+            "selected_node_ids": [memes[0]["id"], memes[1]["id"]],
+            "mask_relation_type": support_edge["edge_type"],
+            "operator_label": "test_operator",
+            "evidence_label": "DERIVED",
+            "confidence": 0.77,
+            "rationale": "mask one relation class for observatory compare",
+        },
+    )
+    motif = runtime.commit_observatory_action(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        turn_id=None,
+        action={
+            "action_type": "motif_annotation",
+            "target": {
+                "kind": "cluster",
+                "cluster_signature": cluster["cluster_signature"],
+                "member_meme_ids": cluster["member_meme_ids"],
+                "dominant_domain": max(cluster["domain_mix"], key=cluster["domain_mix"].get),
+            },
+            "cluster_signature": cluster["cluster_signature"],
+            "source_graph_hash": cluster["source_graph_hash"],
+            "algorithm_version": cluster["algorithm_version"],
+            "manual_label": "Ablated persistence motif",
+            "manual_summary": "Operator-defined cluster after ablation pass.",
+            "operator_label": "test_operator",
+            "evidence_label": "OPERATOR_ASSERTED",
+            "confidence": 0.83,
+            "rationale": "manual cluster naming",
+        },
+    )
+
+    trace = runtime.observatory_service.session_trace(session_id=session["id"])
+    measurement_event_ids = {
+        row["payload"].get("measurement_event_id")
+        for row in trace["trace_events"]
+        if row["payload"].get("measurement_event_id")
+    }
+    assert ablation["event"]["id"] in measurement_event_ids
+    assert motif["event"]["id"] in measurement_event_ids
+    assert any(row["event_type"] == "OBSERVATORY_MEASUREMENT" for row in trace["trace_events"])
+    assert trace["membrane_events"]
+
+    reverted = runtime.revert_observatory_action(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        turn_id=None,
+        event_id=ablation["event"]["id"],
+    )
+    assert reverted["event"]["action_type"] == "revert"
+
+    trace_after_revert = runtime.observatory_service.session_trace(session_id=session["id"])
+    revert_ids = {
+        row["payload"].get("measurement_event_id")
+        for row in trace_after_revert["trace_events"]
+        if row["event_type"] == "OBSERVATORY_REVERT"
+    }
+    assert reverted["event"]["id"] in revert_ids
 
 
 def test_basin_payload_exposes_projection_metadata_and_sparse_diagnostics(tmp_path, runtime) -> None:

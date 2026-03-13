@@ -2276,3 +2276,232 @@ Remaining uncertainties:
 No Python syntax/runtime check or TUI/manual interaction proof was run; the new popup flow relies on Terminal.app AppleScript on macOS and may need manual confirmation in the live environment.
 Next shortest proof path:
 Run the TUI once, trigger `F7` after a real Adam reply, and confirm the popup writes feedback plus hum refresh; if needed, follow with targeted pytest or a tiny smoke script for the new `eden feedback` command.
+
+## [2026-03-13T18:16:23Z] PRE-FLIGHT
+Operator task:
+Implement the EDEN observatory graph workbench roadmap: close browser contract gaps for preview/commit/revert and measurement/edit flows, add browser-local layout workbench controls including ForceAtlas2-class parameters, add Gephi-style filters/appearance/statistics/data-lab/export surfaces, and update specs/evidence honestly.
+Task checksum:
+observatory-react-workbench+preview-commit-revert+trace-endpoint+layout-runner+filters-appearance-stats+export-interoperability
+Repo situation:
+Root AGENTS.md constraints already loaded. Working tree is dirty before edits: modified `.DS_Store` plus untracked `logs/hum_state/65c7b12d-2a42-4daa-bf8c-259bd3baeb6e/`. Existing observatory docs and Playwright audit still mark browser contract gaps while legacy exporter HTML already contains an older non-React graph instrument with preview/edit/revert controls.
+Relevant spec surfaces read:
+docs/OBSERVATORY_SPEC.md; docs/OBSERVATORY_INTERACTION_SPEC.md; docs/MEASUREMENT_EVENT_MODEL.md; docs/OBSERVATORY_E2E_AUDIT.md; docs/KNOWN_LIMITATIONS.md; docs/IMPLEMENTATION_TRUTH_TABLE.md
+Natural-language contracts in force:
+Observatory remains EDEN-native and live-first; layout/render changes are not evidence claims; browser view state stays local and non-authoritative; preview computes candidate deltas without persistence; commit/revert are the authoritative mutation path; memodes remain derived structures with connected support-floor requirements.
+Files/modules likely in scope:
+eden/observatory/service.py; eden/observatory/server.py; eden/observatory/exporters.py; eden/observatory/contracts.py; eden/observatory/geometry.py; eden/storage/graph_store.py; web/observatory/src/App.tsx; web/observatory/src/components/GraphPanel.tsx; web/observatory/src/styles.css; web/observatory/src/App.test.tsx; web/observatory/tests/e2e/observatory.spec.ts; tests/test_observatory_measurements.py; tests/test_observatory_server.py; docs/OBSERVATORY_SPEC.md; docs/OBSERVATORY_INTERACTION_SPEC.md; docs/MEASUREMENT_EVENT_MODEL.md; docs/OBSERVATORY_E2E_AUDIT.md; docs/KNOWN_LIMITATIONS.md; docs/IMPLEMENTATION_TRUTH_TABLE.md
+Status register:
+- Implemented:
+Server-side preview/commit/revert, edge mutation, memode assertion/update, measurement ledger persistence, and SSE invalidation; React observatory read surfaces with graph/basin/overview/measurements/tanakh tabs and browser-local view presets.
+- Instrumented:
+Legacy exporter HTML graph instrument demonstrates preview/edit/revert and filter controls but is not the checked-in React runtime contract; trace events are persisted in storage and surfaced in TUI, not yet in React observatory API/UI.
+- Conceptual:
+Browser-local layout worker registry, ForceAtlas2-class parameter controls, Gephi-style appearance/ranking/data-lab/export surfaces in the React shell.
+- Unknown:
+Whether current fixture payloads already contain enough node attributes for the planned appearance/ranking surface without additional exporter changes; whether full Playwright suite runtime is tractable in this turn on this machine.
+Risks / invariants:
+Do not overclaim Gephi parity; keep browser mutation live-only and explicit in static mode; keep layout/style/filter state out of measurement events; preserve evidence boundary wording; avoid breaking existing static export and SSE behavior; preserve performance on large seeded graphs.
+Evidence plan:
+Targeted pytest coverage for new preview/trace/export payload behavior, vitest coverage for React controls/state, build of checked-in observatory bundle, and at least targeted Playwright/browser proofs or fixture-based evidence for the closed gap surfaces.
+Shortest proof path:
+Add missing API/payload fields first (`preview_graph_patch`, trace endpoint, layout/export metadata), port legacy graph instrument behaviors into React with static/live gating, then refresh tests/docs and rebuild the checked-in frontend bundle.
+
+## [2026-03-13T18:20:39Z] PRE-FLIGHT
+Operator task:
+Fix the chat/observatory continuity lenses so reasoning, chain-like, and hum-live surfaces load session-scoped data during and between turns.
+Task checksum:
+aa3b671decb650eedd5086f4ea121bbc3d03a39b0d4504989945f0a2b237a2aa
+Repo situation:
+Root AGENTS.md constraints already loaded. Working tree is dirty before edits: modified `.DS_Store` plus untracked `logs/hum_state/65c7b12d-2a42-4daa-bf8c-259bd3baeb6e/`. Live store inspection shows the latest session already has persisted reasoning (`last_reasoning_len=1965`) and hum (`present=true`, `text_surface` populated), so persistence is not the failing surface.
+Relevant spec surfaces read:
+docs/TUI_SPEC.md; docs/TURN_LOOP_AND_MEMBRANE.md; docs/HUM_SPEC.md
+Natural-language contracts in force:
+The chat surface must keep transcript, hum, aperture, and reasoning lenses visible for the active session; the reasoning lens may only render operator-visible reasoning artifacts; hum is a bounded read-only continuity artifact surfaced through session snapshots, observatory payloads, and the prime TUI hum box; hidden chain-of-thought remains out of scope.
+Files/modules likely in scope:
+web/observatory/src/App.tsx; web/observatory/src/App.test.tsx; eden/observatory/exporters.py; eden/observatory/service.py; tests/test_observatory_server.py
+Status register:
+- Implemented:
+Runtime persistence of `last_reasoning` and bounded hum for the active session; TUI headless render proves the latest session can already display both surfaces from `session_state_snapshot()` and `hum_snapshot()`.
+- Instrumented:
+Live observatory frontend has payload-status reporting and background transcript loading, but session-scoped continuity behavior is not yet proved in tests.
+- Conceptual:
+Anything implying hum as generation input or hidden reasoning beyond operator-visible artifacts remains conceptual and out of scope.
+- Unknown:
+Whether the user report is confined to the browser observatory continuity strip or also includes another chat-adjacent surface outside the reproduced TUI path.
+Risks / invariants:
+Preserve the existing session-scoped observatory contract; do not overclaim hidden reasoning; do not regress static export mode; keep hum read-only and bounded; avoid changing server API shape unless necessary because the backend already supports `session_id` query parameters.
+Evidence plan:
+Patch the React frontend to preserve `session_id` on live API requests and prefer a present hum surface, then prove the continuity strip with a focused vitest regression plus targeted backend checks.
+Shortest proof path:
+Thread `session_id` through live experiment-scoped fetches, stop a sessionless `overview.hum` object from masking transcript hum, add a continuity-strip test, and run the focused frontend/backend evidence path.
+
+## [2026-03-13T18:26:12Z] POST-FLIGHT
+Files changed:
+web/observatory/src/App.tsx; web/observatory/src/App.test.tsx; eden/observatory/static/observatory_app/index.js; eden/observatory/static/observatory_app/build-meta.json; codex_notes_garden.md
+Specs changed:
+None. Existing TUI/hum contracts were preserved; this turn restored code to the current contract rather than revising prose.
+Natural-language contracts added/revised/preserved:
+Preserved the existing contract that live reasoning and hum lenses are session-scoped observability surfaces. No new canonical terms were introduced.
+Behavior implemented or modified:
+Live observatory experiment-scoped fetches now retain the active `session_id` query parameter for overview/graph/basin/measurements/geometry/tanakh requests. The browser continuity strip now prefers a present transcript hum over a sessionless overview hum placeholder, so `Reasoning`, `Chain-Like`, and `Hum Live` can bind to the active session instead of falling back to blank/sessionless continuity state.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python` live-store inspection proved persisted reasoning and hum already existed for session `1042c094-fa43-45d4-8c4e-2d0a7c5707b1`; `cd web/observatory && npm test -- src/App.test.tsx` passed with new continuity-strip regression; `./.venv/bin/pytest tests/test_observatory_server.py -q` passed; `cd web/observatory && npm run build` refreshed the checked-in bundle; `build_status()` now reports `warning=false` with matching source/built hash `da43b2311468a95b`; full `./.venv/bin/pytest -q` exposed one unrelated TUI review-focus failure in `tests/test_tui_smoke.py::test_tui_boots_blank_mode_and_uses_multiline_composer`.
+Status register changes:
+- Implemented:
+Session-scoped browser continuity loading is now proved by source change plus vitest regression and rebuilt static bundle; live observatory no longer drops `session_id` on experiment-scoped continuity fetches.
+- Instrumented:
+The full repo suite still reports an unrelated TUI review-focus mismatch, outside the observatory continuity path changed in this turn.
+- Conceptual:
+Hum remains read-only and bounded; no prompt-injection or hidden reasoning behavior was added.
+- Unknown:
+Whether the operator also observed a separate non-observatory chat surface issue beyond the reproduced browser continuity path remains unproved.
+Truth-table / limitations updates:
+No docs/status tables changed in this turn because the existing contract already described the intended behavior and the fix restored code to that contract.
+Remaining uncertainties:
+Full pytest is not green because of the unrelated `action_show_review()` focus expectation in `tests/test_tui_smoke.py`; I did not alter that popup-review path in this turn.
+Next shortest proof path:
+Manual-check the browser observatory from a live session to confirm the continuity strip updates across a second turn, then address the separate TUI review-focus failure in its own bounded turn if full-suite green is required.
+
+## [2026-03-13T19:17:26Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/observatory/service.py`; `/Users/brianray/Adam/eden/observatory/server.py`; `/Users/brianray/Adam/eden/observatory/exporters.py`; `/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx`; `/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`; `/Users/brianray/Adam/web/observatory/src/workers/layoutWorker.ts`; `/Users/brianray/Adam/web/observatory/src/workers/statsWorker.ts`; `/Users/brianray/Adam/web/observatory/tests/e2e/harness/fixtures.mjs`; `/Users/brianray/Adam/web/observatory/tests/e2e/harness/server.mjs`; `/Users/brianray/Adam/web/observatory/tests/e2e/helpers.ts`; `/Users/brianray/Adam/web/observatory/tests/e2e/observatory.spec.ts`; `/Users/brianray/Adam/tests/test_observatory_measurements.py`; `/Users/brianray/Adam/tests/test_observatory_server.py`; `/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/MEASUREMENT_EVENT_MODEL.md`; `/Users/brianray/Adam/docs/OBSERVATORY_E2E_AUDIT.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`docs/OBSERVATORY_SPEC.md`; `docs/OBSERVATORY_INTERACTION_SPEC.md`; `docs/MEASUREMENT_EVENT_MODEL.md`; `docs/OBSERVATORY_E2E_AUDIT.md`; `docs/IMPLEMENTATION_TRUTH_TABLE.md`; `docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Revised the observatory contract from a read-mostly React shell with explicit browser gaps to an EDEN-native graph workbench. Preserved the evidence boundary that preview/commit/revert remain the only authoritative mutation path and that layout/style/filter/table state remains browser-local and non-authoritative.
+Behavior implemented or modified:
+React observatory now exposes explicit `INSPECT` / `MEASURE` / `EDIT` / `ABLATE` / `COMPARE` controls, coordinate-mode switching, compare rendering from `preview_graph_patch`, attributable preview/commit/revert flows, session-trace visibility, browser-local layout execution (`forceatlas2`, `fruchterman_reingold`, `noverlap`, `radial`), appearance/filter/statistics/Data Lab surfaces, and graph export interoperability. Live API now serves `GET /api/sessions/<session_id>/trace`, preview responses now expose `compare_selection` and `preview_graph_patch`, graph payloads now expose layout/appearance/filter/statistics/export capability metadata, and the prime TUI review surface again mounts/focuses its inline feedback controls.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q tests/test_observatory_measurements.py tests/test_observatory_server.py` -> `16 passed`
+`npm --prefix web/observatory run build`
+`npm --prefix web/observatory test -- --run src/App.test.tsx` -> `4 passed`
+`npm --prefix web/observatory exec playwright test tests/e2e/observatory.spec.ts --project=chromium` -> `18 passed`
+`./.venv/bin/python scripts/check_observatory_build_meta.py` -> `ok=true`, matching source/built hash `4492769cf8e966d8`
+`./.venv/bin/pytest -q` -> `67 passed`
+Status register changes:
+- Implemented:
+Browser-visible compare/coordinate controls, browser-visible measure/edit/ablate/compare flows, preview patch rendering, runtime trace surface, worker-backed layout/statistics surfaces, Data Lab export surface, and backend proof for preview patch plus trace linkage.
+- Instrumented:
+Large frontend bundle warning remains visible at build time (`index.js` ~873 kB minified); runtime/build freshness guard proves the bundle is current but not yet split into smaller chunks.
+- Conceptual:
+Literal Gephi plugin parity, arbitrary external import, and plugin ecosystems remain conceptual/out of scope.
+- Unknown:
+No additional unknowns were introduced in this turn beyond future performance characteristics on materially larger graphs than the current heavy fixture cap.
+Truth-table / limitations updates:
+Updated observatory truth/limitations surfaces to remove the stale browser-gap language, add the workbench contract, and restate the non-authoritative layout/style/filter boundary explicitly.
+Remaining uncertainties:
+The workbench contract is proved for the current fixture families and live API shape, not for arbitrary third-party graph imports or unconstrained Gephi-scale workloads.
+Next shortest proof path:
+If broader scale proof is required, add a larger seeded fixture and a dedicated performance audit for worker cancelation/repaint cadence before claiming stronger throughput guarantees.
+
+## [2026-03-13T19:42:54Z] PRE-FLIGHT
+Operator task:
+Add ignore rules for local/generated paths that are bloating commit surfaces, targeting the current 50k+-line churn risk without hiding checked-in runtime contract files.
+Task checksum:
+gitignore-noise-pruning+node_modules+hum-state+test-results
+Repo situation:
+Working tree is already dirty from prior observatory/frontend/docs edits. Current status shows local/generated noise mixed with real source edits: root `test-results/`, per-session `logs/hum_state/...`, and large `web/observatory/node_modules/...` churn alongside intentional source changes under `web/observatory/src/...`.
+Relevant spec surfaces read:
+`AGENTS.md`; `docs/OBSERVATORY_SPEC.md`; `docs/HUM_SPEC.md`
+Natural-language contracts in force:
+The checked-in observatory bundle under `eden/observatory/static/observatory_app/` remains runtime contract surface and should not be blanket-ignored. Hum artifacts are generated per session under `logs/hum_state/<experiment_id>/<session_id>/...`; ignore hygiene may suppress new local churn but must not overclaim removal of already tracked files.
+Files/modules likely in scope:
+`/Users/brianray/Adam/.gitignore`; `/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+Current ignore rules already cover `.DS_Store`, `.venv*`, Python cache, tmp, selected logs, databases, exports, and one Vite cache path.
+- Instrumented:
+`git status --short`, `git diff --numstat`, `du -sh`, and `git ls-files` prove current churn sources and show that `web/observatory/node_modules/` is already heavily indexed.
+- Conceptual:
+Purging already tracked generated/frontend dependency files from the index.
+- Unknown:
+Whether the operator wants tracked `web/observatory/node_modules/` removed from the index in this turn or only future-ignore protection.
+Risks / invariants:
+Do not ignore observatory bundle files that the runtime contract expects to be checked in. `.gitignore` will not stop changes on already tracked files. Keep the change minimal and root-scoped where possible.
+Evidence plan:
+Patch `.gitignore`, then verify with `git status --short --ignored` and direct path checks that root `test-results/`, new `logs/hum_state/...`, and untracked `web/observatory/node_modules/...` paths are now ignored.
+Shortest proof path:
+Add three targeted ignore patterns, rerun status with ignored markers, and report the remaining tracked-node_modules caveat explicitly.
+
+## [2026-03-13T19:43:42Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/.gitignore`; `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None.
+Natural-language contracts added/revised/preserved:
+Preserved the observatory runtime contract that the checked-in bundle under `eden/observatory/static/observatory_app/` should remain version-visible. Preserved the hum contract while adding ignore hygiene for newly generated per-session `logs/hum_state/...` artifacts.
+Behavior implemented or modified:
+Git now ignores new root `test-results/` artifacts, new per-session `logs/hum_state/` artifacts, and new/untracked `web/observatory/node_modules/` churn.
+Evidence produced (tests / traces / commands / exports):
+Patched `.gitignore`; verified with `git status --short --ignored`; verified direct matches with `git check-ignore -v test-results logs/hum_state/65c7b12d-2a42-4daa-bf8c-259bd3baeb6e web/observatory/node_modules/@yomguithereal`; measured tracked dependency caveat with `git ls-files web/observatory/node_modules | wc -l` -> `7618`.
+Status register changes:
+- Implemented:
+Targeted ignore rules now cover the main newly generated local churn surfaces seen in this turn.
+- Instrumented:
+Proof now exists that the new ignore rules match the intended paths and that `web/observatory/node_modules/` remains heavily indexed.
+- Conceptual:
+Removing already tracked generated/dependency files from the index remains conceptual in this turn.
+- Unknown:
+Whether Brian the operator wants the indexed `web/observatory/node_modules/` and historical tracked `logs/hum_state/...` artifacts purged from the index now or preserved for repo archaeology.
+Truth-table / limitations updates:
+None; no runtime feature status changed.
+Remaining uncertainties:
+`.gitignore` does not affect already tracked files. Current status still shows modified tracked files under `web/observatory/node_modules/` because they are already in the index.
+Next shortest proof path:
+If commit-surface reduction must include already tracked dependency/runtime artifacts, run a separate index-cleanup turn using `git rm -r --cached web/observatory/node_modules` and any tracked `logs/hum_state/...` files, then verify with `git status --short`.
+
+## [2026-03-13T19:35:39Z] PRE-FLIGHT
+Operator task:
+Extend the layout workbench beyond ForceAtlas2 by organizing a wider terrain of layout families in the UI, with sub-item algorithms and explicit usage explanations.
+Task checksum:
+layout-workbench-taxonomy+algorithm-descriptions+family-organized-ui
+Repo situation:
+Observatory graph workbench turn is already in progress and the tree is dirty from prior observatory/frontend/docs/test edits in this session. Current layout worker only runs a small subset (`forceatlas2`, `fruchterman_reingold`, `noverlap`, `radial`) and the exporter/UI catalog still exposes a flat layout list rather than a family-organized terrain.
+Relevant spec surfaces read:
+`docs/OBSERVATORY_SPEC.md`
+Natural-language contracts in force:
+Layout execution remains browser-local and non-authoritative; coordinate/layout choices are view state, not graph evidence; do not overclaim literal Gephi/plugin parity; add explanations that clarify when each algorithm family is useful.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/observatory/exporters.py`; `/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`; `/Users/brianray/Adam/web/observatory/src/workers/layoutWorker.ts`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Status register:
+- Implemented:
+Browser-local layout workbench with worker-backed `forceatlas2`, `fruchterman_reingold`, `noverlap`, and `radial`; compare/render/state boundary already proved.
+- Instrumented:
+Layout metadata is already exported to the frontend, but it is flat and sparse on explanations.
+- Conceptual:
+Broader layout family taxonomy and UI explanation surface for force-directed, hierarchical, tree, circular, spectral, multilevel, constraint-based, orthogonal, planar, geographic, community, and edge-bundling families.
+- Unknown:
+How many of the requested algorithms can be made runnable in this turn without destabilizing the workbench or overclaiming unsupported implementations.
+Risks / invariants:
+Do not silently label reference-only algorithms as runnable; keep heavy-graph honesty; preserve current layout snapshot keys; avoid inflating the bundle with unnecessary dependencies.
+Evidence plan:
+Extend exported layout catalog metadata with family/group/explanation fields, add more runnable browser-local layouts where feasible, render an organized family browser in the React UI, add focused frontend tests, rebuild the bundle, and rerun the focused frontend/backend proof path.
+Shortest proof path:
+First make the layout catalog hierarchical and descriptive, then add runnable algorithms that fit the existing worker model, then wire grouped UI rendering and prove the new layout/explanation surface in Vitest plus build.
+
+## [2026-03-13T20:05:18Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/workbench/layoutTerrain.ts`; `/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/workers/layoutWorker.ts`; `/Users/brianray/Adam/web/observatory/src/styles.css`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/web/observatory/tests/e2e/observatory.spec.ts`; `/Users/brianray/Adam/eden/observatory/exporters.py`; `/Users/brianray/Adam/tests/test_observatory_server.py`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/docs/OBSERVATORY_E2E_AUDIT.md`; `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`docs/OBSERVATORY_SPEC.md`; `docs/IMPLEMENTATION_TRUTH_TABLE.md`; `docs/KNOWN_LIMITATIONS.md`; `docs/OBSERVATORY_E2E_AUDIT.md`
+Natural-language contracts added/revised/preserved:
+Revised the observatory spec so the graph workbench now names a 12-family layout terrain, distinguishes runnable browser-worker layouts from reference/explanation-only algorithms, and makes the payload/bundled-terrain merge explicit. Preserved the evidence boundary: layouts, layout explanations, snapshots, appearance, filters, and Data Lab state remain browser-local and non-authoritative.
+Behavior implemented or modified:
+React graph workbench now renders a family-organized layout browser with subgroup headings, usage explanations, runnable/reference badges, generic parameter controls, and a broader runnable subset (`forceatlas2`, `fruchterman_reingold`, `kamada_kawai`, `linlog`, `sugiyama_layered`, `radial_tree`, `simple_circular`, `circular_degree`, `circular_community`, `radial`, `noverlap`, `fixed_coordinate`, `community_clusters`). Layout worker now executes the added runnable subset and carries cluster/geo metadata needed for community and anchored layouts. Python graph payload now exports `layout_families` plus expanded runnable-layout metadata/defaults so live/static API surfaces advertise the same workbench terrain.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix web/observatory test -- --run src/App.test.tsx` -> `4 passed`; `npm --prefix web/observatory run build` -> success; `npm --prefix web/observatory exec playwright test tests/e2e/observatory.spec.ts --project=chromium` -> `18 passed`; `./.venv/bin/pytest -q tests/test_observatory_server.py tests/test_observatory_measurements.py` -> `16 passed`; `./.venv/bin/pytest -q` -> `67 passed`; `./.venv/bin/python scripts/check_observatory_build_meta.py` -> `ok: true`, matching source/built hash `3a1f0dfdd8e7a2e2`.
+Status register changes:
+- Implemented:
+Family-organized layout terrain UI, expanded runnable browser-worker layouts, and exported payload family metadata are now proved by build/tests in this turn.
+- Instrumented:
+Payload metadata covers family ordering and runnable-layout overrides/defaults; the checked-in frontend terrain catalog still supplies many reference-only algorithm descriptions for breadth.
+- Conceptual:
+Literal execution of every listed reference algorithm, true Gephi plugin parity, and post-layout edge bundling execution remain conceptual.
+- Unknown:
+Performance/readability quality of the newly added runnable layouts on very large real seeded graphs beyond the existing heavy-cap and Playwright fixture proofs.
+Truth-table / limitations updates:
+Updated truth-table row for the browser-local layout workbench and added limitations covering the broader terrain vs executable subset plus payload/bundled-terrain merge behavior.
+Remaining uncertainties:
+The layout terrain shown in the UI is intentionally broader than the executable worker subset. Many reference-only algorithms are explanatory browse targets, not active implementations.
+Next shortest proof path:
+If Brian the operator wants more of the reference terrain to become executable, pick the next bounded family (`stress-majorization`, `Yifan Hu`, or an orthogonal/grid pass), add one worker-backed implementation at a time, and prove each with targeted UI + performance tests rather than bulk-promoting the whole catalog.

@@ -12,6 +12,11 @@
   },
   "dependencies": {
     "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
+    "graphology-layout": "^0.6.1",
+    "graphology-layout-forceatlas2": "^0.10.1",
+    "graphology-layout-noverlap": "^0.4.2",
+    "graphology-metrics": "^2.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sigma": "^3.0.0-beta.24",

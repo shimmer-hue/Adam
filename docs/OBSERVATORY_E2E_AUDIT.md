@@ -2,8 +2,8 @@
 
 ## Scope
 - Canonical browser proof surface: Playwright under `web/observatory/tests/e2e/`.
-- Full browser proof: Chromium J01-J17 plus `J16a` and `J16b`.
-- Cross-browser smoke: Firefox and WebKit for J01, J05, and J17.
+- Full browser proof: Chromium J01-J17 plus `J16a` and `J16b`, including the graph workbench journeys for compare, preview/commit/revert, runtime trace, layout controls, and heavy-graph fallback.
+- Cross-browser smoke retained for Firefox and WebKit on J01, J05, and J17.
 - Backend/server proof retained separately through `tests/test_observatory_server.py` and `tests/test_observatory_measurements.py`.
 
 ## Bugs Fixed During Audit
@@ -11,16 +11,18 @@
 - Journey evidence emission is now fail-fast. `persistJourneyEvidence` verifies screenshot, DOM, and JSON artifacts exist and are non-empty before a journey can pass, and request failures are captured alongside console/network evidence.
 - Static export proof now covers both supported HTTP-served parity and unsupported `file://` runtime behavior using a real exported `observatory_index.html` fixture.
 
-## Remaining Browser Contract Gaps
-- J06 is an explicit browser contract gap after rerun. The current React UI exposes a `Compare` graph-mode radio only; it still does not expose a coordinate-mode switcher or a baseline-vs-modified compare surface.
-- J10-J14 remain explicit browser contract gaps against documented backend implementation. The current React UI still does not surface measure-preview, attributable edge edit, memode assertion, revert, or runtime-causality flows.
+## Workbench Coverage
+- J06 now proves browser-visible compare state, coordinate-mode switching, the family-organized layout terrain, runnable-layout controls, snapshot save/restore, and cancel/reset behavior without entering the measurement ledger.
+- J10-J14 now prove browser-visible measure preview, attributable edge edit, memode assertion/update, explicit revert, and runtime-trace causality surfaces against the live preview/commit/revert API.
+- Static parity remains honest: the same controls stay visible in static exports, but mutation paths are disabled with explicit copy.
 
 ## Commands Run
-- `npm --prefix web/observatory test`
 - `npm --prefix web/observatory run build`
-- `npm --prefix web/observatory run test:e2e -- --project=chromium --output=test-results/chromium-final`
-- `npm --prefix web/observatory run test:e2e -- --project=firefox --project=webkit --output=test-results/cross-browser-smoke`
+- `npm --prefix web/observatory test -- --run src/App.test.tsx`
+- `npm --prefix web/observatory exec playwright test tests/e2e/observatory.spec.ts --project=chromium`
 - `./.venv/bin/pytest -q tests/test_observatory_server.py tests/test_observatory_measurements.py`
+- `./.venv/bin/pytest -q`
+- `./.venv/bin/python scripts/check_observatory_build_meta.py`
 
 ## Exact Evidence Produced
 - Chromium proof bundle: `web/observatory/test-results/chromium-final/`
@@ -88,17 +90,16 @@
 - Result: pass.
 
 ## J06 — Compare / Coordinate Browser Truth Revalidation
-- Register: Explicit browser contract gap
+- Register: Implemented
 - Preconditions: graph payload present.
 - Operator intent: compare coordinate/layout views without confusing them for graph mutation.
-- Actual UI path used: Graph tab; activate `Compare` radio; inspect for baseline/modified state and coordinate-mode controls.
-- Expected UI states: explicit coordinate-mode controls and compare semantics separated from mutation/ledger state.
-- Actual evidence gathered: Chromium `web/observatory/test-results/chromium-final/observatory-J06-chromium-r-d9f79-r-truth-before-any-demotion-chromium/J06.json`.
-- Network/SSE evidence: GET-only traffic; no mutation requests; no SSE.
+- Actual UI path used: Graph tab; activate `COMPARE`; switch coordinate mode; browse the layout terrain; run layout controls; save and restore a browser-local layout snapshot; cancel/reset the layout run.
+- Expected UI states: explicit coordinate-mode controls, baseline/modified compare rendering, family-organized layout browsing with usage copy, layout controls separated from mutation/ledger state, and browser-local snapshot persistence.
+- Actual evidence gathered: Chromium Playwright rerun of `web/observatory/tests/e2e/observatory.spec.ts::J06`.
+- Network/SSE evidence: GET-only traffic for read surfaces; no mutation requests; no SSE.
 - Ledger diff or proof of no ledger change: `delta 0`.
-- localStorage diff when relevant: none.
-- Result: pass as browser gap proof.
-- If absent: exact proof of browser contract gap: the React UI exposes a `Compare` graph-mode radio only; there is still no `Coordinate mode` radiogroup and no visible `Baseline`/`Modified` compare surface in the DOM.
+- localStorage diff when relevant: layout snapshot and preset keys are written under the manifest/hash-scoped browser-local preset namespace.
+- Result: pass.
 
 ## J07 — Browser-Local Preset Persistence Remains Non-Authoritative
 - Register: Implemented
@@ -137,69 +138,64 @@
 - Result: pass.
 
 ## J10 — Measure Mode Preview Without Mutation
-- Register: Implemented server/API; explicit browser contract gap
-- Preconditions: current React UI only.
-- Operator intent: preview or measure geometry without mutation if the GUI path exists.
-- Actual UI path used: load `live-normal`; inspect all visible tabs, radios, and buttons for explicit `Measure`, `Preview`, or `Commit` browser controls.
-- Expected UI states: explicit measure/preview controls if implemented in the browser.
-- Actual evidence gathered: Chromium `web/observatory/test-results/chromium-final/observatory-J10-chromium-p-c73a6--mode-is-a-GUI-contract-gap-chromium/J10.json`.
-- Network/SSE evidence: GET-only traffic; no POST `/preview`; no SSE.
-- Ledger diff or proof of no ledger change: `delta 0`.
+- Register: Implemented
+- Preconditions: live `normal` fixture with measure-capable graph selection.
+- Operator intent: preview and commit local geometry through the browser without silent mutation.
+- Actual UI path used: load `live-normal`; select `MEASURE`; choose nodes; run `Preview`; inspect compare patch and metric deltas; run `Commit`.
+- Expected UI states: explicit measure controls, preview-separated commit, authoritative ledger update only after commit.
+- Actual evidence gathered: Chromium Playwright rerun of `web/observatory/tests/e2e/observatory.spec.ts::J10`.
+- Network/SSE evidence: `POST /preview` followed by `POST /commit`, then follow-up GET refreshes for graph, measurements, overview, and trace surfaces.
+- Ledger diff or proof of no ledger change: `delta 1` only after explicit commit.
 - localStorage diff when relevant: none.
-- Result: pass as browser gap proof against backend-implemented contract.
-- If absent: exact proof of browser contract gap: no `Measure` tab or radio is present, and no `Preview` or `Commit` button is present in the current React UI.
+- Result: pass.
 
 ## J11 — Edit Edge Add/Update/Remove Is Attributable and Preview-Separated
-- Register: Implemented server/API; explicit browser contract gap
-- Preconditions: current React UI only.
-- Operator intent: run an attributable preview-separated edge mutation flow if the GUI path exists.
-- Actual UI path used: load `live-normal`; inspect for `Preview`, `Commit`, operator, rationale, evidence-label, and confidence controls.
-- Expected UI states: explicit attributable edit controls if implemented in the browser.
-- Actual evidence gathered: Chromium `web/observatory/test-results/chromium-final/observatory-J11-chromium-p-ed158-emove-is-a-GUI-contract-gap-chromium/J11.json`.
-- Network/SSE evidence: GET-only traffic; no POST `/preview` or `/commit`; no SSE.
-- Ledger diff or proof of no ledger change: `delta 0`.
+- Register: Implemented
+- Preconditions: live `normal` fixture with an editable semantic edge.
+- Operator intent: run an attributable preview-separated edge mutation flow through the browser.
+- Actual UI path used: load `live-normal`; select `EDIT`; configure edge update fields plus rationale/evidence/confidence; run `Preview`; run `Commit`.
+- Expected UI states: explicit attributable edit controls, preview-separated commit, visible relation change, and ledger update.
+- Actual evidence gathered: Chromium Playwright rerun of `web/observatory/tests/e2e/observatory.spec.ts::J11`.
+- Network/SSE evidence: `POST /preview` and `POST /commit`, followed by invalidation-driven GET refreshes.
+- Ledger diff or proof of no ledger change: `delta 1` only after commit.
 - localStorage diff when relevant: none.
-- Result: pass as browser gap proof against backend-implemented contract.
-- If absent: exact proof of browser contract gap: no `Preview` or `Commit` button and no attributable edit fields are present in the current React UI.
+- Result: pass.
 
 ## J12 — Known Memode Assertion Enforces Admissibility and Provenance Separation
-- Register: Implemented server/API; explicit browser contract gap
-- Preconditions: current React UI only.
-- Operator intent: assert a known memode if the GUI path exists.
-- Actual UI path used: load `live-normal`; inspect body text and controls for `Assert known memode`, `Preview`, and `Commit`.
-- Expected UI states: explicit admissibility flow if implemented in the browser.
-- Actual evidence gathered: Chromium `web/observatory/test-results/chromium-final/observatory-J12-chromium-p-02546-rtion-is-a-GUI-contract-gap-chromium/J12.json`.
-- Network/SSE evidence: GET-only traffic; no POSTs; no SSE.
-- Ledger diff or proof of no ledger change: `delta 0`.
+- Register: Implemented
+- Preconditions: live `normal` fixture with an admissible meme support subgraph.
+- Operator intent: assert a known memode and then refine membership from the browser while keeping operator provenance explicit.
+- Actual UI path used: load `live-normal`; select `EDIT`; configure memode assertion; run `Preview`; run `Commit`; reopen the flow for membership update and commit again.
+- Expected UI states: explicit memode form, preview-separated commit, admissibility-preserving update, and ledgered provenance.
+- Actual evidence gathered: Chromium Playwright rerun of `web/observatory/tests/e2e/observatory.spec.ts::J12`.
+- Network/SSE evidence: preview/commit POSTs for memode assertion and membership update, followed by GET refreshes.
+- Ledger diff or proof of no ledger change: `delta 2` after the two explicit commits.
 - localStorage diff when relevant: none.
-- Result: pass as browser gap proof against backend-implemented contract.
-- If absent: exact proof of browser contract gap: no memode assertion action and no preview/commit controls are present in the current React UI.
+- Result: pass.
 
 ## J13 — Revert Is Explicit, Attributable, and Ledgered
-- Register: Implemented server/API; explicit browser contract gap
-- Preconditions: current React UI only.
-- Operator intent: revert a prior observatory mutation if the GUI path exists.
-- Actual UI path used: open Measurements and inspect for a `Revert` action.
-- Expected UI states: explicit revert action if implemented in the browser.
-- Actual evidence gathered: Chromium `web/observatory/test-results/chromium-final/observatory-J13-chromium-p-cb40e-from-the-current-browser-UI-chromium/J13.json`.
-- Network/SSE evidence: GET-only traffic; no POST `/revert`; no SSE.
-- Ledger diff or proof of no ledger change: `delta 0`.
+- Register: Implemented
+- Preconditions: live `normal` fixture with a committed observatory mutation in the ledger.
+- Operator intent: revert a prior browser-visible mutation explicitly and see the graph recover.
+- Actual UI path used: perform a committed graph edit; open Measurements; activate `Revert` for that event; inspect graph and ledger state afterward.
+- Expected UI states: explicit revert action, new `revert` ledger entry, and browser-visible graph restoration.
+- Actual evidence gathered: Chromium Playwright rerun of `web/observatory/tests/e2e/observatory.spec.ts::J13`.
+- Network/SSE evidence: `POST /revert` followed by invalidation-driven GET refreshes.
+- Ledger diff or proof of no ledger change: `delta 1` for the revert event itself.
 - localStorage diff when relevant: none.
-- Result: pass as browser gap proof against backend-implemented contract.
-- If absent: exact proof of browser contract gap: Measurements remains readable, but no `Revert` action is surfaced anywhere in the current React UI.
+- Result: pass.
 
 ## J14 — Runtime Bridge Causality
-- Register: Implemented server/API; explicit browser contract gap
-- Preconditions: current React UI only.
-- Operator intent: verify browser-visible runtime causality after observatory mutation if the GUI path exists.
-- Actual UI path used: load `live-normal`; inspect body text for runtime log, trace, or causality surfaces.
-- Expected UI states: runtime/trace surface if implemented in the browser.
-- Actual evidence gathered: Chromium `web/observatory/test-results/chromium-final/observatory-J14-chromium-p-e516e--surfaced-in-the-browser-UI-chromium/J14.json`.
-- Network/SSE evidence: GET-only traffic; no mutation requests; no SSE.
-- Ledger diff or proof of no ledger change: `delta 0`.
+- Register: Implemented
+- Preconditions: live `normal` fixture plus at least one committed observatory action.
+- Operator intent: verify browser-visible runtime causality after observatory mutation.
+- Actual UI path used: load `live-normal`; commit an observatory action; open the runtime trace panel; inspect linked trace payloads and latest-turn causality context.
+- Expected UI states: browser-visible runtime/trace surface with measurement-event linkage and no extra mutation authority.
+- Actual evidence gathered: Chromium Playwright rerun of `web/observatory/tests/e2e/observatory.spec.ts::J14`.
+- Network/SSE evidence: `GET /api/sessions/<session_id>/trace` after explicit mutation plus the normal read refresh traffic.
+- Ledger diff or proof of no ledger change: `delta 0` from viewing trace alone.
 - localStorage diff when relevant: none.
-- Result: pass as browser gap proof against backend-implemented contract.
-- If absent: exact proof of browser contract gap: the current React bundle exposes no runtime log, trace, or mutation-causality panel.
+- Result: pass.
 
 ## J15 — Large-Graph Resilience and Honest Caps
 - Register: Implemented

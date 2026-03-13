@@ -570,6 +570,82 @@ button {
   font-size: 0.82rem;
 }
 
+.layout-terrain {
+  display: grid;
+  gap: 14px;
+}
+
+.layout-family-card,
+.layout-detail-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(49, 31, 17, 0.9);
+}
+
+.layout-family-card header,
+.layout-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.layout-family-card h3,
+.layout-detail-card h3,
+.layout-subgroup h4 {
+  margin: 0;
+  color: var(--amber-hot);
+}
+
+.layout-family-card p,
+.layout-detail-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.layout-subgroup {
+  display: grid;
+  gap: 8px;
+}
+
+.layout-algorithm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.layout-algorithm-button {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  text-align: left;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(18, 11, 7, 0.72);
+  color: var(--ink);
+  cursor: pointer;
+  transition: 140ms ease;
+}
+
+.layout-algorithm-button strong {
+  font-size: 0.94rem;
+}
+
+.layout-algorithm-button span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.layout-algorithm-button:hover,
+.layout-algorithm-button.is-active {
+  border-color: rgba(239, 177, 95, 0.45);
+  background: rgba(239, 177, 95, 0.14);
+}
+
 .transcript-list {
   display: flex;
   flex-direction: column;

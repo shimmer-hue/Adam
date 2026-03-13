@@ -48,10 +48,22 @@ Supported in v1.2:
 ## Semantics
 
 - Preview computes a candidate change and its metric deltas but does not persist an event.
+- Preview responses may expose `compare_selection` and `preview_graph_patch` so the browser can render baseline vs modified state without committing.
 - Commit persists the event and, when applicable, mutates the graph.
 - Revert persists a new `revert` event. Reversion is itself part of the measurement ledger.
+- Commits and reverts also emit runtime trace events whose payloads link back to the committed `measurement_event_id`.
 - Browser view presets are never measurement events. They stay in browser-local state.
+- Browser-local layouts, appearance controls, filter presets, layout snapshots, and Data Lab table state are never measurement events. They stay in browser-local state.
 - Tanakh tool-surface runs are not measurement events in v1.2. They persist as Tanakh sidecar artifacts (`tanakh_surface.json`, `tanakh_measurements.json`, scene/passsage/validation sidecars) until a first-class schema extension is specified and proved.
+
+## Runtime trace linkage
+
+- `GET /api/sessions/<session_id>/trace` exposes the browser-visible runtime bridge for observatory work.
+- The trace payload carries:
+  - `latest_turn_trace`
+  - `trace_events`
+  - `membrane_events`
+- These trace surfaces are evidence of runtime causality and attribution. They are not additional mutation paths.
 
 ## Evidence handling
 

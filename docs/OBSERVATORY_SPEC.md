@@ -1,6 +1,6 @@
 # Observatory Spec
 
-EDEN v1.2 keeps Python authoritative for exports, clustering, basin projection, and measurement provenance while replacing the inline canvas artifacts with one checked-in React + TypeScript + Vite observatory bundle. The browser layer is a live-first measurement instrument with static export retained as an HTTP-served artifact path.
+EDEN v1.2 keeps Python authoritative for exports, clustering, basin projection, and measurement provenance while replacing the inline canvas artifacts with one checked-in React + TypeScript + Vite observatory bundle. The browser layer is now a live-first graph workbench: it exposes inspect, measure, edit, ablate, compare, layout, filtering, styling, ranking, tabular, and export surfaces while keeping authority boundaries explicit.
 
 ## Artifact families
 
@@ -67,6 +67,14 @@ Generated per experiment under `exports/<experiment_id>/`:
   - `assemblies`
   - `cluster_summaries`
   - `active_set_slices`
+- browser workbench metadata surfaces:
+  - `layout_families`
+  - `layout_catalog`
+  - `layout_defaults`
+  - `appearance_dimensions`
+  - `filter_dimensions`
+  - `statistics_capabilities`
+  - `export_formats`
 - legacy `nodes` / `edges` remain for one compatibility release only
 - semantic clustering is computed only on the meme-only semantic subgraph with deterministic Louvain settings, canonical node ordering, and versioned tokenization/labeling inputs
 - graph UI grammar is explicit:
@@ -85,17 +93,50 @@ Generated per experiment under `exports/<experiment_id>/`:
 - raw JSON survives only as a debug tab
 - coordinate modes remain explicit view modes, not evidence claims
 
+## Browser-local workbench surfaces
+
+- the graph tab exposes explicit mode controls for `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, and `COMPARE`
+- the shell keeps a search/filter rail, coordinate-mode selector, selection summary, precision drawer, measurement ledger actions, runtime trace panel, and Data Lab tables visible as first-class workbench surfaces
+- compare mode renders baseline vs modified state from preview responses without committing mutation
+- local layout execution is browser-only:
+  - layouts run through a worker-backed `LayoutRunner`
+  - the layout picker is organized as a 12-family terrain browser spanning force-directed, hierarchical, tree, circular, spectral, multilevel, constraint, orthogonal, planar, geographic, community, and edge-bundling families
+  - every terrain item carries operator-facing explanation copy for what it is and how it is typically used
+  - runnable browser-worker layouts currently include `forceatlas2`, `fruchterman_reingold`, `kamada_kawai`, `linlog`, `sugiyama_layered`, `radial_tree`, `simple_circular`, `circular_degree`, `circular_community`, `radial`, `noverlap`, `fixed_coordinate`, and `community_clusters`
+  - many additional algorithms are exposed as reference-only terrain items so the operator can browse the wider layout landscape without EDEN pretending they execute locally
+  - presets and layout snapshots persist in browser-local storage keyed by experiment identity plus manifest / graph hash
+  - layout, filter, appearance, and table state do not enter the measurement ledger
+- appearance controls can style node / edge color, size, label visibility, and opacity from EDEN attributes such as kind, domain, cluster, evidence label, active-set presence, degree, weight, and regard/reward/risk where present
+- filter controls can constrain text, attribute/range slices, connected components, isolated-node visibility, and ego neighborhoods without mutating graph facts
+- the Data Lab provides node/edge tables, sorting, bulk selection, CSV/JSON export of the current selection, and precision-drawer handoff
+- export interoperability includes `gexf`, `graphml`, node CSV, and edge CSV for the current browser-visible graph slice
+
+## Public browser payload contract
+
+- graph payloads expose layout, appearance, filter, statistics, and export capability metadata so the React shell can stay declarative instead of hard-coding instrument assumptions
+- graph payload layout metadata includes:
+  - `layout_families`
+  - `layout_catalog`
+  - `layout_defaults`
+- payload layout metadata may be partial; the checked-in frontend terrain catalog fills unspecified reference/explanation entries so older static exports still render the full layout landscape truthfully
+- preview responses expose:
+  - `compare_selection`
+  - `preview_graph_patch`
+- `preview_graph_patch` is a browser compare artifact only; it is not a persisted graph fact
+- when live session context exists, the shell bootstrap exposes `session_trace` alongside `preview`, `commit`, and `revert`
+
 ## Measurement-first contract
 
 1. Select nodes or an edge.
 2. Propose an action in the precision drawer.
-3. Preview before/after metric deltas.
+3. Preview before/after metric deltas plus `preview_graph_patch` baseline vs modified state.
 4. Commit only if the change is warranted.
 5. Persist the event with provenance.
-6. Refresh graph, geometry, and measurement ledger views.
+6. Refresh graph, geometry, measurement ledger, and runtime trace views.
 7. Revert explicitly if needed.
 
 Observation does not silently mutate the graph. Mutation is a separate, attributable step.
+Layout, styling, filter presets, table sort state, and coordinate-mode choices remain browser-local view state and are not evidence.
 
 ## Behavioral attractor basin
 
@@ -195,6 +236,7 @@ Live API:
 - `GET /api/experiments/<experiment_id>/sessions`
 - `GET /api/sessions/<session_id>/turns`
 - `GET /api/sessions/<session_id>/active-set`
+- `GET /api/sessions/<session_id>/trace`
 - `GET /api/runtime/status`
 - `GET /api/runtime/model`
 - `GET /api/experiments/<experiment_id>/events` (SSE invalidation stream)

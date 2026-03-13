@@ -2003,6 +2003,23 @@ class ChatScreen(Screen):
                         with VerticalScroll(id="chat_tape", can_focus=True):
                             yield Static(id="chat_exchange_panel")
                         yield Static(id="feedback_loop_panel")
+                        with Vertical(id="inline_feedback_surface"):
+                            with Horizontal(id="inline_feedback_command_row"):
+                                yield Input(placeholder="Verdict code: A / E / R / S", id="inline_feedback_verdict_input")
+                                yield Input(placeholder="Confirm with Y", id="inline_feedback_confirm_input")
+                            yield Static(id="inline_feedback_status_panel")
+                            yield TextArea(
+                                id="inline_feedback_explanation_input",
+                                soft_wrap=True,
+                                show_line_numbers=False,
+                                placeholder="Explain the review decision. A / E / R require explanation.",
+                            )
+                            yield TextArea(
+                                id="inline_feedback_corrected_input",
+                                soft_wrap=True,
+                                show_line_numbers=False,
+                                placeholder="Corrected text for EDIT.",
+                            )
                         yield TextArea(
                             id="composer_input",
                             soft_wrap=True,
@@ -2043,6 +2060,8 @@ class ChatScreen(Screen):
         self.query_one("#thinking_panel", Static).update(self.main_thinking_panel())
         self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
         self.query_one("#feedback_loop_panel", Static).update(self.main_feedback_loop_panel())
+        self._sync_inline_feedback_surface()
+        self.query_one("#inline_feedback_status_panel", Static).update(self.main_inline_feedback_status_panel())
         self.query_one("#composer_hint_panel", Static).update(self.main_composer_hint_panel())
         self.query_one("#runtime_chyron_panel", Static).update(self.main_runtime_chyron_panel())
 
@@ -3338,10 +3357,12 @@ class ChatScreen(Screen):
             self._last_hum_signature = hum_signature
             if latest_feedback:
                 latest = latest_feedback[0]
-                app.ui_state.last_feedback = (
+                latest_summary = (
                     f"Popup review stored {str(latest.get('verdict', 'skip')).upper()} for "
                     f"T{latest.get('turn_index', '?')}."
                 )
+                if " recorded at " not in str(app.ui_state.last_feedback or ""):
+                    app.ui_state.last_feedback = latest_summary
             self._invalidate_transcript_cache()
             self._mark_graph_dirty()
             if self.is_mounted:
@@ -3661,7 +3682,10 @@ class ChatScreen(Screen):
         self.refresh_panels()
 
     def focus_inline_feedback(self) -> None:
-        self.focus_composer()
+        try:
+            self.query_one("#inline_feedback_verdict_input", Input).focus()
+        except Exception:
+            self.focus_composer()
 
     def _feedback_popup_command(self) -> str:
         app = self.app
@@ -3715,6 +3739,7 @@ class ChatScreen(Screen):
         )
         self._write_forensic(f"[INFO] Feedback popup :: {detail}")
         self.refresh_panels()
+        self.call_after_refresh(self.focus_inline_feedback)
 
     async def handle_deck(self) -> None:
         await self.app.push_screen(DeckModal(self))

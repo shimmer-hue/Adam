@@ -162,6 +162,9 @@ class _ObservatoryHandler(http.server.SimpleHTTPRequestHandler):
         if action_name == "active-set":
             self._send_json(self._service.session_active_set(session_id=session_id))
             return
+        if action_name == "trace":
+            self._send_json(self._service.session_trace(session_id=session_id))
+            return
         self._send_json({"error": f"Unknown action '{action_name}'."}, status=404)
 
     def _handle_api_get(self, parsed: urllib.parse.ParseResult) -> None:
