@@ -609,20 +609,28 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
                 yield Static(id="atlas_status_panel")
             with Vertical(classes="atlas_column", id="atlas_main_column"):
                 yield DataTable(zebra_stripes=True, cursor_type="row", id="atlas_records_table")
-                yield Static(id="atlas_preview_panel")
-                with Vertical(classes="field_stack", id="atlas_folder_field"):
-                    yield Static("Folder", classes="field_label", id="atlas_folder_label")
-                    yield Input(placeholder="Folder path, e.g. projects/atlas", id="atlas_folder_input")
-                with Vertical(classes="field_stack", id="atlas_tags_field"):
-                    yield Static("Tags", classes="field_label", id="atlas_tags_label")
-                    yield Input(placeholder="Tags, comma-separated", id="atlas_tags_input")
-                with Horizontal(id="atlas_taxonomy_actions"):
-                    yield Button("Save Taxonomy", id="atlas_save_btn", variant="primary")
-                    yield Button("Open Transcript", id="atlas_open_btn")
-                with Horizontal(id="atlas_session_actions"):
-                    yield Button("Resume Session", id="atlas_resume_btn")
-                    yield Button("Refresh", id="atlas_refresh_btn")
-                    yield Button("Close", id="atlas_close_btn")
+                with Horizontal(id="atlas_detail_row"):
+                    with Vertical(classes="atlas_detail_column", id="atlas_metadata_column"):
+                        with Vertical(classes="field_stack", id="atlas_folder_field"):
+                            yield Static("Folder", classes="field_label", id="atlas_folder_label")
+                            yield Input(placeholder="Folder path, e.g. projects/atlas", id="atlas_folder_input")
+                        with Vertical(classes="field_stack", id="atlas_tags_field"):
+                            yield Static("Tags", classes="field_label", id="atlas_tags_label")
+                            yield TextArea("", id="atlas_tags_input")
+                        with Horizontal(id="atlas_taxonomy_actions"):
+                            yield Button("Save Taxonomy", id="atlas_save_btn", variant="primary")
+                            yield Button("Open Transcript", id="atlas_open_btn")
+                    with Vertical(classes="atlas_detail_column", id="atlas_preview_column"):
+                        with VerticalScroll(id="atlas_preview_scroller"):
+                            yield Static(id="atlas_preview_panel")
+                        with Horizontal(id="atlas_observatory_actions"):
+                            yield Button("Open Observatory", id="atlas_observatory_btn")
+                            yield Button("Turns API", id="atlas_turns_api_btn")
+                            yield Button("Active Set API", id="atlas_active_set_api_btn")
+                        with Horizontal(id="atlas_session_actions"):
+                            yield Button("Resume Session", id="atlas_resume_btn")
+                            yield Button("Refresh", id="atlas_refresh_btn")
+                            yield Button("Close", id="atlas_close_btn")
 
     def on_mount(self) -> None:
         _sync_node_look(self)
@@ -711,13 +719,13 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
     def _sync_editor_fields(self) -> None:
         record = self._selected_record()
         folder_input = self.query_one("#atlas_folder_input", Input)
-        tags_input = self.query_one("#atlas_tags_input", Input)
+        tags_input = self.query_one("#atlas_tags_input", TextArea)
         if record is None:
             folder_input.value = ""
-            tags_input.value = ""
+            tags_input.load_text("")
             return
         folder_input.value = record["folder"]
-        tags_input.value = ", ".join(record["tags"])
+        tags_input.load_text(", ".join(record["tags"]))
 
     def _counts_for_lens(self, lens: str) -> list[tuple[str, int]]:
         counts: dict[str, int] = {}
@@ -760,7 +768,7 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
             self._selected_session_id = None
             self._selected_preview = None
             self.query_one("#atlas_folder_input", Input).value = ""
-            self.query_one("#atlas_tags_input", Input).value = ""
+            self.query_one("#atlas_tags_input", TextArea).load_text("")
             self._refresh_panels()
             return
         selected_ids = {record["id"] for record in filtered}
@@ -809,11 +817,39 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
         )
         return Panel(body, title="Atlas Status", border_style=ICE)
 
+    def _observatory_context(self) -> dict[str, str] | None:
+        record = self._selected_record()
+        if record is None:
+            return None
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        experiment_id = str(record.get("experiment_id") or "").strip()
+        session_id = str(record["id"])
+        export_dir = app.runtime.export_dir_for_experiment(experiment_id) if experiment_id else None
+        export_path = str((export_dir / "observatory_index.html").resolve()) if export_dir is not None else ""
+        status = app.ui_state.observatory_status or app.runtime.observatory_status()
+        if not status or not experiment_id:
+            return {
+                "state": "stopped",
+                "export_path": export_path,
+            }
+        base_url = str(status["url"])
+        return {
+            "state": "ready",
+            "export_path": export_path,
+            "gui_url": _observatory_target_url(app.runtime, status, experiment_id),
+            "overview_url": f"{base_url}api/experiments/{experiment_id}/overview?session_id={session_id}",
+            "turns_url": f"{base_url}api/sessions/{session_id}/turns",
+            "active_set_url": f"{base_url}api/sessions/{session_id}/active-set",
+        }
+
     def _preview_panel(self) -> Panel:
         record = self._selected_record()
         preview = self._selected_preview
         if record is None:
             return Panel(Text("No saved conversations yet.", style=MUTED), title="Session Preview", border_style=AMBER)
+        observatory = self._observatory_context() or {}
+        profile_request = (preview or {}).get("profile_request") or {}
         projection = " / ".join(["all_texts", record["folder"], *[f"#{tag}" for tag in record["tags"]]])
         recent_turn_lines = []
         feedback_lines = []
@@ -827,13 +863,33 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
             ]
         else:
             recent_turn_lines = ["Loading preview surface..."]
+        observatory_lines = [
+            f"state={observatory.get('state', 'stopped')}",
+            f"export={observatory.get('export_path') or 'n/a'}",
+        ]
+        if observatory.get("state") == "ready":
+            observatory_lines.extend(
+                [
+                    f"gui={observatory.get('gui_url', 'n/a')}",
+                    f"overview_api={observatory.get('overview_url', 'n/a')}",
+                    f"turns_api={observatory.get('turns_url', 'n/a')}",
+                    f"active_set_api={observatory.get('active_set_url', 'n/a')}",
+                ]
+            )
+        else:
+            observatory_lines.append("Open Session Observatory to start the browser surface and refresh a session-scoped export.")
         body = Text.from_markup(
             f"[bold {AMBER}]Session[/] {record['title']}\n"
-            f"experiment={record['experiment_name']} mode={record.get('experiment_mode', 'blank')}\n"
-            f"requested={record.get('requested_mode', 'manual')} budget={record.get('budget_mode', 'balanced')}\n"
+            f"session_id={record['id']}\n"
+            f"experiment={record['experiment_name']} ({record.get('experiment_id', 'n/a')}) mode={record.get('experiment_mode', 'blank')}\n"
+            f"requested={record.get('requested_mode', 'manual')} budget={record.get('budget_mode', 'balanced')} low_motion={bool(profile_request.get('low_motion', False))} debug={bool(profile_request.get('debug', True))}\n"
             f"turns={record.get('turn_count', 0)} feedback={record.get('feedback_count', 0)}\n"
+            f"created={record.get('created_at', 'n/a')}\n"
             f"updated={record.get('updated_at', 'n/a')}\n"
-            f"path={projection or 'all_texts'}\n\n"
+            f"path={projection or 'all_texts'}\n"
+            f"tags={record.get('tag_display', 'untagged')}\n"
+            f"transcript_ready={bool(preview and preview.get('conversation_log_exists'))}\n"
+            f"transcript_path={(preview or {}).get('conversation_log_path') or record.get('conversation_log_path', 'n/a')}\n\n"
             f"[bold {AMBER}]Latest Brian[/] {record['last_user_excerpt']}\n"
             f"[bold {AMBER}]Latest Adam[/] {record['last_response_excerpt']}\n\n"
             f"[bold {AMBER}]Recent Turns[/]\n"
@@ -843,6 +899,8 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
                 if feedback_lines
                 else ""
             )
+            + "\n\n[bold #ffbf66]Browser Observatory[/]\n"
+            + "\n".join(observatory_lines)
         )
         return Panel(body, title="Session Preview", border_style=AMBER)
 
@@ -884,7 +942,7 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
         assert isinstance(app, EdenTuiApp)
         record = self._selected_record()
         folder = self.query_one("#atlas_folder_input", Input).value
-        tags = self.query_one("#atlas_tags_input", Input).value
+        tags = self.query_one("#atlas_tags_input", TextArea).text
         updated = await asyncio.to_thread(
             partial(app.runtime.update_conversation_archive, self._selected_session_id, folder=folder, tags=tags)
         )
@@ -896,6 +954,43 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
         )
         self._records = await asyncio.to_thread(app.runtime.conversation_archive_records)
         self._refresh_table()
+
+    async def _open_observatory_target_worker(self, target: str) -> None:
+        record = self._selected_record()
+        if record is None:
+            self._status_message = "No session selected."
+            self._refresh_panels()
+            return
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        experiment_id = str(record.get("experiment_id") or "").strip()
+        session_id = str(record["id"])
+        if not experiment_id:
+            self._status_message = "The selected session does not have an experiment anchor."
+            self._refresh_panels()
+            return
+        status = await asyncio.to_thread(partial(app.runtime.start_observatory, reuse_existing=True))
+        app.ui_state.observatory_status = status
+        if target == "gui":
+            await asyncio.to_thread(partial(app.runtime.export_observability, experiment_id=experiment_id, session_id=session_id))
+            target_url = _observatory_target_url(app.runtime, status, experiment_id)
+            label = "session observatory"
+        elif target == "turns":
+            target_url = f"{status['url']}api/sessions/{session_id}/turns"
+            label = "session turns API"
+        elif target == "active_set":
+            target_url = f"{status['url']}api/sessions/{session_id}/active-set"
+            label = "session active-set API"
+        else:
+            self._status_message = f"Unknown observatory target: {target}"
+            self._refresh_panels()
+            return
+        launch = await asyncio.to_thread(partial(open_browser_url, target_url))
+        if launch.ok:
+            self._status_message = f"Opened {label} for {record['title']}."
+        else:
+            self._status_message = f"{label} ready for {record['title']}, but browser launch failed: {launch.detail}"
+        self._refresh_panels()
 
     @on(Button.Pressed, "#atlas_open_btn")
     def handle_open_transcript(self) -> None:
@@ -914,6 +1009,18 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
         self._records = await asyncio.to_thread(app.runtime.conversation_archive_records)
         self._selected_preview = await asyncio.to_thread(partial(app.runtime.conversation_archive_preview, self._selected_session_id))
         self._refresh_panels()
+
+    @on(Button.Pressed, "#atlas_observatory_btn")
+    def handle_open_session_observatory(self) -> None:
+        self.run_worker(self._open_observatory_target_worker("gui"), exclusive=True, group="atlas_observatory")
+
+    @on(Button.Pressed, "#atlas_turns_api_btn")
+    def handle_open_session_turns_api(self) -> None:
+        self.run_worker(self._open_observatory_target_worker("turns"), exclusive=True, group="atlas_observatory")
+
+    @on(Button.Pressed, "#atlas_active_set_api_btn")
+    def handle_open_session_active_set_api(self) -> None:
+        self.run_worker(self._open_observatory_target_worker("active_set"), exclusive=True, group="atlas_observatory")
 
     @on(Button.Pressed, "#atlas_resume_btn")
     def handle_resume_session(self) -> None:
@@ -4130,6 +4237,7 @@ class EdenTuiApp(App):
     #session_title_row Select,
     #session_action_row Button,
     #atlas_taxonomy_actions Button,
+    #atlas_observatory_actions Button,
     #atlas_session_actions Button {{
         margin-bottom: 0;
     }}
@@ -4139,6 +4247,7 @@ class EdenTuiApp(App):
     #session_title_row Select,
     #session_action_row Button:last-child,
     #atlas_taxonomy_actions Button:last-child,
+    #atlas_observatory_actions Button:last-child,
     #atlas_session_actions Button:last-child {{
         margin-right: 0;
     }}
@@ -4184,6 +4293,36 @@ class EdenTuiApp(App):
         width: 1fr;
         min-width: 70;
     }}
+    #atlas_detail_row {{
+        height: 22;
+        min-height: 20;
+    }}
+    .atlas_detail_column {{
+        padding: 0 1;
+        height: 1fr;
+    }}
+    #atlas_metadata_column {{
+        width: 34;
+        min-width: 32;
+        max-width: 38;
+    }}
+    #atlas_preview_column {{
+        width: 1fr;
+        min-width: 36;
+    }}
+    #atlas_preview_scroller {{
+        height: 1fr;
+        min-height: 14;
+        margin-bottom: 0;
+        scrollbar-gutter: stable;
+        scrollbar-size-vertical: 2;
+        scrollbar-color: {AMBER};
+        scrollbar-color-hover: {ICE};
+        scrollbar-color-active: {TEXT};
+        scrollbar-background: #181015;
+        scrollbar-background-hover: #20161c;
+        scrollbar-background-active: #281d24;
+    }}
     #deck_summary, #review_summary, #session_config_header, #session_config_summary, #ingest_summary, #atlas_summary {{
         margin: 1 2;
     }}
@@ -4201,17 +4340,46 @@ class EdenTuiApp(App):
         color: {TEXT};
     }}
     #atlas_preview_panel {{
-        min-height: 12;
+        height: auto;
+        min-height: 0;
+        margin-bottom: 0;
     }}
     #atlas_taxonomy_panel, #atlas_status_panel {{
         height: 1fr;
         min-height: 8;
     }}
+    #atlas_folder_field {{
+        height: 5;
+    }}
+    #atlas_tags_field {{
+        height: 11;
+    }}
+    #atlas_tags_input {{
+        height: 1fr;
+        min-height: 7;
+        background: #11070d;
+        border: tall {AMBER};
+        color: {TEXT};
+        scrollbar-gutter: stable;
+        scrollbar-size-vertical: 2;
+        scrollbar-color: {AMBER};
+        scrollbar-color-hover: {ICE};
+        scrollbar-color-active: {TEXT};
+        scrollbar-background: #181015;
+        scrollbar-background-hover: #20161c;
+        scrollbar-background-active: #281d24;
+    }}
+    #atlas_tags_input:focus {{
+        border: tall {ICE};
+        background: #14090d;
+    }}
     #atlas_taxonomy_actions,
+    #atlas_observatory_actions,
     #atlas_session_actions {{
         height: 3;
     }}
     #atlas_taxonomy_actions Button,
+    #atlas_observatory_actions Button,
     #atlas_session_actions Button {{
         width: 1fr;
     }}
@@ -4276,11 +4444,28 @@ class EdenTuiApp(App):
     .look-typewriter-light #review_explanation_input,
     .look-typewriter-light #review_corrected_input,
     .look-typewriter-light #ingest_prompt_input,
+    .look-typewriter-light TextArea,
     .look-typewriter-light Input,
     .look-typewriter-light Select {{
         background: {TYPEWRITER_LIGHT.marble_light};
         border: tall {TYPEWRITER_LIGHT.amber};
         color: {TYPEWRITER_LIGHT.text};
+    }}
+    .look-typewriter-light #atlas_tags_input {{
+        scrollbar-color: {TYPEWRITER_LIGHT.amber};
+        scrollbar-color-hover: {TYPEWRITER_LIGHT.ice};
+        scrollbar-color-active: {TYPEWRITER_LIGHT.text};
+        scrollbar-background: #e8dece;
+        scrollbar-background-hover: #dfd3c0;
+        scrollbar-background-active: #d5c6b1;
+    }}
+    .look-typewriter-light #atlas_preview_scroller {{
+        scrollbar-color: {TYPEWRITER_LIGHT.amber};
+        scrollbar-color-hover: {TYPEWRITER_LIGHT.ice};
+        scrollbar-color-active: {TYPEWRITER_LIGHT.text};
+        scrollbar-background: #e8dece;
+        scrollbar-background-hover: #dfd3c0;
+        scrollbar-background-active: #d5c6b1;
     }}
     .look-typewriter-light .field_label {{
         color: {TYPEWRITER_LIGHT.muted};

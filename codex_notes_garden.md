@@ -1895,3 +1895,115 @@ Remaining uncertainties:
 Working tree remains dirty with pre-existing unrelated edits outside this refactor scope.
 Next shortest proof path:
 Manual visual pass in the live TUI to confirm spacing and panel proportions on the target terminal size using the provided screenshot baseline.
+
+## [2026-03-12T17:58:21-04:00] PRE-FLIGHT
+Operator task:
+Rearrange the Conversation Atlas to match the new two-column mockup: session table on the upper right, folder/tags editor on the lower-left of the right work area, richer session preview on the lower-right, and session-scoped browser observatory access.
+Task checksum:
+atlas-layout-reflow-v2
+Repo situation:
+Working tree remains dirty from prior and unrelated edits; preserve existing modifications. Relevant implementation remains centered in eden/tui/app.py with supporting docs/tests in docs/TUI_SPEC.md and tests/test_tui_smoke.py.
+Relevant spec surfaces read:
+AGENTS.md; docs/TUI_SPEC.md.
+Natural-language contracts in force:
+Conversation Atlas remains a relational transcript library over persisted session metadata; layout and operator ergonomics may change, but archive semantics, transcript generation, graph mutation behavior, and schema must not.
+Files/modules likely in scope:
+eden/tui/app.py; docs/TUI_SPEC.md; tests/test_tui_smoke.py; codex_notes_garden.md.
+Status register:
+- Implemented:
+Conversation Atlas search/filter/save/open/resume/refresh flow and session-scoped observatory export/runtime support already exist in code.
+- Instrumented:
+TUI smoke coverage already proves atlas selection, metadata save, transcript open, refresh, resume, and observatory launch from chat.
+- Conceptual:
+Nested lower Atlas split with square-ish tags editor and richer session preview/observatory affordances.
+- Unknown:
+Exact Textual sizing needed for the lower split to visually match the mockup without starving the preview or records table.
+Risks / invariants:
+Do not change update_conversation_archive semantics, transcript path semantics, or observatory artifact naming. Session preview may expose more factual fields and observatory URLs, but must only surface data grounded in current runtime/export capabilities.
+Evidence plan:
+Patch Atlas compose/CSS/preview/actions, update the TUI spec and smoke tests for the new structure and observatory controls, then run ./.venv/bin/pytest -q.
+Shortest proof path:
+Implement the right-column lower split and observatory buttons in eden/tui/app.py, prove the new structure and actions in tests/test_tui_smoke.py, update docs/TUI_SPEC.md, then run the full pytest suite and append POST-FLIGHT with exact evidence.
+
+## [2026-03-12T18:03:40-04:00] POST-FLIGHT
+Files changed:
+eden/tui/app.py; tests/test_tui_smoke.py; docs/TUI_SPEC.md; codex_notes_garden.md.
+Specs changed:
+docs/TUI_SPEC.md.
+Natural-language contracts added/revised/preserved:
+Preserved archive metadata, transcript, observatory artifact, and graph semantics. Revised the Atlas layout contract to a top table plus lower split, with richer session preview and honest session-scoped browser observatory affordances.
+Behavior implemented or modified:
+Conversation Atlas now renders a two-column shell where the right work column contains the session table above a split detail row; the detail row places Folder + larger Tags editor + taxonomy actions on the left and Session Preview + observatory/session actions on the right. Session preview now exposes session id, experiment id, profile flags, transcript path/state, recent turns, recent feedback, and observatory export/live API references. Added buttons to open the session-scoped observatory GUI export, session turns API, and session active-set API for the selected conversation.
+Evidence produced (tests / traces / commands / exports):
+./.venv/bin/python -m py_compile eden/tui/app.py tests/test_tui_smoke.py; ./.venv/bin/pytest -q tests/test_tui_smoke.py -> 9 passed in 27.60s; ./.venv/bin/pytest -q -> 53 passed in 33.99s.
+Status register changes:
+- Implemented:
+Atlas nested lower split, square-ish tags editor, richer preview content, and session observatory/open-API buttons, proved by passing smoke and full-suite runs.
+- Instrumented:
+Smoke coverage now asserts the new Atlas subtree shape and observatory button behavior.
+- Conceptual:
+None added.
+- Unknown:
+Visual parity against the operator-provided screenshot is still unproved because this turn did not include a live terminal screenshot comparison.
+Truth-table / limitations updates:
+No updates required; behavior changed within the existing Atlas capability surface rather than adding a new runtime capability.
+Remaining uncertainties:
+The worktree still contains pre-existing unrelated edits outside this Atlas task. Exact screenshot-level spacing/proportion match remains visually unverified.
+Next shortest proof path:
+Launch the TUI, open Conversation Atlas, and compare the lower split proportions plus preview density against the provided mockup at the target terminal size.
+
+## [2026-03-12T18:37:14-04:00] PRE-FLIGHT
+Operator task:
+Restore visible Atlas action buttons, specifically `Resume Session` and `Refresh`, which are being pushed out of the visible lower-right work area by the current preview sizing.
+Task checksum:
+atlas-action-visibility-v1
+Repo situation:
+Working tree remains dirty from prior task work and unrelated edits; preserve those changes. Current Atlas implementation already contains the action widgets in eden/tui/app.py, so the expected fix is layout/CSS plus any minimal structure needed for visibility.
+Relevant spec surfaces read:
+AGENTS.md; docs/TUI_SPEC.md.
+Natural-language contracts in force:
+Conversation Atlas stays a two-column relational transcript surface with visible direct actions in the work column. This turn must not change archive/update/resume semantics; it must restore the promised button visibility.
+Files/modules likely in scope:
+eden/tui/app.py; docs/TUI_SPEC.md; tests/test_tui_smoke.py; codex_notes_garden.md.
+Status register:
+- Implemented:
+Atlas action handlers for `Resume Session`, `Refresh`, and `Close` already exist and are covered by tests.
+- Instrumented:
+Smoke tests prove the buttons exist in the widget tree and their handlers work when reachable.
+- Conceptual:
+Scrollable/constrained lower-right preview region that guarantees action rows remain visible.
+- Unknown:
+Whether a pure CSS height constraint is sufficient, or whether the preview needs its own scroll container to prevent clipping on the target terminal geometry.
+Risks / invariants:
+Do not move or rename the action semantics. Keep preview richness, but not at the cost of hiding required controls.
+Evidence plan:
+Patch the Atlas preview region so the lower-right buttons remain visible, update the TUI spec/test expectations if structure changes, then run targeted and full pytest.
+Shortest proof path:
+Constrain the lower detail row and make the preview independently scrollable if needed, prove the action rows still exist and the suite passes, then append POST-FLIGHT.
+
+## [2026-03-12T18:39:12-04:00] POST-FLIGHT
+Files changed:
+eden/tui/app.py; tests/test_tui_smoke.py; docs/TUI_SPEC.md; codex_notes_garden.md.
+Specs changed:
+docs/TUI_SPEC.md.
+Natural-language contracts added/revised/preserved:
+Preserved Atlas action semantics and two-column workflow. Revised the layout contract so the preview pane can scroll independently and no longer obscures the required action rows.
+Behavior implemented or modified:
+Wrapped the lower-right preview surface in its own scroll container and constrained the lower detail row height so `Resume Session`, `Refresh`, `Close`, and the observatory buttons remain visible beneath the preview content.
+Evidence produced (tests / traces / commands / exports):
+./.venv/bin/python -m py_compile eden/tui/app.py tests/test_tui_smoke.py; ./.venv/bin/pytest -q tests/test_tui_smoke.py -> 9 passed in 27.63s; ./.venv/bin/pytest -q -> 53 passed in 33.89s.
+Status register changes:
+- Implemented:
+Atlas preview scrolling/action-row visibility fix, proved by compile plus passing targeted/full test runs.
+- Instrumented:
+Smoke coverage now asserts the preview column structure with the dedicated preview scroller.
+- Conceptual:
+None added.
+- Unknown:
+Exact screenshot-level spacing remains visually unverified in a live terminal pass, though the action-row visibility defect is addressed structurally.
+Truth-table / limitations updates:
+No updates required; this was a layout correction within an existing capability.
+Remaining uncertainties:
+Working tree remains dirty from unrelated prior edits; live screenshot comparison still not performed in this turn.
+Next shortest proof path:
+Open the Atlas in the live TUI and confirm the lower-right buttons are visible at the target window size shown in the screenshot.

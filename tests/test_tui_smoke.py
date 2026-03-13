@@ -210,12 +210,19 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
     second_session = runtime.start_session(experiment["id"], title="Atlas Two")
     runtime.chat(session_id=second_session["id"], user_text="Describe conversation atlas two.")
     opened_urls: list[str] = []
+    export_calls: list[tuple[str, str | None]] = []
+    original_export = runtime.export_observability
 
     def capture_open(url: str) -> BrowserOpenResult:
         opened_urls.append(url)
         return BrowserOpenResult(ok=True, method="mock")
 
+    def capture_export(*, experiment_id: str, session_id: str | None = None):
+        export_calls.append((experiment_id, session_id))
+        return original_export(experiment_id=experiment_id, session_id=session_id)
+
     monkeypatch.setattr("eden.tui.app.open_browser_url", capture_open)
+    monkeypatch.setattr(runtime, "export_observability", capture_export)
 
     app = EdenTuiApp(runtime)
     async with app.run_test() as pilot:
@@ -226,14 +233,13 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         assert isinstance(app.screen, ConversationAtlasModal)
         modal = app.screen
         center_ids = [child.id for child in modal.query_one("#atlas_main_column").children if child.id]
-        assert center_ids == [
-            "atlas_records_table",
-            "atlas_preview_panel",
-            "atlas_folder_field",
-            "atlas_tags_field",
-            "atlas_taxonomy_actions",
-            "atlas_session_actions",
-        ]
+        assert center_ids == ["atlas_records_table", "atlas_detail_row"]
+        detail_ids = [child.id for child in modal.query_one("#atlas_detail_row").children if child.id]
+        assert detail_ids == ["atlas_metadata_column", "atlas_preview_column"]
+        metadata_ids = [child.id for child in modal.query_one("#atlas_metadata_column").children if child.id]
+        assert metadata_ids == ["atlas_folder_field", "atlas_tags_field", "atlas_taxonomy_actions"]
+        preview_ids = [child.id for child in modal.query_one("#atlas_preview_column").children if child.id]
+        assert preview_ids == ["atlas_preview_scroller", "atlas_observatory_actions", "atlas_session_actions"]
         assert modal.query_one_optional("#atlas_projection_panel") is None
         assert modal.query_one_optional("#atlas_editor_hint") is None
         search = modal.query_one("#atlas_search_input", Input)
@@ -243,8 +249,12 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         assert modal._selected_record()["id"] == first_session["id"]
         assert modal._selected_preview is not None
         assert modal._selected_preview["session_title"] == "Atlas One"
+        preview_panel = modal.query_one("#atlas_preview_panel", Static).render()
+        preview_text = preview_panel._renderable.renderable.plain
+        assert "Browser Observatory" in preview_text
+        assert "transcript_path=" in preview_text
         modal.query_one("#atlas_folder_input", Input).value = "library/notes"
-        modal.query_one("#atlas_tags_input", Input).value = "research, archive, research"
+        modal.query_one("#atlas_tags_input", TextArea).load_text("research, archive, research")
         await modal._save_metadata_worker()
         await pilot.pause(0.3)
         record = next(item for item in runtime.conversation_archive_records() if item["id"] == first_session["id"])
@@ -257,6 +267,16 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         assert refreshed_record["conversation_log_exists"] is True
         transcript_path = Path(refreshed_record["conversation_log_path"])
         assert transcript_path.exists()
+        modal.query_one("#atlas_observatory_btn", Button).press()
+        await pilot.pause(0.8)
+        assert export_calls == [(experiment["id"], first_session["id"])]
+        assert any(url.endswith(f"{experiment['id']}/observatory_index.html") for url in opened_urls)
+        modal.query_one("#atlas_turns_api_btn", Button).press()
+        await pilot.pause(0.3)
+        assert opened_urls[-1].endswith(f"api/sessions/{first_session['id']}/turns")
+        modal.query_one("#atlas_active_set_api_btn", Button).press()
+        await pilot.pause(0.3)
+        assert opened_urls[-1].endswith(f"api/sessions/{first_session['id']}/active-set")
         modal.query_one("#atlas_refresh_btn", Button).press()
         await pilot.pause(0.3)
         assert len(modal._filtered_records) == 1
@@ -266,6 +286,8 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         assert isinstance(app.screen, ChatScreen)
         assert app.ui_state.session_id == first_session["id"]
         assert app.ui_state.session_title == "Atlas One"
+
+    runtime.stop_observatory()
 
 
 @pytest.mark.asyncio

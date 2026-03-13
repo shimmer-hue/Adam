@@ -115,10 +115,16 @@ Secondary surfaces:
   - relational lenses for folders, tags, experiments, and experiment modes
   - two-column layout:
     - left filter rail for search, sort, lens, facet filter, taxonomy projections, and atlas status
-    - main work column for session list, selected-session preview, folder/tags editor, taxonomy actions, and session actions
+    - right work column with the session list at the top and a lower split:
+      - metadata/editor pane on the lower left for `Folder`, a larger square-ish `Tags` editor, and taxonomy actions
+      - selected-session preview pane on the lower right with richer session metadata, transcript path/state, recent turns, recent feedback, and session-scoped observatory references
+      - the preview subpane scrolls independently so `Resume Session`, `Refresh`, and companion observatory controls remain visible at the bottom of the work column
   - search + facet filter + sort over saved sessions
-  - selected-session preview with recent turns and feedback excerpts sits directly under the session list
   - metadata editor keeps the virtual `folder` path plus multi-value `tags`, but the instructional editor panel is removed
+  - session preview exposes live/session-specific observatory affordances grounded in the existing browser observatory surface:
+    - `Open Observatory` refreshes a session-scoped export and opens the GUI surface
+    - `Turns API` opens the live session transcript endpoint
+    - `Active Set API` opens the live session active-set endpoint
   - direct `Open Transcript`, `Save Taxonomy`, `Resume Session`, `Refresh`, and `Close` actions remain in the work column
 
 ## Design contract
