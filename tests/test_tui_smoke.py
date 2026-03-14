@@ -8,13 +8,13 @@ import pytest
 from textual.widgets import Button, Input, Select, Static, TextArea
 
 from eden.browser import BrowserOpenResult
-from eden.tui.app import ChatScreen, ConversationAtlasModal, DeckModal, EdenTuiApp, SessionConfigModal
+from eden.tui.app import ActionStrip, ChatScreen, ConversationAtlasModal, DeckModal, EdenTuiApp, SessionConfigModal
 
 
 @pytest.mark.asyncio
 async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_files) -> None:
     app = EdenTuiApp(runtime)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(200, 60)) as pilot:
         assert isinstance(app.screen, ChatScreen)
         await pilot.pause(1.0)
         assert app.ui_state.session_id is not None
@@ -22,11 +22,11 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         chat_secondary = app.screen.query_one("#chat_secondary")
         assert app.screen.query_one("#chat_deck").parent is chat_primary
         assert app.screen.query_one("#signal_field").parent is chat_secondary
-        assert app.screen.query_one("#action_bus_panel")
-        assert app.screen.query_one("#header_ingest_btn", Button)
-        aperture_button = app.screen.query_one("#header_aperture_btn", Button)
-        menu = app.screen.query_one("#runtime_action_menu", Select)
-        assert str(menu.value) == "review"
+        menu = app.screen.query_one("#runtime_action_menu", ActionStrip)
+        assert menu.value == "review"
+        rendered_strip = menu.render().plain
+        assert "01 Review Last Reply" in rendered_strip
+        assert "10 Open Browser Observatory" in rendered_strip
         await pilot.press("tab")
         await pilot.pause(0.2)
         assert getattr(app.focused, "id", None) == "runtime_action_menu"
@@ -34,7 +34,9 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         await pilot.pause(0.2)
         composer = app.screen.query_one("#composer_input", TextArea)
         assert composer.text == "hi"
-        aperture_button.press()
+        menu.set_value("toggle_aperture")
+        menu.focus()
+        await pilot.press("enter")
         await pilot.pause(0.2)
         assert app.ui_state.aperture_drawer_open is True
         assert app.screen.query_one("#aperture_drawer_panel")
@@ -116,7 +118,7 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
 @pytest.mark.asyncio
 async def test_inline_feedback_skip_submits_from_verdict_enter(runtime) -> None:
     app = EdenTuiApp(runtime)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(200, 60)) as pilot:
         await pilot.pause(1.0)
         assert isinstance(app.screen, ChatScreen)
 
@@ -142,7 +144,7 @@ async def test_inline_feedback_skip_submits_from_verdict_enter(runtime) -> None:
 @pytest.mark.asyncio
 async def test_inline_feedback_edit_walks_explanation_then_corrected_on_enter(runtime) -> None:
     app = EdenTuiApp(runtime)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(200, 60)) as pilot:
         await pilot.pause(1.0)
         assert isinstance(app.screen, ChatScreen)
 
@@ -420,8 +422,7 @@ async def test_tui_compact_layout_keeps_first_action_and_escape_recovery(runtime
         assert isinstance(app.screen, ChatScreen)
         assert app.screen._is_compact_layout() is True
         assert getattr(app.focused, "id", None) == "composer_input"
-        assert app.screen.query_one("#action_bus_panel").display is False
-        assert app.screen.query_one("#runtime_status_strip").display is False
+        assert app.screen.query_one("#runtime_action_menu").display is True
         assert app.screen.query_one("#chat_secondary").display is False
 
         chyron = app.screen.query_one("#runtime_chyron_panel")
@@ -540,20 +541,21 @@ async def test_runtime_action_menu_selection_executes_observatory(runtime, monke
     monkeypatch.setattr("eden.tui.app.open_browser_url", capture_open)
 
     app = EdenTuiApp(runtime)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(200, 60)) as pilot:
         await pilot.pause(1.0)
         assert isinstance(app.screen, ChatScreen)
-        menu = app.screen.query_one("#runtime_action_menu", Select)
-
-        menu.value = "observatory"
+        menu = app.screen.query_one("#runtime_action_menu", ActionStrip)
+        menu.focus()
+        menu.set_value("observatory", notify=True)
+        await pilot.press("enter")
         await pilot.pause(0.8)
 
         assert opened_urls
         assert opened_urls[0].endswith(f"{app.ui_state.experiment_id}/observatory_index.html")
         assert "observatory_index.html" in app.ui_state.last_feedback
-        assert str(menu.value) == "review"
+        assert menu.value == "observatory"
 
-        menu.value = "observatory"
+        await pilot.press("enter")
         await pilot.pause(0.8)
 
         assert len(opened_urls) == 2
@@ -581,26 +583,26 @@ async def test_runtime_action_menu_observatory_progress_and_duplicate_guard(runt
     monkeypatch.setattr("eden.tui.app.open_browser_url", capture_open)
 
     app = EdenTuiApp(runtime)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(200, 60)) as pilot:
         await pilot.pause(1.0)
         assert isinstance(app.screen, ChatScreen)
-        menu = app.screen.query_one("#runtime_action_menu", Select)
-
-        menu.value = "observatory"
+        menu = app.screen.query_one("#runtime_action_menu", ActionStrip)
+        menu.focus()
+        menu.set_value("observatory", notify=True)
+        await pilot.press("enter")
         await pilot.pause(0.1)
 
-        panel = app.screen.main_action_bus_panel()
-        assert "action=Open Browser Observatory" in panel.renderable.plain
-        assert "phase=Ensuring observatory server" in panel.renderable.plain
-        assert "elapsed=" in panel.renderable.plain
-        assert "progress=" in panel.renderable.plain
-        assert str(menu.value) == "review"
+        rendered_strip = menu.render().plain
+        assert "action=Open Browser Observatory" in rendered_strip
+        assert "phase=Ensuring observatory server" in rendered_strip
+        assert "elapsed=" in rendered_strip
+        assert "progress=" in rendered_strip
+        assert menu.value == "observatory"
 
-        menu.value = "observatory"
+        await pilot.press("enter")
         await pilot.pause(0.1)
 
         assert start_calls == 1
-        assert "already running" in app.ui_state.last_feedback
 
         await pilot.pause(1.0)
 

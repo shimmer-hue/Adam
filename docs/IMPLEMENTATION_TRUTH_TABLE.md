@@ -9,7 +9,7 @@
 | `python -m eden` default entry path | Implemented | no subcommand required for the normal TUI path; flags remain optional overrides |
 | Repo-root `python3 app.py` launcher | Implemented | root launcher re-execs the repo-local `.venv` interpreter and then dispatches into `eden.app:main` |
 | Local repo-managed MLX model storage | Implemented | default MLX model target is `models/qwen3.5-35b-a3b-mlx-mxfp4` under repo root |
-| Local MLX shard-readiness tracking | Implemented | live contract surfaces distinguish metadata-only, partial, and ready model states |
+| Local MLX shard-readiness tracking | Implemented | the top action shelf status lines distinguish metadata-only, partial, and ready model states |
 | Repo-local Qwen 3.5 MLX backend | Implemented | repo-local 4-shard model completed and real MLX generation succeeded |
 | Multiline composer | Implemented | `TextArea`-based; covered by TUI smoke test |
 | Composer focus recovery | Implemented | `Esc` returns focus to the composer, compact aperture view also collapses back to dialogue, and printable keys outside editable widgets are routed there automatically |
@@ -20,8 +20,8 @@
 | Operator-facing answer sanitization | Implemented | membrane now strips `Answer` / `Basis` / `Next Step` scaffolding and keeps model reasoning separate from Adam's visible reply |
 | Aperture pull-down drawer | Implemented | `F8` opens a full-width readable active-set scan on wide terminals and a compact aperture-only swap view on small terminals |
 | Latest-turn reply review popup | Implemented | `Review` / `F7` now launches a repo-local terminal popup for `accept` / `edit` / `reject` / `skip` on Adam's latest answer |
-| Conversation log artifact | Implemented | active session transcript is written to markdown under `exports/conversations/` and surfaced via the action bus + merged runtime/event chyron |
-| Conversation atlas archive surface | Implemented | modal archive browser exposes all saved sessions through sort/filter plus virtual folder/tag projections stored in session metadata; the `F10`/binding path now opens it through the same worker-safe flow as the action bus |
+| Conversation log artifact | Implemented | active session transcript is written to markdown under `exports/conversations/` and surfaced via the action strip + merged runtime/event chyron |
+| Conversation atlas archive surface | Implemented | modal archive browser exposes all saved sessions through sort/filter plus virtual folder/tag projections stored in session metadata; the `F10`/binding path now opens it through the same worker-safe flow as the action strip |
 | Fixed local-MLX runtime contract | Implemented | the live TUI no longer exposes backend selection on the primary surface; local MLX is the normal runtime contract |
 | Deck + Review secondary surfaces | Implemented | detailed budget / thinking / history remain in `Deck`; explicit feedback remains in `Review` |
 | Dedicated model reasoning panel | Implemented | MLX/Qwen reasoning is kept on and surfaced separately from the final answer, with direct reasoning, chain-like, and hum-live lenses in the prime TUI plus a browser reasoning radio group in the observatory continuity strip; the prime-TUI reasoning pane is now a focusable scroll viewport for longer live traces |
@@ -65,7 +65,7 @@
 | Frontend build freshness guard | Implemented | `build-meta.json` emitted at build time, runtime warning via `/api/status`, CI check script in `scripts/check_observatory_build_meta.py` |
 | Robust observatory server lifecycle | Implemented | host/port args, reuse, free-port fallback, tests |
 | Observatory open without forced synchronous export | Implemented | TUI observatory actions now start/open the server immediately and reuse existing artifacts when present |
-| TUI observatory action progress surface | Implemented | Action Bus now separates menu focus from active observatory work, shows phase-progress plus accurate elapsed time, and resets the menu after dispatch so repeat observatory launches remain selectable |
+| TUI observatory action progress surface | Implemented | the top action shelf separates selected action from active observatory work and shows phase-progress plus accurate elapsed time while the strip remains directly repeatable |
 | Export location feedback | Implemented | TUI export action reports the artifact directory path in the session feedback surface after generation |
 | Geometry diagnostics | Implemented | ringness, radiality, linearity, communities, triadic closure, spectral summaries, mirror/chirality/translation proxies |
 | Large-graph geometry fallback | Implemented | seeded-scale graphs use sparse-safe approximations instead of SciPy / dense full-graph linear algebra |

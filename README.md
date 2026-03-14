@@ -60,9 +60,9 @@ Original module path from the repo root:
 
 `python3 app.py` is also valid, but only after you have already changed into `/Users/brianray/Adam`.
 
-The live dialogue surface boots directly into a real chat session on the repo-local runtime. The top action bus exposes review, conversation-log, profile, session, export, observatory, and model-prepare actions without dropping you onto a separate launcher. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
+The live dialogue surface boots directly into a real chat session on the repo-local runtime. The top action shelf exposes review, conversation-log, profile, session, export, observatory, model-prepare, ingest, aperture, and chyron actions as a multi-row button grid with integrated runtime/progress lines, without dropping you onto a separate launcher. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
 
-Use flags only when you want an explicit shell override. The normal path is the repo-local MLX default. The action bus can prepare the local Qwen model directly if it is not cached yet.
+Use flags only when you want an explicit shell override. The normal path is the repo-local MLX default. The action strip can prepare the local Qwen model directly if it is not cached yet.
 
 Advanced shell override example:
 
@@ -107,8 +107,8 @@ Useful flags:
 1. Change into the repo root with `cd /Users/brianray/Adam`.
 2. Start EDEN with `.venv/bin/python app.py`.
 3. EDEN resumes the latest persisted session automatically. If none exists yet, it creates a blank live session automatically.
-4. If the local model is not cached yet, use the top action bus and run `Prepare Local Model`. EDEN stores it under `models/` in this repo.
-5. The top action bus is keyboard-first: `Tab` / `Shift+Tab` moves focus, arrow keys choose a menu item, `Enter` executes it, and the full-width action select sits above a separate quick-action row for `Ingest Document` / `Open Aperture`.
+4. If the local model is not cached yet, use the top action strip and run `Prepare Local Model`. EDEN stores it under `models/` in this repo.
+5. The top action strip is keyboard-first: `Tab` / `Shift+Tab` moves focus, `Left` / `Right` changes the selected action, typing digits jumps to an action number, and `Enter` executes it.
 6. If focus drifts away from the composer, press `Esc` to return to it. Printable keys typed outside editable widgets are routed back into the composer automatically.
 7. Press `F8` to pull down the full-width aperture drawer. It occupies the top band of the screen and renders a wider natural-language scan of the active set.
 8. The large left column is the Adam dialogue surface: scrolling Brian/Adam tape, inline reply-review strip, and always-visible composer.
@@ -123,9 +123,9 @@ Useful flags:
 17. `F9` opens the ingest bay, where you provide a PDF/document path plus a short framing prompt. The document content and framing prompt are both indexed into the memgraph for later retrieval.
 18. Open `Utilities Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
 19. Review Adam inline: after each Adam reply, the reply-review strip appears directly under the transcript. Type `A`, `E`, `R`, or `S`, press `Enter` to move into the required field, then press `Enter` again in the last required field to commit. `A` / `R` require explanation; `E` requires explanation plus corrected text. Use `Shift+Enter` for a newline inside explanation or corrected text. Submitting there writes a feedback event and updates graph channels.
-20. Conversation logs are also written to `exports/conversations/<experiment-slug>/...md`. The merged bottom chyron shows the active transcript file, and `Open Conversation Log` in the action bus opens it directly.
+20. Conversation logs are also written to `exports/conversations/<experiment-slug>/...md`. The merged bottom chyron shows the active transcript file, and `Open Conversation Log` in the action strip opens it directly.
 21. Adam's visible reply is now a clean operator-facing answer. Model thinking stays in the separate thinking surface instead of appearing as `Answer`, `Basis`, or `Next Step` scaffolding inside the dialogue.
-22. Use `Tune Session` or `Start New Session` from the action bus when you want a bounded inference-profile change.
+22. Use `Tune Session` or `Start New Session` from the action strip when you want a bounded inference-profile change.
 23. Use `Export Artifacts` to write graph, basin, geometry, measurement, and index artifacts.
 24. Use `Open Browser Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
 23. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.

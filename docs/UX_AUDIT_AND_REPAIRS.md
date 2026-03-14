@@ -30,7 +30,7 @@ Observed before repair:
 
 - top chrome dominated the screen
 - the dialogue/composer area was clipped
-- the `Live Contract` note truncated the first-action guidance
+- the top status note truncated the first-action guidance
 - the footer only showed the early function keys
 
 Operator impact:
@@ -119,7 +119,7 @@ Verified after repair:
 
 Before:
 
-- `Live Contract` note was too narrow to carry the first action on small terminals
+- the old top status note was too narrow to carry the first action on small terminals
 
 After:
 
@@ -170,7 +170,7 @@ all return focus to the composer.
 ## Regression Coverage Added Or Updated
 
 - compact layout smoke coverage
-- `Tab` to action menu and `Enter` execution coverage
+- `Tab` to the action strip and `Enter` execution coverage
 - `Esc` recovery coverage
 - compact aperture open/close coverage
 - no-reply review guard coverage

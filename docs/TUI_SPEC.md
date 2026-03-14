@@ -9,29 +9,33 @@ Live dialogue boot:
 - EDEN opens directly into a chat session surface
 - if a previous session exists, EDEN resumes the latest persisted session automatically
 - if no session exists yet, EDEN creates a blank experiment/session automatically
-- the top action bus remains available:
-  - menu actions:
-    - `Toggle Aperture Drawer`
-    - `Ingest PDF / Doc`
-    - `Review Last Reply`
-    - `Open Conversation Log`
-    - `Open Conversation Atlas`
-    - `Tune Session`
-    - `Start New Session`
-    - `Continue Latest`
-    - `Start Blank Eden`
-    - `Start Seeded Eden`
-    - `Prepare Local Model`
-    - `Open Browser Observatory`
-    - `Export Artifacts`
-    - `Open Utilities Deck`
-    - `Help`
-  - persistent quick buttons:
-    - `Ingest Document`
-    - `Open/Close Aperture`
+- the top action strip remains available:
+  - numbered actions:
+    - `01 Review Last Reply`
+    - `02 Open Conversation Log`
+    - `03 Open Conversation Atlas`
+    - `04 Tune Session`
+    - `05 Start New Session`
+    - `06 Continue Latest`
+    - `07 Start Blank Eden`
+    - `08 Start Seeded Eden`
+    - `09 Prepare Local Model`
+    - `10 Open Browser Observatory`
+    - `11 Export Artifacts`
+    - `12 Open Utilities Deck`
+    - `13 Help`
+    - `14 Ingest PDF / Doc`
+    - `15 Toggle Aperture Drawer`
+    - `16 Toggle Runtime Chyron`
   - layout:
-    - full-width action select
-    - separate quick-action row to avoid wrapped/clipped menu rendering
+    - single focusable top action shelf with a multi-row button grid and integrated runtime/status lines
+    - no separate quick-action row or dropdown surface
+  - interaction:
+    - `Tab` / `Shift+Tab` focuses the strip
+    - `Left` / `Right` moves selection
+    - typing digits jumps to an action number
+    - `Enter` executes the currently selected action
+    - clicking a numbered action executes it directly
 - default MLX model storage remains under `models/` in the repo root
 
 Session-start modal:
@@ -85,7 +89,7 @@ Primary split:
 
 Wide aperture drawer:
 
-- toggled from the action menu or `F8`
+- toggled from the action strip or `F8`
 - occupies a narrower top band of the screen when open
 - renders a wider natural-language scan of the active set, persistent anchors, and live heat
 - collapses back to the compact telemetry stack when closed
@@ -135,13 +139,13 @@ Secondary surfaces:
 - dialogue-first prime surface: visible transcript and composer dominate the left column; telemetry stays visible but secondary on the right
 - the prime dialogue bay is intentionally longer than the secondary telemetry stack so more transcript remains visible at once
 - live-session boot is the default path; the app no longer lands on a launcher before chat opens
-- session and utility actions now live in the keyboard-executable top action bus instead of left-column buttons
+- session and utility actions now live in the compact keyboard-executable top action strip instead of left-column buttons
 - normal entry path is `.venv/bin/python -m eden` or `.venv/bin/python -m eden app`
 - shell flags remain optional overrides; the normal runtime contract is repo-local MLX
-- the action bus exposes keyboard-focusable menu + quick buttons, while Live Contract reports model readiness, active session, and focus state
-- choosing an action from the top action `Select` executes it immediately; `Enter` on a focused action menu executes the currently selected action and duplicate dispatch is suppressed
-- the Action Bus now separates menu focus from active work: `menu_focus` reflects the current `Select` value, while long-running observatory work surfaces a phase-based progress bar plus accurate elapsed time
-- `Open Browser Observatory` resets the runtime menu back to its neutral review focus after dispatch so repeat observatory launches stay selectable instead of getting stuck on the same `Select` value
+- the action strip is a single focusable runtime control rather than a dropdown; it now owns the full topbar when the aperture drawer is closed
+- choosing an action now means selecting it in the strip and pressing `Enter`, typing its number then pressing `Enter`, or clicking it directly
+- the strip renders fully spelled-out numbered actions as brighter button-like chips and carries the runtime/session/progress lines directly beneath them
+- `Open Browser Observatory` stays repeatable from the strip without forcing a reset back to review focus
 - multiline composition is first-class
 - `Esc` returns focus to the composer, and printable keys pressed outside editable widgets are routed back into the composer automatically
 - the dialogue tape is scrollable and can be navigated by focusing it, then using `Up`, `Down`, `PageUp`, `PageDown`, `Home`, or `End`
@@ -159,13 +163,13 @@ Secondary surfaces:
 - `Review` only opens the popup when Adam has already replied; otherwise the composer keeps focus and the status line explains that there is nothing to review yet
 - conversation logs are written as markdown artifacts under `exports/conversations/` for the active session and surfaced on-screen plus via `Open Conversation Log`
 - the conversation atlas treats saved sessions as a relational transcript library: all logs remain under the single export root while folder/tag organization is stored as session metadata and projected in the atlas
-- conversation boundaries are explicit through the live contract, transcript state, automatic popup review after each assistant turn, and new-session flow: ask or ingest, review when Adam answers, and end by opening a new session
+- conversation boundaries are explicit through the top action shelf status lines, transcript state, automatic popup review after each assistant turn, and new-session flow: ask or ingest, review when Adam answers, and end by opening a new session
 - budget changes remain visible, but now live in Deck instead of the prime chat pane
 - latest-session resume restores the latest persisted session surface without forcing a new session flow first
-- keyboard-only navigation is supported through top action-bus focus, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the function-key bindings
+- keyboard-only navigation is supported through top action-strip focus, digit jump or `Left` / `Right` selection, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the function-key bindings
 - corpus ingest supports a framing prompt whose phrases are graph-indexed as persistent document-conditioning material
 - export actions report the artifact directory path in the status surface so the operator can find the generated files without guesswork
-- observatory launch status is explicitly phased in the Action Bus (`queued`, `ensuring server`, `exporting payloads`, `opening browser`); elapsed time is real elapsed time, not an ETA claim
+- observatory launch status is explicitly phased in the top action shelf (`queued`, `ensuring server`, `exporting payloads`, `opening browser`); elapsed time is real elapsed time, not an ETA claim
 
 ## Budget panel contents
 

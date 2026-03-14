@@ -2737,3 +2737,289 @@ Evidence plan:
 - Single apply_patch change plus operator-visible confirmation of `F11` reveal/close behavior and compact layout impact.
 Shortest proof path:
 - Reload TUI, issue `F11` from hidden state, verify chyron appears from bottom band, and issue `F11` again to hide.
+## [2026-03-14 11:20:22 EDT] PRE-FLIGHT
+Operator task:
+Make chat dialogue real-estate tighter by removing inline per-turn review/draft cards and keep the runtime event chyron as a bottom drawer with Textual-legal hidden state.
+Task checksum:
+`_sync_runtime_chyron_drawer` and `main_chat_exchange_panel` in `eden/tui/app.py`.
+Repo situation:
+UI refactor remains active in this working tree and no branch switch occurred for this change.
+Relevant spec surfaces read:
+`docs/TUI_SPEC.md`, `AGENTS.md`.
+Natural-language contracts in force:
+Bottom hidden runtime/event chyron and popup review flow from `docs/TUI_SPEC.md`.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+- Instrumented:
+- Conceptual:
+- Unknown:
+Risks / invariants:
+- Inline review panel removal can reduce transcript context in-chat; popup review remains available.
+- Chyron `styles.display` must remain string values (`block`/`none`) to avoid `StyleValueError`.
+Evidence plan:
+- Verify startup no longer raises `StyleValueError`.
+- Verify `Review / T#` and `Brian / Draft` panels are no longer created in transcript surfaces.
+- Verify chyron opens/closes with `F11` and is hidden by default.
+Shortest proof path:
+Start the TUI, check one full user→Adam turn, press `F11` twice, and confirm only the intended surfaces remain.
+## [2026-03-14 11:20:22 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+No normative doc edits this turn; existing `docs/TUI_SPEC.md` already specifies hidden bottom runtime/event chyron and popup review behavior.
+Natural-language contracts added/revised/preserved:
+Preserved popup-only feedback review contract; reduced in-chat transcript clutter by removing inline review/draft cards.
+Behavior implemented or modified:
+`_sync_runtime_chyron_drawer` now uses Textual string display values (`"block"`/`"none"`), preventing `StyleValueError` from boolean assignment.
+`main_chat_exchange_panel` no longer appends the inline per-turn `Review / T#` panel or `Brian / Draft` preview panel.
+Evidence produced (tests / traces / commands / exports):
+`apply_patch` updates completed on `eden/tui/app.py`; no smoke execution run in this pass.
+Status register changes:
+- Implemented:
+  - Chyron drawer display now transitions between hidden and open without boolean-style errors.
+  - Inline transcript no longer shows explicit latest-review cards or draft-preview cards.
+- Instrumented:
+  - None.
+- Conceptual:
+  - None.
+- Unknown:
+  - Visual confirmation of runtime chyron pull-up behavior and final TUI real-estate impact still pending.
+Truth-table / limitations updates:
+No updates to `docs/IMPLEMENTATION_TRUTH_TABLE.md` or `docs/KNOWN_LIMITATIONS.md` were required for this layout-only pass.
+Remaining uncertainties:
+- Runtime startup still needs a launch check to verify the exact `StyleValueError` path is now resolved under live execution.
+Next shortest proof path:
+Run `cd /Users/brianray/Adam && source .venv/bin/activate && python3 app.py`, press `F11` to toggle the runtime chyron from hidden, send a turn, and visually confirm the removed boxes.
+## [2026-03-14 11:33:14 EDT] PRE-FLIGHT
+Operator task:
+Recover from the over-broad TUI refactor by comparing against the prior commit, restoring only the functional surfaces that were mistakenly removed, and preserving the requested hidden bottom runtime drawer.
+Task checksum:
+Use `HEAD~1` as the restore source for `eden/tui/app.py`, then selectively reintroduce inline review machinery without bringing back the passive `Reply Review` or `Message Input` boxes.
+Repo situation:
+The most recent commit (`c29bc0db`) removed more than requested; local worktree also contained an additional structural regression in `chat_shell` where `chat_secondary` was nested under `chat_primary`.
+Relevant spec surfaces read:
+`docs/TUI_SPEC.md`, `codex_notes_garden.md`, `git show HEAD~1:eden/tui/app.py`.
+Natural-language contracts in force:
+Keep dialogue/transcript material intact, keep right telemetry visible in the prime split, keep runtime/event chyron hidden by default and toggleable from the bottom, and do not restore the passive review/hint boxes the operator asked to remove.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+- Instrumented:
+- Conceptual:
+- Unknown:
+Risks / invariants:
+- Restoring the wrong prior surfaces would reintroduce the exact vertical clutter the operator asked to remove.
+- Inline feedback controls must be restored from the prior commit in a way that keeps the passive summary panels absent.
+Evidence plan:
+- `py_compile` for syntax, then full `./.venv/bin/pytest -q`.
+Shortest proof path:
+- Restore from `HEAD~1` selectively, keep the drawer fix, verify the smoke tests around multiline draft, review focus, and F11 drawer behavior.
+## [2026-03-14 11:40:23 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+None. The existing TUI spec already matches the restored prime split plus hidden bottom runtime drawer.
+Natural-language contracts added/revised/preserved:
+Preserved the requested removal of passive `Reply Review` and `Message Input` boxes while restoring the mistakenly removed transcript/right-bay/inline-review material from before commit `c29bc0db`.
+Behavior implemented or modified:
+Restored `chat_secondary` as a true sibling right telemetry bay inside `#chat_shell`.
+Restored transcript review/draft material that had been removed in error.
+Restored the hidden inline feedback controls and focus/submission path expected by `F7` and the TUI smoke tests.
+Kept the runtime/event chyron as a hidden-by-default bottom drawer using Textual-valid display values.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python -m py_compile eden/tui/app.py`
+`./.venv/bin/pytest -q` -> `70 passed in 49.65s`
+Status register changes:
+- Implemented:
+  - Prime split right telemetry bay restored.
+  - Hidden inline feedback control path restored without reintroducing the passive summary/hint panels.
+  - Bottom runtime chyron drawer preserved and test-covered.
+- Instrumented:
+  - None newly added.
+- Conceptual:
+  - None newly introduced.
+- Unknown:
+  - Live operator preference for the exact remaining vertical surfaces still needs manual confirmation in the terminal.
+Truth-table / limitations updates:
+No truth-table or limitations edits were required for this recovery turn.
+Remaining uncertainties:
+- Manual visual confirmation is still useful for the exact surfaces the operator wants removed next, since the prior interpretation was wrong.
+Next shortest proof path:
+Launch the TUI, confirm the right telemetry column is back on the main split, confirm `F11` opens/closes the bottom drawer, and identify the specific remaining passive boxes to remove by their on-screen titles.
+## [2026-03-14 11:54:24 EDT] PRE-FLIGHT
+Operator task:
+Remove the blue `Review / T#` card from the dialogue transcript so the tape reads as a simple Brian/Adam back-and-forth scroll.
+Task checksum:
+Delete only the transcript review card append in `main_chat_exchange_panel`, preserve inline `F7` review machinery, preserve the draft card, and align the user-facing transcript docs.
+Repo situation:
+The recovery turn restored transcript/right-bay/inline-review functionality; the remaining operator complaint is now isolated to the extra transcript review card.
+Relevant spec surfaces read:
+`docs/HOW_TO_USE_ADAM_TUI.md`, `docs/KNOWN_LIMITATIONS.md`, current `eden/tui/app.py`, recent `codex_notes_garden.md`.
+Natural-language contracts in force:
+The prime transcript should read as Brian/Adam dialogue cards plus the unsent draft card, while review remains a popup/inline control path rather than a separate scroll-tape card.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+- Instrumented:
+- Conceptual:
+- Unknown:
+Risks / invariants:
+- Do not remove Adam verdict styling/title data if the operator only wants the extra blue review panel gone.
+- Do not disturb the hidden inline review controls restored in the prior recovery turn.
+Evidence plan:
+- `py_compile` and full `./.venv/bin/pytest -q`.
+Shortest proof path:
+- Remove the `Review / T#` panel append, update the transcript docs, rerun the full test suite.
+## [2026-03-14 11:54:24 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+Updated the user-facing transcript contract in `docs/HOW_TO_USE_ADAM_TUI.md`; refined `docs/KNOWN_LIMITATIONS.md` wording so verdict labels are described as living on Adam cards rather than as separate transcript review panels.
+Natural-language contracts added/revised/preserved:
+Revised the prime transcript contract to Brian/Adam cards plus the unsent draft card only. Preserved popup/inline review as the feedback path and preserved verdict labels on Adam cards.
+Behavior implemented or modified:
+Removed the separate `Review / T#` panel append from `main_chat_exchange_panel`, so the scroll tape now renders only Brian/Adam exchanges plus the draft card.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python -m py_compile eden/tui/app.py`
+`./.venv/bin/pytest -q` -> `70 passed in 50.13s`
+Status register changes:
+- Implemented:
+  - Transcript no longer inserts a separate blue review card between Brian and Adam replies.
+- Instrumented:
+  - None newly added.
+- Conceptual:
+  - None newly introduced.
+- Unknown:
+  - Manual operator preference for whether Adam titles should continue to carry stored verdict labels remains untested.
+Truth-table / limitations updates:
+No implementation-truth-table edit was required; limitations wording was narrowed to match the new transcript rendering.
+Remaining uncertainties:
+- The operator may still want the verdict suffix removed from Adam card titles, but that was not requested in this pass.
+Next shortest proof path:
+Launch the TUI and confirm the dialogue tape now reads as alternating Brian/Adam cards without the blue `Review / T#` insert.
+## [2026-03-14 12:08:00 EDT] PRE-FLIGHT
+Operator task:
+Replace the tall top-of-window action bus/dropdown with a smaller, more elegant runtime action surface that preserves every current runtime action and avoids regressions.
+Task checksum:
+Swap the runtime `Select`/quick-row header for a compact focusable action strip with direct numeric selection and button-like action targets; preserve all 16 actions, keyboard execution, observatory repeatability/progress semantics, and compact-layout behavior.
+Repo situation:
+Working tree already dirty before this turn in `/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `.DS_Store`, and this append-only notes file. Existing changes are treated as operator-owned unless directly required by this task.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, current `eden/tui/app.py`, current `tests/test_tui_smoke.py`.
+Natural-language contracts in force:
+The TUI remains the primary runtime surface; header actions must stay keyboard-first, preserve all current options, keep observatory launch/progress truthful, and maintain the dialogue-first layout.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, likely wording touch-ups in `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Current runtime header exposes 16 actions through a `Select`, immediate dispatch on `Select.Changed`, observatory progress reporting, and compact-layout hiding of the adjacent status panel.
+- Instrumented:
+  - Runtime observatory progress phases are already surfaced truthfully with elapsed time.
+- Conceptual:
+  - A smaller action-strip replacement for the dropdown.
+- Unknown:
+  - Exact visual fit of a compact action strip at the operator's terminal geometry until runtime/manual verification.
+Risks / invariants:
+- Do not strand any runtime action behind hidden pagination or remove existing keyboard reachability.
+- Do not break repeat observatory launches or truthful progress reporting.
+- Do not turn the header into many separate tab stops that slow keyboard navigation.
+- Do not overwrite unrelated dirty changes in `app.py` or docs.
+Evidence plan:
+- Add/adjust TUI smoke tests around the new runtime action strip, then run targeted TUI tests and full `./.venv/bin/pytest -q`.
+Shortest proof path:
+- Implement a single focusable action strip widget in `eden/tui/app.py`, wire its messages into runtime action dispatch/progress, update the TUI contract wording, and rerun pytest.
+## [2026-03-14 12:17:19 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`; `/Users/brianray/Adam/docs/USER_JOURNEYS.md`; `/Users/brianray/Adam/docs/UX_AUDIT_AND_REPAIRS.md`; `/Users/brianray/Adam/README.md`; append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md` updated the runtime-header contract from dropdown action bus + quick buttons to a compact numbered action strip; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` now describe Live Contract/action-strip progress truthfully.
+Natural-language contracts added/revised/preserved:
+Revised the top-of-window runtime control contract to a single focusable numbered action strip with digit jump, left/right selection, Enter execution, and click execution. Preserved all 16 runtime actions, compact-layout behavior, observatory progress truthfulness, and the dialogue-first split.
+Behavior implemented or modified:
+Replaced the runtime `Select` + quick-action row with a custom `ActionStrip` widget in `eden/tui/app.py`; moved action/progress reporting into Live Contract; preserved runtime action dispatch paths; kept observatory repeatable without dropdown-reset logic; updated TUI smoke coverage to drive the strip.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python -m py_compile eden/tui/app.py tests/test_tui_smoke.py`
+`./.venv/bin/pytest -q tests/test_tui_smoke.py -k "runtime_action_menu or boots_blank_mode or compact"` -> `4 passed, 8 deselected`
+`./.venv/bin/pytest -q` -> `70 passed in 51.08s`
+Runtime sanity check at `200x60`: strip render lines measured `74`, `77`, and `63` characters, so the final two action rows and hint line stay within the intended wide-terminal header width.
+Status register changes:
+- Implemented:
+  - Runtime header now uses a compact numbered action strip instead of the tall dropdown action bus.
+  - Live Contract now carries truthful action/progress state that used to live in the separate action-bus box.
+- Instrumented:
+  - None newly added beyond existing observatory progress instrumentation.
+- Conceptual:
+  - None newly introduced.
+- Unknown:
+  - Exact operator preference on the strip's final visual polish still benefits from manual terminal viewing, but the bounded render-width risk that existed during implementation was reduced and checked.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to replace stale Action Bus wording with the implemented action-strip/Live-Contract behavior.
+Remaining uncertainties:
+- No correctness gaps remain in automated evidence. Remaining risk is aesthetic preference at the operator's preferred terminal geometry rather than missing action reachability or broken runtime behavior.
+Next shortest proof path:
+Launch the TUI in the operator's normal window size, tab into the action strip once, and confirm the new smaller header feels right before doing any further micro-polish on copy, spacing, or label abbreviations.
+## [2026-03-14 12:20:45 EDT] PRE-FLIGHT
+Operator task:
+Remove the separate Live Contract panel, expand the runtime action strip vertically, spell out every menu item fully, make the controls read more like buttons, and shift the top surface toward a brighter cyan presentation.
+Task checksum:
+Delete the dedicated `#runtime_status_strip`/Live Contract surface, redesign `ActionStrip` into a taller full-width button shelf with full labels and cyan-forward styling, and preserve all 16 runtime actions plus truthful runtime/progress visibility without regressing keyboard execution.
+Repo situation:
+Working tree remains dirty from the prior header refactor and aligned doc updates in `eden/tui/app.py`, TUI docs, README, tests, and this append-only notes file. Existing unrelated dirt remains operator-owned.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, current `eden/tui/app.py`, `tests/test_tui_smoke.py`.
+Natural-language contracts in force:
+The TUI remains the primary runtime surface. Runtime actions must stay keyboard-first and complete; observatory/action progress must stay truthful; dialogue-first operation must remain intact even if the dedicated Live Contract box is removed.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/USER_JOURNEYS.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/README.md`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Compact numbered action strip with immediate keyboard execution and all 16 runtime actions.
+  - Separate Live Contract panel that currently carries runtime/progress state.
+- Instrumented:
+  - Observatory progress phases and elapsed time are already surfaced truthfully.
+- Conceptual:
+  - Full-label, cyan-forward, more button-like expanded action shelf without a separate Live Contract box.
+- Unknown:
+  - Final visual density of the taller action shelf at compact terminal sizes until runtime/test verification.
+Risks / invariants:
+- Do not drop any runtime action or strand action/progress state when removing Live Contract.
+- Do not regress focus order, digit jump, left/right movement, Enter execution, or repeat observatory launches.
+- Do not let full labels wrap into unreadable fragments.
+Evidence plan:
+- Update TUI smoke tests around the action shelf and compact layout, then rerun full `./.venv/bin/pytest -q`.
+Shortest proof path:
+- Move status/progress text into `ActionStrip`, remove `#runtime_status_strip`, restyle/reflow the strip, update the TUI contract docs, and rerun pytest.
+## [2026-03-14 12:34:41 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/USER_JOURNEYS.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/docs/UX_AUDIT_AND_REPAIRS.md`, `/Users/brianray/Adam/README.md`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/USER_JOURNEYS.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/docs/UX_AUDIT_AND_REPAIRS.md`, `/Users/brianray/Adam/README.md`.
+Natural-language contracts added/revised/preserved:
+Revised the topbar contract from action strip + separate Live Contract to one integrated top action shelf. Preserved keyboard-first runtime action access, truthful observatory progress, and dialogue-first operation.
+Behavior implemented or modified:
+Removed the dedicated Live Contract widget from `ChatScreen.compose()`. Reflowed `ActionStrip` into a taller multi-row full-label button shelf with brighter cyan-forward styling and integrated runtime/progress lines. Added teardown-safe `NoMatches` guards around panel refresh paths. Added explicit app-level focus cycling so first `Tab` from the composer lands on the action shelf without regressing action execution coverage.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python -m py_compile /Users/brianray/Adam/eden/tui/app.py /Users/brianray/Adam/tests/test_tui_smoke.py`
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py -k "runtime_action_menu or boots_blank_mode or compact"` -> `4 passed, 8 deselected`
+`./.venv/bin/pytest -q` -> `70 passed in 51.73s`
+Status register changes:
+- Implemented:
+  - Integrated top action shelf with full labels, button-like chips, brighter cyan styling, and inline runtime/progress lines.
+  - Teardown-safe refresh guards that avoid `#runtime_topbar` lookup failures during observatory worker cleanup.
+  - Updated TUI/docs/test contract for the action shelf replacing the removed Live Contract box.
+- Instrumented:
+  - Observatory progress remains phase-based with accurate elapsed time on the action shelf.
+- Conceptual:
+  - None newly introduced.
+- Unknown:
+  - Final operator preference on exact spacing/color intensity still wants manual terminal viewing, but no correctness gap remains in automated evidence.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` so they describe the integrated action shelf truthfully instead of referencing Live Contract.
+Remaining uncertainties:
+- Manual aesthetic judgment at the operator's preferred terminal geometry.
+Next shortest proof path:
+Launch `.venv/bin/python -m eden` at the operator's normal window size and verify the taller cyan action shelf spacing before any further visual micro-tuning.

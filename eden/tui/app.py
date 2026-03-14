@@ -19,6 +19,7 @@ from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, Select, Static, TextArea
@@ -157,6 +158,26 @@ ACTION_MENU_OPTIONS = [
 ]
 
 ACTION_MENU_LABELS = {value: label for label, value in ACTION_MENU_OPTIONS}
+ACTION_STRIP_OPTIONS = [
+    ("Review Last Reply", "review"),
+    ("Open Conversation Log", "conversation_log"),
+    ("Open Conversation Atlas", "archive"),
+    ("Tune Session", "profile"),
+    ("Start New Session", "new_session"),
+    ("Continue Latest", "resume"),
+    ("Start Blank Eden", "blank"),
+    ("Start Seeded Eden", "seeded"),
+    ("Prepare Local Model", "prepare_mlx"),
+    ("Open Browser Observatory", "observatory"),
+    ("Export Artifacts", "export"),
+    ("Open Utilities Deck", "deck"),
+    ("Help", "help"),
+    ("Ingest PDF / Doc", "ingest_pdf"),
+    ("Toggle Aperture Drawer", "toggle_aperture"),
+    ("Toggle Runtime Chyron", "toggle_chyron"),
+]
+ACTION_STRIP_INDEX = {value: index for index, (_, value) in enumerate(ACTION_STRIP_OPTIONS)}
+ACTION_STRIP_NUMBER = {value: index + 1 for index, (_, value) in enumerate(ACTION_STRIP_OPTIONS)}
 
 ARCHIVE_SORT_OPTIONS = [
     ("Recently Updated", "updated_desc"),
@@ -259,6 +280,210 @@ class ComposerTextArea(TextArea):
         await super()._on_key(event)
 
 
+class ActionStrip(Static):
+    can_focus = True
+
+    @dataclass
+    class Changed(Message):
+        strip: "ActionStrip"
+        action: str
+
+        @property
+        def control(self) -> "ActionStrip":
+            return self.strip
+
+    @dataclass
+    class Submitted(Message):
+        strip: "ActionStrip"
+        action: str
+
+        @property
+        def control(self) -> "ActionStrip":
+            return self.strip
+
+    def __init__(self, *, value: str = "review", id: str | None = None) -> None:
+        super().__init__("", id=id)
+        self._value = value if value in ACTION_STRIP_INDEX else ACTION_STRIP_OPTIONS[0][1]
+        self._pending_digits = ""
+        self._pending_digits_at = 0.0
+        self._hitboxes: list[tuple[int, int, int, str]] = []
+        self._status_line_count = 2
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    def on_mount(self) -> None:
+        _sync_node_look(self)
+
+    def on_focus(self, _event: events.Focus) -> None:
+        self.refresh()
+
+    def on_blur(self, _event: events.Blur) -> None:
+        self._pending_digits = ""
+        self.refresh()
+
+    def set_value(self, value: str, *, notify: bool = False) -> None:
+        normalized = (value or ACTION_STRIP_OPTIONS[0][1]).strip().lower()
+        if normalized not in ACTION_STRIP_INDEX:
+            return
+        changed = normalized != self._value
+        self._value = normalized
+        self.refresh()
+        if changed and notify:
+            self.post_message(self.Changed(self, normalized))
+
+    def _button_style(self, value: str) -> str:
+        if value == self._value:
+            return "bold #04161b on #98f4ff"
+        return "bold #bff9ff on #103445"
+
+    def _available_width(self) -> int:
+        local_width = getattr(getattr(self, "size", None), "width", 0) or 0
+        app_width = getattr(getattr(self, "app", None), "size", None)
+        return max(32, local_width or getattr(app_width, "width", 120) or 120)
+
+    def _button_label(self, value: str) -> str:
+        label = ACTION_MENU_LABELS.get(value, value.replace("_", " "))
+        return f"{ACTION_STRIP_NUMBER[value]:02d} {label}"
+
+    def _button_width(self) -> int:
+        return max(len(self._button_label(value)) for _, value in ACTION_STRIP_OPTIONS) + 2
+
+    def _column_count(self, available_width: int) -> int:
+        if available_width >= 132:
+            return 3
+        if available_width >= 82:
+            return 2
+        return 1
+
+    def _button_rows(self, available_width: int) -> list[list[str]]:
+        columns = self._column_count(available_width)
+        values = [value for _, value in ACTION_STRIP_OPTIONS]
+        return [values[index : index + columns] for index in range(0, len(values), columns)]
+
+    def preferred_height(self, available_width: int) -> int:
+        return len(self._button_rows(available_width)) + self._status_line_count + 1
+
+    def _status_lines(self, available_width: int) -> list[tuple[str, str]]:
+        app = getattr(self, "app", None)
+        if app is None:
+            return [
+                ("digits jump | left/right move | Enter runs | click runs", ICE),
+                ("runtime surface arming...", MUTED),
+            ]
+        screen = getattr(app, "screen", None)
+        if screen and hasattr(screen, "action_strip_status_lines"):
+            return screen.action_strip_status_lines(available_width)
+        return [
+            ("digits jump | left/right move | Enter runs | click runs", ICE if self.has_focus else TEXT),
+            ("runtime surface arming...", MUTED),
+        ]
+
+    def _render_row(self, row_index: int, values: list[str], *, button_width: int) -> tuple[Text, list[tuple[int, int, int, str]]]:
+        row = Text()
+        hitboxes: list[tuple[int, int, int, str]] = []
+        cursor = 0
+        for index, value in enumerate(values):
+            if index:
+                separator = "  "
+                row.append(separator, style=MUTED)
+                cursor += len(separator)
+            chip = f"[  {self._button_label(value):<{button_width}}  ]"
+            start = cursor
+            row.append(chip, style=self._button_style(value))
+            cursor += len(chip)
+            hitboxes.append((row_index, start, cursor, value))
+        return row, hitboxes
+
+    def render(self) -> Text:
+        available_width = max(28, self._available_width() - 2)
+        rows = self._button_rows(available_width)
+        button_width = self._button_width()
+        body = Text()
+        self._hitboxes = []
+        for row_index, row_values in enumerate(rows):
+            row, hitboxes = self._render_row(row_index, row_values, button_width=button_width)
+            if row_index:
+                body.append("\n")
+            body.append(row)
+            self._hitboxes.extend(hitboxes)
+        body.append("\n\n")
+        for index, (line, style) in enumerate(self._status_lines(available_width)):
+            if index:
+                body.append("\n")
+            body.append(line, style=style)
+        return body
+
+    def _select_relative(self, delta: int) -> None:
+        current_index = ACTION_STRIP_INDEX.get(self._value, 0)
+        next_index = (current_index + delta) % len(ACTION_STRIP_OPTIONS)
+        self._pending_digits = ""
+        self.set_value(ACTION_STRIP_OPTIONS[next_index][1], notify=True)
+
+    def _accept_digit(self, digit: str) -> None:
+        if not digit.isdigit():
+            return
+        now = monotonic()
+        if (now - self._pending_digits_at) >= 1.2:
+            self._pending_digits = ""
+        candidate = f"{self._pending_digits}{digit}".lstrip("0")
+        if not candidate:
+            return
+        number = int(candidate)
+        if number < 1 or number > len(ACTION_STRIP_OPTIONS):
+            candidate = digit
+            number = int(candidate)
+            if number < 1 or number > len(ACTION_STRIP_OPTIONS):
+                return
+        self._pending_digits = candidate
+        self._pending_digits_at = now
+        self.set_value(ACTION_STRIP_OPTIONS[number - 1][1], notify=True)
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "left":
+            self._select_relative(-1)
+            event.stop()
+            return
+        if event.key == "right":
+            self._select_relative(1)
+            event.stop()
+            return
+        if event.key == "home":
+            self._pending_digits = ""
+            self.set_value(ACTION_STRIP_OPTIONS[0][1], notify=True)
+            event.stop()
+            return
+        if event.key == "end":
+            self._pending_digits = ""
+            self.set_value(ACTION_STRIP_OPTIONS[-1][1], notify=True)
+            event.stop()
+            return
+        if event.key == "backspace":
+            self._pending_digits = ""
+            self.refresh()
+            event.stop()
+            return
+        if event.key == "enter":
+            self._pending_digits = ""
+            self.refresh()
+            self.post_message(self.Submitted(self, self._value))
+            event.stop()
+            return
+        if event.character and event.character.isdigit():
+            self._accept_digit(event.character)
+            event.stop()
+
+    def on_click(self, event: events.Click) -> None:
+        for row, start, end, value in self._hitboxes:
+            if event.y == row and start <= event.x < end:
+                self._pending_digits = ""
+                self.set_value(value, notify=True)
+                self.post_message(self.Submitted(self, value))
+                event.stop()
+                return
+
+
 def _sync_node_look(node: Any) -> str:
     app = getattr(node, "app", None)
     runtime = getattr(app, "runtime", None)
@@ -293,14 +518,15 @@ class HelpModal(ModalScreen[None]):
         help_text = Text.from_markup(
             f"[bold {AMBER}]EDEN Controls[/]\n\n"
             "EDEN boots directly into a live dialogue surface.\n"
-            "The top action bus keeps the menu plus quick ingest/aperture controls visible.\n"
+            "The top action strip keeps the runtime actions compact and always visible.\n"
+            "Focus it with Tab, move with Left/Right, jump by typing the action number, and press Enter to run.\n"
             "F8 opens a full-width aperture drawer for a wider active-set scan.\n"
             "F9 opens the ingest bay so you can load a PDF or other document with a framing prompt.\n"
             "The large left column is the Adam dialogue: longer scrolling transcript tape and live composer.\n"
             "The right column stacks the memgraph bus, a persistent hum fact box, a larger aperture/active-set read, and a lower reasoning surface with chain-like and hum-live lenses.\n"
             "The runtime loop and session/event state live in a bottom-docked runtime/event chyron drawer that is hidden until pulled up.\n"
-            "Use Action Bus -> Open Conversation Log to open the saved markdown transcript for the live session.\n"
-            "Use Action Bus -> Open Conversation Atlas to browse saved sessions through folder and tag projections.\n"
+            "Use the action strip -> Open Conversation Log to open the saved markdown transcript for the live session.\n"
+            "Use the action strip -> Open Conversation Atlas to browse saved sessions through folder and tag projections.\n"
             "Open Utilities Deck for detailed budget, thinking, history, ingest, launch utilities, and the UI look selector.\n"
             "Review Last Reply opens a dedicated terminal popup for graph-backed feedback on Adam's latest answer.\n\n"
             "[bold]F1[/] help overlay\n"
@@ -2027,7 +2253,6 @@ class ChatScreen(Screen):
         self._graph_health_dirty = True
         self._event_lines: list[str] = []
         self._last_runtime_action_dispatch: tuple[str, float] | None = None
-        self._suppress_runtime_action_change = False
         self._last_feedback_signature: tuple[str, str] | None = None
         self._last_hum_signature: tuple[str, str] | None = None
 
@@ -2035,42 +2260,45 @@ class ChatScreen(Screen):
         yield Header(show_clock=True)
         with Vertical(id="runtime_frame"):
             with Horizontal(id="runtime_topbar"):
-                with Vertical(id="runtime_action_bus"):
-                    yield Static(id="action_bus_panel")
-                    with Vertical(id="runtime_top_controls"):
-                        yield Select(
-                            ACTION_MENU_OPTIONS,
-                            value="review",
-                            allow_blank=False,
-                            id="runtime_action_menu",
-                            prompt="Action menu",
-                        )
-                        with Horizontal(id="runtime_quick_action_row"):
-                            yield Button("Ingest Document", id="header_ingest_btn")
-                            yield Button("Open Aperture", id="header_aperture_btn")
-                yield Static(id="runtime_status_strip")
+                yield ActionStrip(value="review", id="runtime_action_menu")
                 yield Static(id="aperture_drawer_panel")
             with Horizontal(id="chat_shell"):
                 with Vertical(id="chat_primary"):
                     with Vertical(id="chat_deck"):
                         with VerticalScroll(id="chat_tape", can_focus=True):
                             yield Static(id="chat_exchange_panel")
+                        with Vertical(id="inline_feedback_surface"):
+                            with Horizontal(id="inline_feedback_command_row"):
+                                yield Input(placeholder="Verdict code: A / E / R / S", id="inline_feedback_verdict_input")
+                            yield Static(id="inline_feedback_status_panel")
+                            yield ReviewTextArea(
+                                id="inline_feedback_explanation_input",
+                                soft_wrap=True,
+                                show_line_numbers=False,
+                                placeholder="Explain the review decision. Press Enter to submit. Shift+Enter adds a newline.",
+                            )
+                            yield ReviewTextArea(
+                                id="inline_feedback_corrected_input",
+                                soft_wrap=True,
+                                show_line_numbers=False,
+                                placeholder="Corrected text for EDIT. Press Enter to submit. Shift+Enter adds a newline.",
+                            )
                         yield ComposerTextArea(
                             id="composer_input",
                             soft_wrap=True,
                             show_line_numbers=False,
                             placeholder="Message Adam here. Ask a question, continue the session, or correct the draft. Enter sends. F9 ingests a document first if needed.",
                         )
-                    with Vertical(id="chat_secondary"):
-                        yield SignalField(id="signal_field")
-                        yield Static(id="hum_panel")
-                        yield Static(id="active_aperture_panel")
-                        with Horizontal(id="reasoning_mode_row"):
-                            yield Button("Reasoning", id="reasoning_mode_reasoning_btn")
-                            yield Button("Chain-Like", id="reasoning_mode_chain_btn")
-                            yield Button("Hum Live", id="reasoning_mode_hum_btn")
-                        with VerticalScroll(id="thinking_scroller", can_focus=True):
-                            yield Static(id="thinking_panel")
+                with Vertical(id="chat_secondary"):
+                    yield SignalField(id="signal_field")
+                    yield Static(id="hum_panel")
+                    yield Static(id="active_aperture_panel")
+                    with Horizontal(id="reasoning_mode_row"):
+                        yield Button("Reasoning", id="reasoning_mode_reasoning_btn")
+                        yield Button("Chain-Like", id="reasoning_mode_chain_btn")
+                        yield Button("Hum Live", id="reasoning_mode_hum_btn")
+                    with VerticalScroll(id="thinking_scroller", can_focus=True):
+                        yield Static(id="thinking_panel")
             with Vertical(id="runtime_chyron_drawer"):
                 yield Static(id="runtime_chyron_panel")
         yield Footer()
@@ -2083,25 +2311,34 @@ class ChatScreen(Screen):
         self.call_after_refresh(self.focus_composer)
 
     def refresh_panels(self) -> None:
-        self._sync_responsive_layout()
-        self._health()
-        self._sync_aperture_drawer()
-        self._sync_runtime_chyron_drawer()
-        self._sync_header_controls()
-        self.query_one("#action_bus_panel", Static).update(self.main_action_bus_panel())
-        self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
-        self.query_one("#aperture_drawer_panel", Static).update(self.main_aperture_drawer_panel())
-        self.query_one("#active_aperture_panel", Static).update(self.main_aperture_panel())
-        self.query_one("#hum_panel", Static).update(self.main_hum_panel())
-        self._sync_reasoning_mode_controls()
-        self.query_one("#thinking_panel", Static).update(self.main_thinking_panel())
-        self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
-        self.query_one("#runtime_chyron_panel", Static).update(self.main_runtime_chyron_panel())
+        if not self.is_mounted:
+            return
+        try:
+            self._sync_responsive_layout()
+            self._health()
+            self._sync_aperture_drawer()
+            self._sync_runtime_chyron_drawer()
+            self._sync_header_controls()
+            self.query_one("#aperture_drawer_panel", Static).update(self.main_aperture_drawer_panel())
+            self.query_one("#active_aperture_panel", Static).update(self.main_aperture_panel())
+            self.query_one("#hum_panel", Static).update(self.main_hum_panel())
+            self._sync_reasoning_mode_controls()
+            self.query_one("#thinking_panel", Static).update(self.main_thinking_panel())
+            self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
+            self._sync_inline_feedback_surface()
+            self.query_one("#inline_feedback_status_panel", Static).update(self.main_inline_feedback_status_panel())
+            self.query_one("#runtime_chyron_panel", Static).update(self.main_runtime_chyron_panel())
+        except NoMatches:
+            return
 
     def _refresh_composer_surfaces(self) -> None:
-        self.query_one("#action_bus_panel", Static).update(self.main_action_bus_panel())
-        self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
-        self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
+        if not self.is_mounted:
+            return
+        try:
+            self.query_one("#runtime_action_menu", ActionStrip).refresh()
+            self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
+        except NoMatches:
+            return
 
     def _is_compact_layout(self) -> bool:
         return (self.size.width or 0) < 100 or (self.size.height or 0) < 30
@@ -2111,9 +2348,8 @@ class ChatScreen(Screen):
         app = self.app
         assert isinstance(app, EdenTuiApp)
         topbar = self.query_one("#runtime_topbar", Horizontal)
-        action_bus = self.query_one("#runtime_action_bus", Vertical)
-        action_panel = self.query_one("#action_bus_panel", Static)
-        status_strip = self.query_one("#runtime_status_strip", Static)
+        action_strip = self.query_one("#runtime_action_menu", ActionStrip)
+        aperture_drawer = self.query_one("#aperture_drawer_panel", Static)
         chat_primary = self.query_one("#chat_primary", Vertical)
         chat_secondary = self.query_one("#chat_secondary", Vertical)
         chat_deck = self.query_one("#chat_deck", Vertical)
@@ -2126,11 +2362,10 @@ class ChatScreen(Screen):
         thinking_scroller = self.query_one("#thinking_scroller", VerticalScroll)
 
         if compact:
-            action_panel.display = False
-            status_strip.display = False
-            topbar.styles.height = 6
-            action_bus.styles.width = "1fr"
-            action_bus.styles.min_width = 0
+            action_strip.styles.width = "1fr"
+            action_strip.styles.min_width = 0
+            aperture_drawer.styles.width = 0
+            topbar.styles.height = action_strip.preferred_height(max(32, (self.size.width or 80) - 4))
             chat_deck.styles.min_height = 0
             chat_primary.styles.width = "1fr"
             chat_primary.styles.min_width = 0
@@ -2157,17 +2392,24 @@ class ChatScreen(Screen):
                 thinking_scroller.display = True
                 aperture_panel.styles.height = 12
         else:
-            action_panel.display = True
-            status_strip.display = True
             chat_primary.display = True
             chat_secondary.display = True
             signal_field.display = True
             hum_panel.display = True
             reasoning_mode_row.display = True
             thinking_scroller.display = True
-            topbar.styles.height = 11
-            action_bus.styles.width = 56
-            action_bus.styles.min_width = 56
+            if app.ui_state.aperture_drawer_open:
+                action_strip.styles.width = "42%"
+                action_strip.styles.min_width = 42
+                aperture_drawer.styles.width = "58%"
+                action_width = max(42, int((self.size.width or 120) * 0.42) - 4)
+                drawer_height = max(11, int((self.size.height or 40) * 0.28))
+                topbar.styles.height = max(action_strip.preferred_height(action_width), drawer_height)
+            else:
+                action_strip.styles.width = "1fr"
+                action_strip.styles.min_width = 0
+                aperture_drawer.styles.width = 0
+                topbar.styles.height = action_strip.preferred_height(max(48, (self.size.width or 120) - 4))
             chat_deck.styles.min_height = 28
             chat_primary.styles.width = "62%"
             chat_primary.styles.min_width = 78
@@ -2434,15 +2676,15 @@ class ChatScreen(Screen):
         drawer = self.query_one("#runtime_chyron_drawer", Vertical)
         chyron = self.query_one("#runtime_chyron_panel", Static)
         if app.ui_state.runtime_chyron_open:
-            drawer.styles.display = True
-            chyron.display = True
+            drawer.styles.display = "block"
+            chyron.styles.display = "block"
             chyron.styles.height = 5 if self._is_compact_layout() else 6
             chyron.styles.min_height = chyron.styles.height
             drawer.styles.height = chyron.styles.height
             drawer.styles.min_height = chyron.styles.height
         else:
-            drawer.styles.display = False
-            chyron.display = False
+            drawer.styles.display = "none"
+            chyron.styles.display = "none"
             drawer.styles.height = 0
             drawer.styles.min_height = 0
             chyron.styles.height = 0
@@ -2477,10 +2719,7 @@ class ChatScreen(Screen):
             drawer.styles.height = 0
 
     def _sync_header_controls(self) -> None:
-        app = self.app
-        assert isinstance(app, EdenTuiApp)
-        aperture_button = self.query_one("#header_aperture_btn", Button)
-        aperture_button.label = "Close Aperture" if app.ui_state.aperture_drawer_open else "Open Aperture"
+        self.query_one("#runtime_action_menu", ActionStrip).refresh()
 
     def _meter_bar(self, value: float, *, scale: float, width: int = 8, fill: str = "■", empty: str = "·") -> str:
         clamped = max(0.0, min(value / max(scale, 1e-6), 1.0))
@@ -2529,6 +2768,48 @@ class ChatScreen(Screen):
         if latest_entry is not None and latest_entry.get("turn_id") == app.ui_state.last_turn_id:
             return ("reviewed", latest_entry)
         return ("pending", latest_entry)
+
+    def _sync_inline_feedback_surface(self) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        surface = self.query_one("#inline_feedback_surface", Vertical)
+        has_reply = bool(app.ui_state.last_turn_id)
+        surface.display = False
+        if not has_reply:
+            surface.styles.height = 0
+            return
+        surface.styles.height = 0
+
+    def _inline_feedback_intent(self) -> tuple[str | None, str]:
+        raw_code = self.query_one("#inline_feedback_verdict_input", Input).value.strip().upper()
+        verdict_map = {
+            "A": "accept",
+            "E": "edit",
+            "R": "reject",
+            "S": "skip",
+        }
+        return verdict_map.get(raw_code), raw_code
+
+    def _inline_feedback_form_state(self) -> dict[str, Any]:
+        verdict, raw_code = self._inline_feedback_intent()
+        explanation = self.query_one("#inline_feedback_explanation_input", TextArea).text.strip()
+        corrected = self.query_one("#inline_feedback_corrected_input", TextArea).text.strip()
+        needs_explanation = verdict in {"accept", "edit", "reject"}
+        needs_corrected = verdict == "edit"
+        ready = verdict is not None
+        if needs_explanation:
+            ready = ready and bool(explanation)
+        if needs_corrected:
+            ready = ready and bool(corrected)
+        return {
+            "verdict": verdict,
+            "raw_code": raw_code,
+            "explanation": explanation,
+            "corrected": corrected,
+            "needs_explanation": needs_explanation,
+            "needs_corrected": needs_corrected,
+            "ready": ready,
+        }
 
     def _conversation_stage(self) -> tuple[str, str]:
         app = self.app
@@ -2741,38 +3022,8 @@ class ChatScreen(Screen):
         )
         return Panel(body, title="Aperture Drawer", border_style=AMBER, style=f"on {SHADE_ALT}")
 
-    def main_action_bus_panel(self) -> Panel:
-        app = self.app
-        assert isinstance(app, EdenTuiApp)
-        selected_value = str(self.query_one("#runtime_action_menu", Select).value or "review")
-        selected = ACTION_MENU_LABELS.get(selected_value, selected_value.replace("_", " "))
-        log_state = "ready" if app.ui_state.conversation_log_path else "pending"
-        action_progress = app.ui_state.action_progress or {}
-        text = Text()
-        text.append("Action Bus\n", style=f"bold {AMBER}")
-        text.append(
-            f"menu_focus={selected} | aperture={'open' if app.ui_state.aperture_drawer_open else 'closed'} "
-            f"| review={'armed' if self._feedback_loop_state()[0] == 'pending' else 'clear'} | transcript={log_state}\n",
-            style=TEXT,
-        )
-        if action_progress:
-            started_at = float(action_progress.get("started_at", monotonic()))
-            elapsed = _format_elapsed(monotonic() - started_at)
-            step = int(action_progress.get("step", 0))
-            total = int(action_progress.get("total", 1))
-            text.append(
-                f"action={action_progress.get('label', 'unknown')} | phase={action_progress.get('phase', 'running')} | elapsed={elapsed}\n",
-                style=TEXT,
-            )
-            text.append(
-                f"progress={_progress_bar(step, total)} {step}/{total} | {safe_excerpt(str(action_progress.get('detail', 'working')), limit=108)}",
-                style=MUTED,
-            )
-        else:
-            last_summary = app.ui_state.last_action_summary or app.ui_state.last_feedback or "No action has run yet."
-            text.append("action=idle | observatory is repeatable via F3 or menu\n", style=TEXT)
-            text.append(f"last={safe_excerpt(last_summary, limit=132)}", style=MUTED)
-        return Panel(text, title="Action Bus", border_style=AMBER, style=f"on {SHADE_ALT}")
+    def _selected_runtime_action(self) -> str:
+        return self.query_one("#runtime_action_menu", ActionStrip).value or "review"
 
     def _set_runtime_action_progress(
         self,
@@ -2816,30 +3067,52 @@ class ChatScreen(Screen):
         progress = app.ui_state.action_progress or {}
         return progress.get("action") == action
 
-    def _reset_runtime_action_menu(self) -> None:
-        if not self.is_mounted:
-            return
-        menu = self.query_one("#runtime_action_menu", Select)
-        if str(menu.value or "review") == "review":
-            return
-        self._suppress_runtime_action_change = True
-        menu.value = "review"
-
-    def main_action_status_panel(self) -> Panel:
+    def action_strip_status_lines(self, max_width: int) -> list[tuple[str, str]]:
         app = self.app
         assert isinstance(app, EdenTuiApp)
         model_status = self._model_status()
         profile = app.ui_state.current_profile or {}
         focus_id = getattr(self.app.focused, "id", "none") or "none"
-        stage, stage_note = self._conversation_stage()
-        text = Text.from_markup(
-            f"[bold {AMBER}]Live Contract[/]\n"
-            f"runtime={self._active_backend_label()} stage={model_status.get('stage', 'n/a')}\n"
-            f"session={app.ui_state.session_title or app.ui_state.session_id or 'arming'} "
-            f"profile={profile.get('profile_name', 'pending')} focus={focus_id} convo={stage}\n"
-            f"note={safe_excerpt(stage_note, limit=112)}"
+        stage, _stage_note = self._conversation_stage()
+        selected_value = self._selected_runtime_action()
+        selected = ACTION_MENU_LABELS.get(selected_value, selected_value.replace("_", " "))
+        log_state = "ready" if app.ui_state.conversation_log_path else "pending"
+        action_progress = app.ui_state.action_progress or {}
+        runtime_line = (
+            f"runtime={self._active_backend_label()} stage={model_status.get('stage', 'n/a')} "
+            f"session={safe_excerpt(str(app.ui_state.session_title or app.ui_state.session_id or 'arming'), limit=28)} "
+            f"profile={safe_excerpt(str(profile.get('profile_name', 'pending')), limit=24)} "
+            f"focus={focus_id} convo={stage}"
         )
-        return Panel(text, title="Live Contract", border_style=AMBER, style=f"on {SHADE_ALT}")
+        if action_progress:
+            started_at = float(action_progress.get("started_at", monotonic()))
+            elapsed = _format_elapsed(monotonic() - started_at)
+            step = int(action_progress.get("step", 0))
+            total = int(action_progress.get("total", 1))
+            detail_limit = max(18, max_width - 58)
+            return [
+                (safe_excerpt(runtime_line, limit=max_width), TEXT),
+                (
+                    safe_excerpt(
+                        f"action={action_progress.get('label', 'unknown')} | phase={action_progress.get('phase', 'running')} | "
+                        f"elapsed={elapsed} | progress={_progress_bar(step, total)} {step}/{total} | "
+                        f"{safe_excerpt(str(action_progress.get('detail', 'working')), limit=detail_limit)}",
+                        limit=max_width,
+                    ),
+                    ICE,
+                ),
+            ]
+        last_summary = app.ui_state.last_action_summary or app.ui_state.last_feedback or "No action has run yet."
+        summary_limit = max(24, max_width - 62)
+        action_line = (
+            f"selected={ACTION_STRIP_NUMBER.get(selected_value, 1):02d} {selected} | aperture={'open' if app.ui_state.aperture_drawer_open else 'closed'} "
+            f"| review={'armed' if self._feedback_loop_state()[0] == 'pending' else 'clear'} | transcript={log_state} "
+            f"| last={safe_excerpt(str(last_summary), limit=summary_limit)}"
+        )
+        return [
+            (safe_excerpt(runtime_line, limit=max_width), TEXT),
+            (safe_excerpt(action_line, limit=max_width), ICE if focus_id == "runtime_action_menu" else MUTED),
+        ]
 
     def main_thinking_panel(self) -> Panel:
         app = self.app
@@ -2943,7 +3216,7 @@ class ChatScreen(Screen):
             f"observatory={(app.ui_state.observatory_status or {}).get('url', 'offline')}\n"
             f"graph=memes {health['memes']} memodes {health['memodes']} triadic {health['triadic_closure']:.3f}\n"
             f"transcript={transcript_path}\n"
-            "open transcript via Action Bus -> Open Conversation Log\n"
+            "open transcript via the action strip -> Open Conversation Log\n"
             f"last_status={safe_excerpt(app.ui_state.last_feedback, limit=108)}\n\n"
             f"[bold {AMBER}]Feedback state[/]\n"
             + "\n".join(feedback_lines)
@@ -3040,24 +3313,6 @@ class ChatScreen(Screen):
                         style=f"on {CHIARO_WINE}",
                     )
                 )
-                if feedback_entries:
-                    feedback_lines: list[str] = []
-                    for entry in feedback_entries:
-                        verdict = str(entry.get("verdict", "skip")).upper()
-                        explanation = (entry.get("explanation") or "").strip()
-                        corrected = (entry.get("corrected_text") or "").strip()
-                        feedback_lines.append(f"{verdict} @ {entry.get('created_at', 'n/a')}")
-                        feedback_lines.append(f"why: {explanation or 'none'}")
-                        if corrected:
-                            feedback_lines.append(f"edit: {corrected}")
-                    transcript.append(
-                        Panel(
-                            Text("\n".join(feedback_lines), style=TEXT),
-                            title=f"Review / T{turn['turn_index']}",
-                            border_style=ICE,
-                            style=f"on {CHIARO_SLATE}",
-                        )
-                    )
             self._transcript_cache_session_id = app.ui_state.session_id
             self._transcript_cache_panels = tuple(transcript)
         transcript = list(self._transcript_cache_panels)
@@ -3084,6 +3339,39 @@ class ChatScreen(Screen):
                 )
             )
         return Group(*transcript)
+
+    def main_inline_feedback_status_panel(self) -> Panel:
+        state, latest_entry = self._feedback_loop_state()
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        form = self._inline_feedback_form_state()
+        if state == "pending":
+            text = Text.from_markup(
+                "code="
+                + (form["raw_code"] or "·")
+                + " -> "
+                + str(form["verdict"] or "pending")
+                + " | enter="
+                + ("submits" if form["ready"] else "awaiting fields")
+                + " | explanation="
+                + ("ready" if form["explanation"] else ("needed" if form["needs_explanation"] else "n/a"))
+                + " | corrected="
+                + ("ready" if form["corrected"] else ("needed" if form["needs_corrected"] else "n/a"))
+                + " | submit="
+                + ("armed" if form["ready"] else "waiting")
+            )
+            border = NEON if form["ready"] else ROSE
+        elif state == "reviewed" and latest_entry is not None:
+            text = Text.from_markup(
+                f"Latest stored verdict={str(latest_entry.get('verdict', 'skip')).upper()} | "
+                f"turn=T{latest_entry.get('turn_index', '?')} | "
+                f"{safe_excerpt(latest_entry.get('explanation') or 'no explanation', limit=96)}"
+            )
+            border = NEON if str(latest_entry.get("verdict", "")).lower() == "accept" else AMBER
+        else:
+            text = Text.from_markup("Reply review unlocks after Adam answers.")
+            border = AMBER
+        return Panel(text, title="Graph Impact", border_style=border, style=f"on {SHADE_ALT}")
 
     def deck_summary_panel(self) -> Panel:
         app = self.app
@@ -3250,7 +3538,7 @@ class ChatScreen(Screen):
             if self.is_mounted:
                 self.refresh_panels()
         if app.ui_state.action_progress is not None and self.is_mounted:
-            self.query_one("#action_bus_panel", Static).update(self.main_action_bus_panel())
+            self.query_one("#runtime_action_menu", ActionStrip).refresh()
 
     def _composer_text(self) -> str:
         return self.query_one("#composer_input", TextArea).text
@@ -3259,7 +3547,12 @@ class ChatScreen(Screen):
         self.query_one(selector, TextArea).load_text(value)
 
     def _reset_inline_feedback_inputs(self) -> None:
-        return
+        try:
+            self.query_one("#inline_feedback_verdict_input", Input).value = ""
+            self._set_text_area("#inline_feedback_explanation_input", "")
+            self._set_text_area("#inline_feedback_corrected_input", "")
+        except Exception:
+            return
 
     def focus_composer(self) -> TextArea:
         composer = self.query_one("#composer_input", TextArea)
@@ -3305,7 +3598,9 @@ class ChatScreen(Screen):
             else:
                 app.ui_state.preview_active_set = app.ui_state.last_active_set
                 app.ui_state.preview_trace = app.ui_state.last_trace
-            self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
+            if not self.is_mounted:
+                return
+            self.query_one("#runtime_action_menu", ActionStrip).refresh()
             self.query_one("#active_aperture_panel", Static).update(self.main_aperture_panel())
             self.query_one("#thinking_panel", Static).update(self.main_thinking_panel())
             self.query_one("#runtime_chyron_panel", Static).update(self.main_runtime_chyron_panel())
@@ -3319,6 +3614,54 @@ class ChatScreen(Screen):
     def handle_composer_changed(self, _event) -> None:
         self._refresh_composer_surfaces()
         self._schedule_preview_refresh()
+
+    async def _submit_inline_feedback_from_fields(self) -> None:
+        form = self._inline_feedback_form_state()
+        verdict = form["verdict"]
+        if verdict is None:
+            self.app.ui_state.last_feedback = "Review code must be A, E, R, or S."
+            self.refresh_panels()
+            return
+        await self.submit_feedback(
+            verdict,
+            explanation=form["explanation"],
+            corrected=form["corrected"],
+        )
+
+    @on(Input.Changed, "#inline_feedback_verdict_input")
+    def handle_inline_feedback_input_changed(self, _event: Input.Changed) -> None:
+        self._sync_inline_feedback_surface()
+        self.query_one("#inline_feedback_status_panel", Static).update(self.main_inline_feedback_status_panel())
+
+    @on(TextArea.Changed, "#inline_feedback_explanation_input")
+    @on(TextArea.Changed, "#inline_feedback_corrected_input")
+    def handle_inline_feedback_text_changed(self, _event: TextArea.Changed) -> None:
+        self.query_one("#inline_feedback_status_panel", Static).update(self.main_inline_feedback_status_panel())
+
+    @on(Input.Submitted, "#inline_feedback_verdict_input")
+    async def handle_inline_feedback_verdict_submitted(self, _event: Input.Submitted) -> None:
+        verdict, _ = self._inline_feedback_intent()
+        if verdict == "skip":
+            await self._submit_inline_feedback_from_fields()
+            return
+        if verdict in {"accept", "edit", "reject"}:
+            self.query_one("#inline_feedback_explanation_input", TextArea).focus()
+            return
+        self.app.ui_state.last_feedback = "Review code must be A, E, R, or S."
+        self.refresh_panels()
+        self.query_one("#inline_feedback_verdict_input", Input).focus()
+
+    @on(ReviewTextArea.Submitted, "#inline_feedback_explanation_input")
+    async def handle_inline_feedback_explanation_submitted(self, _event: ReviewTextArea.Submitted) -> None:
+        verdict, _ = self._inline_feedback_intent()
+        if verdict == "edit":
+            self.query_one("#inline_feedback_corrected_input", TextArea).focus()
+            return
+        await self._submit_inline_feedback_from_fields()
+
+    @on(ReviewTextArea.Submitted, "#inline_feedback_corrected_input")
+    async def handle_inline_feedback_corrected_submitted(self, _event: ReviewTextArea.Submitted) -> None:
+        await self._submit_inline_feedback_from_fields()
 
     async def _send_turn(self) -> None:
         app = self.app
@@ -3560,7 +3903,13 @@ class ChatScreen(Screen):
                 return False, f"Failed to open Terminal feedback popup: {exc}"
         return False, "Feedback popup launch is currently wired for Terminal.app on macOS."
 
-    async def handle_review(self) -> None:
+    def focus_inline_feedback(self) -> None:
+        try:
+            self.query_one("#inline_feedback_verdict_input", Input).focus()
+        except Exception:
+            self.focus_composer()
+
+    async def handle_review(self, *, open_inline_feedback: bool = True) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
         if not app.ui_state.last_turn_id:
@@ -3576,6 +3925,8 @@ class ChatScreen(Screen):
         )
         self._write_forensic(f"[INFO] Feedback popup :: {detail}")
         self.refresh_panels()
+        if open_inline_feedback:
+            self.call_after_refresh(self.focus_inline_feedback)
 
     async def handle_deck(self) -> None:
         await self.app.push_screen(DeckModal(self))
@@ -3645,7 +3996,7 @@ class ChatScreen(Screen):
             )
         self.refresh_panels()
         if self._is_compact_layout() and app.ui_state.aperture_drawer_open:
-            self.query_one("#header_aperture_btn", Button).focus()
+            self.query_one("#runtime_action_menu", ActionStrip).focus()
         elif not app.ui_state.aperture_drawer_open and not app.ui_state.runtime_chyron_open:
             self.focus_composer()
 
@@ -3894,7 +4245,6 @@ class ChatScreen(Screen):
                     f"Observatory action already running: {progress.get('phase', 'working')} ({elapsed} elapsed)."
                 )
                 self.refresh_panels()
-                self.call_after_refresh(self._reset_runtime_action_menu)
                 return
             self._set_runtime_action_progress(
                 action="observatory",
@@ -3905,7 +4255,6 @@ class ChatScreen(Screen):
                 detail="Waiting for the observatory worker to begin.",
                 feedback="Observatory queued: preparing browser observability surfaces.",
             )
-            self.call_after_refresh(self._reset_runtime_action_menu)
             self.run_worker(self.handle_observatory(), exclusive=True, group="observatory")
         elif normalized == "export":
             self.run_worker(self.handle_export(), exclusive=True, group="export")
@@ -3916,17 +4265,15 @@ class ChatScreen(Screen):
         elif normalized == "help":
             self.run_worker(self.handle_help(), exclusive=True, group="help")
 
-    @on(Select.Changed, "#runtime_action_menu")
-    def handle_runtime_action_changed(self, _event: Select.Changed) -> None:
-        self.query_one("#action_bus_panel", Static).update(self.main_action_bus_panel())
-        self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
-        if self._suppress_runtime_action_change:
-            self._suppress_runtime_action_change = False
+    @on(ActionStrip.Changed, "#runtime_action_menu")
+    def handle_runtime_action_changed(self, _event: ActionStrip.Changed) -> None:
+        self.query_one("#runtime_action_menu", ActionStrip).refresh()
+
+    @on(ActionStrip.Submitted, "#runtime_action_menu")
+    def handle_runtime_action_submitted(self, event: ActionStrip.Submitted) -> None:
+        if self._recent_runtime_action_dispatch(event.action):
             return
-        action = str(self.query_one("#runtime_action_menu", Select).value or "review")
-        if self._recent_runtime_action_dispatch(action):
-            return
-        self._execute_runtime_action(action)
+        self._execute_runtime_action(event.action)
 
     def _recent_runtime_action_dispatch(self, action: str) -> bool:
         normalized = (action or "review").strip().lower()
@@ -3942,7 +4289,7 @@ class ChatScreen(Screen):
     def handle_focus_surface_change(self, _event: events.Event) -> None:
         if not self.is_mounted:
             return
-        self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
+        self.query_one("#runtime_action_menu", ActionStrip).refresh()
 
     def _handle_scroll_keys(self, event: events.Key) -> bool:
         focused_id = getattr(self.app.focused, "id", None)
@@ -3984,19 +4331,6 @@ class ChatScreen(Screen):
             return
         if self._route_printable_to_composer(event):
             return
-        if event.key == "enter" and self.app.focused and getattr(self.app.focused, "id", None) == "runtime_action_menu":
-            action = str(self.query_one("#runtime_action_menu", Select).value or "review")
-            if not self._recent_runtime_action_dispatch(action):
-                self._execute_runtime_action(action)
-            event.stop()
-
-    @on(Button.Pressed, "#header_ingest_btn")
-    async def handle_header_ingest(self) -> None:
-        await self.handle_ingest()
-
-    @on(Button.Pressed, "#header_aperture_btn")
-    def handle_header_aperture(self) -> None:
-        self.toggle_aperture_drawer()
 
 
 class EdenTuiApp(App):
@@ -4023,25 +4357,18 @@ class EdenTuiApp(App):
         height: 8;
         padding: 0 1 1 1;
     }}
-    #runtime_action_bus {{
-        width: 56;
-        min-width: 56;
-        padding-right: 1;
-    }}
-    #action_bus_panel {{
-        height: 4;
-    }}
-    #runtime_top_controls {{
-        height: 6;
-    }}
-    #runtime_quick_action_row {{
-        height: 3;
-    }}
     #runtime_action_menu, #startup_action_menu {{
         width: 1fr;
         min-width: 32;
     }}
-    #runtime_status_strip, #startup_menu_hint {{
+    #runtime_action_menu {{
+        min-width: 72;
+        padding: 0 1;
+        background: #07232d;
+        border: tall #8ef3ff;
+        color: #c3fbff;
+    }}
+    #startup_menu_hint {{
         width: 1fr;
     }}
     #startup_action_menu {{
@@ -4181,6 +4508,13 @@ class EdenTuiApp(App):
         dock: bottom;
         margin: 0 1 1 1;
     }}
+    #inline_feedback_surface {{
+        display: none;
+        height: 0;
+    }}
+    #inline_feedback_command_row {{
+        height: 3;
+    }}
     #composer_input {{
         height: 5;
         background: {CHIARO_SHADOW};
@@ -4199,8 +4533,9 @@ class EdenTuiApp(App):
         border: tall {NEON};
         background: #14090d;
     }}
-    #runtime_action_menu:focus, #header_ingest_btn:focus, #header_aperture_btn:focus {{
-        border: tall {ICE};
+    #runtime_action_menu:focus {{
+        background: #0b2f3b;
+        border: tall #d9ffff;
     }}
     #review_explanation_input, #review_corrected_input, #ingest_prompt_input {{
         height: 6;
@@ -4218,9 +4553,6 @@ class EdenTuiApp(App):
     }}
     .field_stack Input,
     .field_stack Select {{
-        margin-bottom: 0;
-    }}
-    #runtime_top_controls Select {{
         margin-bottom: 0;
     }}
     #deck_look_select {{
@@ -4259,9 +4591,6 @@ class EdenTuiApp(App):
     #atlas_session_actions Button:last-child {{
         margin-right: 0;
     }}
-    #runtime_quick_action_row Button {{
-        margin-bottom: 0;
-    }}
     Input, Select {{
         background: #261219;
         border: tall {AMBER};
@@ -4271,15 +4600,6 @@ class EdenTuiApp(App):
         margin-right: 1;
         background: #32160f;
         color: {TEXT};
-    }}
-    #header_ingest_btn {{
-        background: #174328;
-        width: 1fr;
-    }}
-    #header_aperture_btn {{
-        background: #2b335a;
-        width: 1fr;
-        margin-right: 0;
     }}
     RichLog {{
         background: #060403;
@@ -4453,10 +4773,14 @@ class EdenTuiApp(App):
         border: tall {TYPEWRITER_LIGHT.neon};
         background: {TYPEWRITER_LIGHT.shade};
     }}
-    .look-typewriter-light #runtime_action_menu:focus,
-    .look-typewriter-light #header_ingest_btn:focus,
-    .look-typewriter-light #header_aperture_btn:focus {{
-        border: tall {TYPEWRITER_LIGHT.ice};
+    .look-typewriter-light #runtime_action_menu {{
+        background: #d8f5f7;
+        border: tall #4fa4b8;
+        color: #173944;
+    }}
+    .look-typewriter-light #runtime_action_menu:focus {{
+        background: #eafcfd;
+        border: tall #2b8195;
     }}
     .look-typewriter-light #review_explanation_input,
     .look-typewriter-light #review_corrected_input,
@@ -4491,12 +4815,6 @@ class EdenTuiApp(App):
         background: {TYPEWRITER_LIGHT.panel};
         color: {TYPEWRITER_LIGHT.text};
         border: tall {TYPEWRITER_LIGHT.amber};
-    }}
-    .look-typewriter-light #header_ingest_btn {{
-        background: #dce5d5;
-    }}
-    .look-typewriter-light #header_aperture_btn {{
-        background: #d9dff0;
     }}
     .look-typewriter-light RichLog {{
         background: {TYPEWRITER_LIGHT.marble_light};
@@ -4546,6 +4864,41 @@ class EdenTuiApp(App):
             if node is not None:
                 _sync_node_look(node)
         self.refresh(layout=True)
+
+    def _focus_chain(self) -> list[Any]:
+        chain = list(self.screen.focus_chain)
+        if not isinstance(self.screen, ChatScreen):
+            return chain
+        try:
+            action_strip = self.screen.query_one("#runtime_action_menu", ActionStrip)
+            composer = self.screen.query_one("#composer_input", TextArea)
+        except NoMatches:
+            return chain
+        if action_strip not in chain or composer not in chain:
+            return chain
+        chain.remove(action_strip)
+        chain.insert(chain.index(composer) + 1, action_strip)
+        return chain
+
+    def action_focus_next(self) -> None:
+        chain = self._focus_chain()
+        if not chain:
+            return
+        focused = self.focused
+        if focused in chain:
+            chain[(chain.index(focused) + 1) % len(chain)].focus()
+            return
+        chain[0].focus()
+
+    def action_focus_previous(self) -> None:
+        chain = self._focus_chain()
+        if not chain:
+            return
+        focused = self.focused
+        if focused in chain:
+            chain[(chain.index(focused) - 1) % len(chain)].focus()
+            return
+        chain[-1].focus()
 
     def apply_session_snapshot(self, snapshot: dict[str, Any]) -> None:
         self.ui_state.experiment_id = snapshot["experiment_id"]

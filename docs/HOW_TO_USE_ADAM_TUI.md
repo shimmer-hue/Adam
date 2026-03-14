@@ -16,30 +16,18 @@ If the terminal is small, Adam now switches into a compact layout. In compact mo
 
 ## What Each Panel Is For
 
-### Action Bus
+### Action Strip
 
-The top control strip.
+The top control shelf.
 
 Use it when you want to:
 
-- choose a command from the menu
-- ingest a document quickly
-- open or close aperture
+- run a numbered runtime action directly
+- jump to an action by typing its number
+- move left or right through the action list before pressing `Enter`
+- scan the current runtime/session/progress lines without a separate status box
 
-If focus is on the action menu, `Enter` runs the selected action.
-
-### Live Contract
-
-The runtime status panel beside the action bus on wide terminals.
-
-It tells you:
-
-- which backend is active
-- which session is loaded
-- what conversation stage you are in
-- which control currently has focus
-
-If you lose track of what to do next, read the `note=` line or press `Esc` to get back to the composer.
+If focus is on the action strip, `Enter` runs the selected action and a click runs the clicked action immediately.
 
 ### Adam Dialogue
 
@@ -49,7 +37,6 @@ It shows:
 
 - your saved turns
 - Adam's saved replies
-- stored review events
 - your current unsent draft when the composer has text
 
 When the tape has focus and there is enough history to scroll, `PageUp` and `PageDown` move through it.
@@ -153,9 +140,7 @@ Verified focus rules:
 - `Tab` cycles through interactive controls.
 - On a no-reply screen the verified order is:
   - composer
-  - action menu
-  - ingest button
-  - aperture button
+  - action strip
   - dialogue tape
   - composer
 - After Adam replies, the popup review is the dedicated review path; focus remains keyboard-first in chat.

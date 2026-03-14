@@ -24,7 +24,7 @@ Expected result:
 
 - Focus starts in the composer.
 - On wide terminals, you see:
-  - `Action Bus` at the top
+  - `Action Strip` at the top
   - `Adam Dialogue` and `Composer` on the left
   - `Memgraph Bus`, `Aperture / Active Set`, and `Thinking / Reasoning` on the right
   - `Runtime / Event Chyron` hidden as a bottom drawer (open with `F11`)
@@ -266,19 +266,14 @@ Purpose:
 Verified focus behavior:
 
 - Initial launch focus: `composer_input`
-- No-reply tab order on the live chat screen:
-  1. composer
-  2. action menu
-  3. ingest button
-  4. aperture button
-  5. dialogue tape
-  6. composer
+- First `Tab` from the composer lands on the top action shelf.
+- Continued `Tab` navigation moves through the other interactive chat surfaces and wraps back around.
 - After an Adam reply, the popup review is launched separately and focus stays in chat controls.
 
 Verified key behaviors:
 
 - `Tab` moves through interactive controls.
-- `Enter` on the action menu executes the selected item.
+- `Enter` on the action strip executes the selected item.
 - `Esc` returns to the composer.
 - `PageUp` and `PageDown` scroll the dialogue tape when it has focus and enough content to scroll.
 - `Esc` closes `Deck`, `Ingest Bay`, `Conversation Atlas`, and compact aperture view.
