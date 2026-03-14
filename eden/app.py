@@ -95,6 +95,7 @@ def cmd_feedback(args) -> int:
     print(response_text or "[empty reply]")
     print()
     print("This popup writes explicit graph-backed feedback only. It does not expose hidden chain-of-thought.")
+    print("Press Enter after each field. For edit feedback, finish corrected reply with a single '.' line.")
     print()
 
     verdict = _prompt_feedback_verdict()

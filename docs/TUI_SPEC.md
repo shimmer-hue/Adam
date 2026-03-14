@@ -80,6 +80,7 @@ Primary split:
     - direct visible reasoning
     - chain-like numbered steps derived from the visible reasoning artifact
     - hum-live chain-like rendering derived from the bounded hum artifact
+    - focusable scroll viewport so longer reasoning or hum-live traces can be read in-place from the prime chat surface
 - bottom runtime strip:
   - merged runtime/event chyron with loop phase, active-set summary, feedback state, transcript pointer, and latest event flow
 
@@ -145,6 +146,7 @@ Secondary surfaces:
 - multiline composition is first-class
 - `Esc` returns focus to the composer, and printable keys pressed outside editable widgets are routed back into the composer automatically
 - the dialogue tape is scrollable and can be navigated by focusing it, then using `Up`, `Down`, `PageUp`, `PageDown`, `Home`, or `End`
+- the reasoning / hum-live viewport is also scrollable when focused, using the same navigation keys as the dialogue tape
 - operator turns are persisted and graph-ingested as `Brian the operator: ...`
 - MLX/Qwen model-emitted thinking is surfaced as a dedicated panel instead of leaking into the main Adam response
 - the signal field is explicitly explanatory: it renders a live orthographic memgraph slice using active-set nodes, recall anchors, recent trace events, and ingest roots while remaining separate from any claim about hidden activations
@@ -153,6 +155,7 @@ Secondary surfaces:
 - the prime surface keeps transcript, reply-review status, composer, memgraph, hum, aperture, reasoning, and the merged runtime/event chyron visible while the operator types; Deck still carries the detailed trace and budget surfaces
 - on compact terminals, the prime surface prioritizes transcript + composer + chyron and hides the right telemetry stack until the operator explicitly opens aperture/deeper surfaces
 - feedback is integrated into the primary dialogue bay through a compact latest-turn review status strip plus a dedicated terminal popup launched from `Review` / `F7`
+- inline review is keyboard-first: `Enter` advances to the next required field and submits from the final required field; `Shift+Enter` inserts a newline inside explanation/corrected-response fields
 - popup review still reuses the graph-backed feedback path and therefore updates regard, reward, risk, and edit channels
 - `Review` only opens the popup when Adam has already replied; otherwise the composer keeps focus and the status line explains that there is nothing to review yet
 - conversation logs are written as markdown artifacts under `exports/conversations/` for the active session and surfaced on-screen plus via `Open Conversation Log`

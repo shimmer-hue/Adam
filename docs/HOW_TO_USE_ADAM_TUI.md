@@ -65,12 +65,15 @@ Use it to judge the latest answer:
 - `R` = reject
 - `S` = skip
 
-Then type `Y` in confirm and press `Enter`.
+Press `Enter` to move into the next required field.
+
+When the last required field is filled, press `Enter` again to submit.
 
 Important:
 
 - `A`, `E`, and `R` require explanation
 - `E` also requires corrected text
+- `Shift+Enter` inserts a newline inside explanation or corrected text
 - if there is no Adam reply yet, `F7` now tells you that instead of pretending the review form exists
 
 ### Message Input

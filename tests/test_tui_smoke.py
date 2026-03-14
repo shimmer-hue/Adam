@@ -73,14 +73,17 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         await app.action_show_review()
         await pilot.pause(0.2)
         assert getattr(app.focused, "id", None) == "inline_feedback_verdict_input"
+        assert app.screen.query_one_optional("#inline_feedback_confirm_input") is None
         verdict = app.screen.query_one("#inline_feedback_verdict_input", Input)
         verdict.value = "A"
         await pilot.pause(0.2)
+        await pilot.press("enter")
+        await pilot.pause(0.2)
         explanation = app.screen.query_one("#inline_feedback_explanation_input", TextArea)
+        assert getattr(app.focused, "id", None) == "inline_feedback_explanation_input"
         explanation.load_text("Accepting because the reply matches the session frame.")
-        confirm = app.screen.query_one("#inline_feedback_confirm_input", Input)
-        confirm.value = "Y"
-        await app.screen._submit_inline_feedback_from_fields()
+        await pilot.pause(0.2)
+        await pilot.press("enter")
         await pilot.pause(0.4)
         assert "ACCEPT recorded" in app.ui_state.last_feedback
         assert runtime.graph_health(app.ui_state.experiment_id)["feedback"] == 1
@@ -102,6 +105,119 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         app.screen._health()
         app.screen._health()
         assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_inline_feedback_skip_submits_from_verdict_enter(runtime) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test() as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        composer = app.screen.query_one("#composer_input", TextArea)
+        composer.load_text("Quick turn for skip review.")
+        await app.screen._send_turn()
+        await pilot.pause(0.4)
+
+        await app.action_show_review()
+        await pilot.pause(0.2)
+
+        verdict = app.screen.query_one("#inline_feedback_verdict_input", Input)
+        verdict.value = "S"
+        await pilot.pause(0.2)
+        await pilot.press("enter")
+        await pilot.pause(0.4)
+
+        assert "SKIP recorded" in app.ui_state.last_feedback
+        assert getattr(app.focused, "id", None) == "composer_input"
+        assert runtime.graph_health(app.ui_state.experiment_id)["feedback"] == 1
+
+
+@pytest.mark.asyncio
+async def test_inline_feedback_edit_walks_explanation_then_corrected_on_enter(runtime) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test() as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        composer = app.screen.query_one("#composer_input", TextArea)
+        composer.load_text("Turn that will be edited.")
+        await app.screen._send_turn()
+        await pilot.pause(0.4)
+
+        await app.action_show_review()
+        await pilot.pause(0.2)
+
+        verdict = app.screen.query_one("#inline_feedback_verdict_input", Input)
+        verdict.value = "E"
+        await pilot.pause(0.2)
+        await pilot.press("enter")
+        await pilot.pause(0.2)
+        assert getattr(app.focused, "id", None) == "inline_feedback_explanation_input"
+
+        explanation = app.screen.query_one("#inline_feedback_explanation_input", TextArea)
+        explanation.load_text("The reply should stay tighter to the graph-grounded continuity.")
+        await pilot.pause(0.2)
+        await pilot.press("enter")
+        await pilot.pause(0.2)
+        assert getattr(app.focused, "id", None) == "inline_feedback_corrected_input"
+
+        corrected = app.screen.query_one("#inline_feedback_corrected_input", TextArea)
+        corrected.load_text("Continuity here is grounded in graph state, retrieval, the membrane, and explicit feedback.")
+        await pilot.pause(0.2)
+        await pilot.press("enter")
+        await pilot.pause(0.4)
+
+        assert "EDIT recorded" in app.ui_state.last_feedback
+        assert getattr(app.focused, "id", None) == "composer_input"
+        assert runtime.graph_health(app.ui_state.experiment_id)["feedback"] == 1
+
+
+@pytest.mark.asyncio
+async def test_tui_hum_live_pane_scrolls_when_focused(runtime) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause(1.0)
+        assert app.ui_state.session_id is not None
+
+        long_hum = "\n".join(
+            f"continuity beat {index} with enough detail to force wrapping through the right telemetry rail"
+            for index in range(1, 26)
+        )
+
+        def hum_snapshot(_session_id: str) -> dict[str, object]:
+            return {
+                "present": True,
+                "generated_at": "2026-03-13T21:10:00Z",
+                "latest_turn_id": "turn-scroll",
+                "turn_window_size": 3,
+                "cross_turn_recurrence_present": True,
+                "text_surface": long_hum,
+            }
+
+        runtime.hum_snapshot = hum_snapshot  # type: ignore[method-assign]
+        app.ui_state.reasoning_mode = "hum_live"
+        app.screen.refresh_panels()
+        await pilot.pause(0.3)
+
+        thinking_scroller = app.screen.query_one("#thinking_scroller")
+        assert thinking_scroller.max_scroll_y > 0
+
+        thinking_scroller.focus()
+        await pilot.pause(0.1)
+        assert getattr(app.focused, "id", None) == "thinking_scroller"
+
+        await pilot.press("pagedown")
+        await pilot.pause(0.1)
+        assert thinking_scroller.scroll_y > 0
+
+        await pilot.press("end")
+        await pilot.pause(0.1)
+        assert thinking_scroller.scroll_y == thinking_scroller.max_scroll_y
+
+        await pilot.press("home")
+        await pilot.pause(0.1)
+        assert thinking_scroller.scroll_y == 0
 
 
 @pytest.mark.asyncio

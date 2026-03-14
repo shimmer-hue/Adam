@@ -2505,3 +2505,116 @@ Remaining uncertainties:
 The layout terrain shown in the UI is intentionally broader than the executable worker subset. Many reference-only algorithms are explanatory browse targets, not active implementations.
 Next shortest proof path:
 If Brian the operator wants more of the reference terrain to become executable, pick the next bounded family (`stress-majorization`, `Yifan Hu`, or an orthogonal/grid pass), add one worker-backed implementation at a time, and prove each with targeted UI + performance tests rather than bulk-promoting the whole catalog.
+
+## [2026-03-13T21:04:56-04:00] PRE-FLIGHT
+Operator task:
+Fix the chat CLI hum scroll feature; the right-rail `Hum Live` reasoning view is clipping instead of scrolling.
+Task checksum:
+chat-cli-hum-scroll-fix
+Repo situation:
+Root AGENTS.md constraints already loaded. Working tree is dirty before edits: modified `.DS_Store` only. Recent repo notes show browser observatory continuity fixes landed earlier; current task is the prime TUI chat surface, not the browser strip.
+Relevant spec surfaces read:
+`docs/TUI_SPEC.md`; `docs/HUM_SPEC.md`; `docs/IMPLEMENTATION_TRUTH_TABLE.md`; `docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts in force:
+The prime TUI keeps transcript/composer on the left and hum/reasoning telemetry on the right; hum remains a bounded read-only continuity artifact; `Hum Live` is a presentation-only lens over the bounded hum text surface and must not imply hidden reasoning.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; possibly the TUI spec/truth surfaces if operator-visible behavior changes need contract alignment.
+Status register:
+- Implemented:
+Chat transcript scrolling via `#chat_tape`; bounded hum artifact generation and TUI hum/reasoning presentation surfaces.
+- Instrumented:
+Hum persistence and continuity text already exist for the TUI; current issue is viewport/input behavior, not missing hum data.
+- Conceptual:
+Any claim that hum participates in generation or hidden chain-of-thought.
+- Unknown:
+Whether the intended fix is mouse-wheel only, keyboard scroll, or both; whether the current `#thinking_panel` widget can scroll with CSS alone or needs a scroll container.
+Risks / invariants:
+Do not regress the dialogue tape scroll path; keep hum read-only; avoid overclaiming beyond TUI viewport behavior; preserve compact-layout behavior and existing reasoning lens semantics.
+Evidence plan:
+Patch the reasoning pane to use a real scrollable surface, add keyboard routing/focus affordance for that pane, cover it with a focused Textual regression, then run targeted TUI tests and the repo pytest suite if the change stays bounded.
+Shortest proof path:
+Convert the reasoning area into a focusable scroll container, teach the chat screen to route scroll keys there, prove the pane can scroll under `Hum Live` with a TUI test, then update docs only if the operator-facing contract text needs to mention the new focus target.
+
+## [2026-03-13T21:10:52-04:00] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`docs/TUI_SPEC.md`; `docs/IMPLEMENTATION_TRUTH_TABLE.md`
+Natural-language contracts added/revised/preserved:
+Revised the TUI contract so the lower reasoning / hum-live surface is explicitly a focusable scroll viewport using the same navigation keys as the dialogue tape. Preserved the hum contract as bounded, read-only, and presentation-only; no hidden reasoning claims were added.
+Behavior implemented or modified:
+The prime chat-screen reasoning surface now renders inside `#thinking_scroller`, a focusable `VerticalScroll` wrapper around the existing `#thinking_panel`. Chat-screen key routing now sends `Up`, `Down`, `PageUp`, `PageDown`, `Home`, and `End` to either the dialogue tape or the reasoning scroller depending on focus, so long `Hum Live` traces scroll in place instead of clipping. Composer guidance now tells Brian the operator that Tab can reach both the dialogue tape and the Hum Live pane.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q tests/test_tui_smoke.py -q` -> pass, including new `test_tui_hum_live_pane_scrolls_when_focused`; `./.venv/bin/pytest -q` -> `68 passed in 41.69s`; ad hoc headless TUI probe showed `#thinking_scroller.max_scroll_y == 8` and `PageDown` advanced `scroll_y` under long hum content.
+Status register changes:
+- Implemented:
+Prime-TUI `Hum Live` / reasoning pane scrolling when the pane is focused.
+- Instrumented:
+None added beyond the regression test and headless probe evidence.
+- Conceptual:
+Hum as generation input or hidden chain-of-thought remains conceptual and unchanged.
+- Unknown:
+Whether Brian the operator also expects mouse-wheel affordance language/documentation beyond the now-proved focus+keyboard path.
+Truth-table / limitations updates:
+Updated the truth-table note for the dedicated model reasoning panel. No limitations text changed because the fix restores the existing intended TUI behavior rather than adding a new bounded caveat.
+Remaining uncertainties:
+The fix proves focus+keyboard scrolling. Mouse-wheel behavior should come from Textual's native scroll container path, but this turn did not add a separate mouse-specific automation proof.
+Next shortest proof path:
+If the operator still sees a gap, run a live TUI/manual mouse-wheel smoke check on the exact terminal host and capture whether the remaining issue is event delivery, terminal emulator behavior, or an additional focus affordance problem.
+
+## [2026-03-13T21:06:17-04:00] PRE-FLIGHT
+Operator task:
+Simplify latest-reply review so the operator can submit with `Enter` after filling the required feedback fields, without the extra `Y` confirmation step.
+Task checksum:
+review-enter-submit-simplification
+Repo situation:
+Root AGENTS.md constraints already loaded. Working tree is dirty before edits: modified `.DS_Store` plus the append-only `codex_notes_garden.md` log. Relevant implementation lives in the TUI feedback strip and the `eden feedback` popup path.
+Relevant spec surfaces read:
+`docs/TUI_SPEC.md`; `docs/HOW_TO_USE_ADAM_TUI.md`; `docs/EXPERIMENT_PROTOCOLS.md`
+Natural-language contracts in force:
+Feedback remains explicit and structured: `accept`/`reject` require explanation; `edit` requires explanation plus corrected text; popup and inline review both write graph-backed feedback and update regard/reward/risk/edit channels.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/eden/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`; `/Users/brianray/Adam/README.md`
+Status register:
+- Implemented:
+Inline and popup feedback both persist graph-backed verdicts; runtime validation already enforces explanation/corrected-text requirements.
+- Instrumented:
+Inline feedback status panel exposes form-readiness hints, but the current affordance is gated behind an extra confirmation field.
+- Conceptual:
+A simpler enter-to-submit review UX that does not require the operator to learn a second commit step.
+- Unknown:
+Whether the current TextArea submit events need explicit focus handoff to avoid trapping `Enter` as a newline in the explanation/corrected fields.
+Risks / invariants:
+Do not weaken feedback validation semantics; preserve skip as the lightest verdict; keep popup and inline review wording aligned; avoid regressing keyboard-only operation.
+Evidence plan:
+Patch the inline review widget/event handling and popup copy, update operator docs, add/adjust TUI smoke coverage for enter-to-submit flows, then run focused and full pytest.
+Shortest proof path:
+Remove the confirm field, submit on `Enter` from verdict for skip and from the final required field for other verdicts, prove with smoke tests for accept/edit/skip, then rerun the repo test suite.
+
+
+## [2026-03-13T21:14:15-04:00] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/eden/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`; `/Users/brianray/Adam/README.md`
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+Natural-language contracts added/revised/preserved:
+Revised the prime TUI reply-review contract so inline review no longer requires a separate `Y` confirmation field. Preserved that `accept`/`reject` require explanation and `edit` requires explanation plus corrected text. Preserved that popup and inline review both write graph-backed feedback through the same runtime path.
+Behavior implemented or modified:
+Inline review now submits with `Enter` from the final required field. `skip` submits directly from the verdict field on `Enter`; `accept`/`reject` move verdict -> explanation and submit from explanation; `edit` moves verdict -> explanation -> corrected text and submits from corrected text. Added `Shift+Enter` newline support inside the review text areas and updated inline/popup/operator-facing copy accordingly.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python -m py_compile eden/tui/app.py eden/app.py tests/test_tui_smoke.py`; `./.venv/bin/python -m pytest -q tests/test_tui_smoke.py -k 'inline_feedback or boots_blank_mode'` -> `3 passed, 9 deselected`; `./.venv/bin/python -m pytest -q` -> `70 passed in 48.88s`
+Status register changes:
+- Implemented:
+Enter-to-submit inline feedback flow with verdict/explanation/corrected-text focus handoff; `Shift+Enter` newline path in inline review fields; updated TUI/docs copy reflecting the new contract.
+- Instrumented:
+Inline feedback status panel now reports enter-submit readiness instead of the removed confirmation gate.
+- Conceptual:
+None newly introduced.
+- Unknown:
+Direct operator comfort/readability of the new flow in a live manual session still needs human validation, even though the keyboard path is covered by tests.
+Truth-table / limitations updates:
+No truth-table or limitations edit was required for this UX simplification. Worktree still contains unrelated pre-existing modifications outside this patch, including `.DS_Store` and `docs/IMPLEMENTATION_TRUTH_TABLE.md`.
+Remaining uncertainties:
+The functional path is proved. Only live operator preference remains outside automated proof.
+Next shortest proof path:
+Launch the TUI, review one `accept`, one `skip`, and one `edit` turn manually, and confirm the flow now feels obvious without reading the inline status strip.

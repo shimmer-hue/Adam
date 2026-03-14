@@ -19,6 +19,7 @@ from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.message import Message
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, Select, Static, TextArea
 
@@ -208,6 +209,30 @@ class UiState:
     reasoning_mode: str = "reasoning"
 
 
+class ReviewTextArea(TextArea):
+    @dataclass
+    class Submitted(Message):
+        textarea: "ReviewTextArea"
+        value: str
+
+        @property
+        def control(self) -> "ReviewTextArea":
+            return self.textarea
+
+    async def _on_key(self, event: events.Key) -> None:
+        if event.key == "enter":
+            event.stop()
+            event.prevent_default()
+            self.post_message(self.Submitted(self, self.text))
+            return
+        if event.key == "shift+enter":
+            event.stop()
+            event.prevent_default()
+            self._replace_via_keyboard("\n", *self.selection)
+            return
+        await super()._on_key(event)
+
+
 def _sync_node_look(node: Any) -> str:
     app = getattr(node, "app", None)
     runtime = getattr(app, "runtime", None)
@@ -274,7 +299,8 @@ class HelpModal(ModalScreen[None]):
             "- ADAM_AUTO: bounded preset choice; MLX currently falls back to runtime_auto and logs that fact\n\n"
             "Feedback rules:\n"
             "- Type A to accept, R to reject, E to edit, S to skip\n"
-            "- Type Y in confirm and press Enter to commit the review\n"
+            "- Press Enter to advance or submit once the required fields are filled\n"
+            "- Use Shift+Enter for a newline inside explanation or corrected-response fields\n"
             "- Accept and reject require explanation\n"
             "- Edit requires explanation and corrected response\n"
             "- Skip records a lightweight no-op verdict"
@@ -2006,19 +2032,18 @@ class ChatScreen(Screen):
                         with Vertical(id="inline_feedback_surface"):
                             with Horizontal(id="inline_feedback_command_row"):
                                 yield Input(placeholder="Verdict code: A / E / R / S", id="inline_feedback_verdict_input")
-                                yield Input(placeholder="Confirm with Y", id="inline_feedback_confirm_input")
                             yield Static(id="inline_feedback_status_panel")
-                            yield TextArea(
+                            yield ReviewTextArea(
                                 id="inline_feedback_explanation_input",
                                 soft_wrap=True,
                                 show_line_numbers=False,
-                                placeholder="Explain the review decision. A / E / R require explanation.",
+                                placeholder="Explain the review decision. Press Enter to submit. Shift+Enter adds a newline.",
                             )
-                            yield TextArea(
+                            yield ReviewTextArea(
                                 id="inline_feedback_corrected_input",
                                 soft_wrap=True,
                                 show_line_numbers=False,
-                                placeholder="Corrected text for EDIT.",
+                                placeholder="Corrected text for EDIT. Press Enter to submit. Shift+Enter adds a newline.",
                             )
                         yield TextArea(
                             id="composer_input",
@@ -2035,7 +2060,8 @@ class ChatScreen(Screen):
                         yield Button("Reasoning", id="reasoning_mode_reasoning_btn")
                         yield Button("Chain-Like", id="reasoning_mode_chain_btn")
                         yield Button("Hum Live", id="reasoning_mode_hum_btn")
-                    yield Static(id="thinking_panel")
+                    with VerticalScroll(id="thinking_scroller", can_focus=True):
+                        yield Static(id="thinking_panel")
             yield Static(id="runtime_chyron_panel")
         yield Footer()
 
@@ -2093,7 +2119,7 @@ class ChatScreen(Screen):
         hum_panel = self.query_one("#hum_panel", Static)
         aperture_panel = self.query_one("#active_aperture_panel", Static)
         reasoning_mode_row = self.query_one("#reasoning_mode_row", Horizontal)
-        thinking_panel = self.query_one("#thinking_panel", Static)
+        thinking_scroller = self.query_one("#thinking_scroller", VerticalScroll)
 
         if compact:
             action_panel.display = False
@@ -2119,7 +2145,7 @@ class ChatScreen(Screen):
                 signal_field.display = False
                 hum_panel.display = False
                 reasoning_mode_row.display = False
-                thinking_panel.display = False
+                thinking_scroller.display = False
                 aperture_panel.styles.height = "1fr"
             else:
                 chat_primary.display = True
@@ -2127,7 +2153,7 @@ class ChatScreen(Screen):
                 signal_field.display = True
                 hum_panel.display = True
                 reasoning_mode_row.display = True
-                thinking_panel.display = True
+                thinking_scroller.display = True
                 aperture_panel.styles.height = 12
         else:
             action_panel.display = True
@@ -2137,7 +2163,7 @@ class ChatScreen(Screen):
             signal_field.display = True
             hum_panel.display = True
             reasoning_mode_row.display = True
-            thinking_panel.display = True
+            thinking_scroller.display = True
             topbar.styles.height = 11
             action_bus.styles.width = 56
             action_bus.styles.min_width = 56
@@ -2525,12 +2551,11 @@ class ChatScreen(Screen):
 
     def _inline_feedback_form_state(self) -> dict[str, Any]:
         verdict, raw_code = self._inline_feedback_intent()
-        confirm = self.query_one("#inline_feedback_confirm_input", Input).value.strip().upper()
         explanation = self.query_one("#inline_feedback_explanation_input", TextArea).text.strip()
         corrected = self.query_one("#inline_feedback_corrected_input", TextArea).text.strip()
         needs_explanation = verdict in {"accept", "edit", "reject"}
         needs_corrected = verdict == "edit"
-        ready = verdict is not None and confirm == "Y"
+        ready = verdict is not None
         if needs_explanation:
             ready = ready and bool(explanation)
         if needs_corrected:
@@ -2538,7 +2563,6 @@ class ChatScreen(Screen):
         return {
             "verdict": verdict,
             "raw_code": raw_code,
-            "confirm": confirm,
             "explanation": explanation,
             "corrected": corrected,
             "needs_explanation": needs_explanation,
@@ -3122,8 +3146,8 @@ class ChatScreen(Screen):
             text = Text.from_markup(
                 f"[bold {AMBER}]Reply review[/]\n"
                 f"Adam / {turn_label} is awaiting operator judgment.\n"
-                "Press F7 or choose Review Last Reply in the Action Bus to open a dedicated terminal popup.\n"
-                "A / E / R require explanation. E also requires corrected text.\n"
+                "Inline review now submits with Enter on the last required field; Shift+Enter inserts a newline.\n"
+                "A / E / R require explanation. E also requires corrected text. Press F7 for the terminal popup if you prefer.\n"
                 "Submitting there writes a feedback event and updates the graph."
             )
             return Panel(text, title="Reply Review", border_style=ROSE, style=f"on {SHADE_ALT}")
@@ -3156,8 +3180,8 @@ class ChatScreen(Screen):
                 + (form["raw_code"] or "·")
                 + " -> "
                 + str(form["verdict"] or "pending")
-                + " | confirm="
-                + (form["confirm"] or "·")
+                + " | enter="
+                + ("submits" if form["ready"] else "awaiting fields")
                 + " | explanation="
                 + ("ready" if form["explanation"] else ("needed" if form["needs_explanation"] else "n/a"))
                 + " | corrected="
@@ -3198,7 +3222,7 @@ class ChatScreen(Screen):
                 f"[bold {AMBER}]Message composer[/]\n"
                 f"state={state} chars={len(draft)} backend={self._active_backend_label()} convo={stage}\n"
                 "Type below to talk to Adam. Esc returns focus here. Printable keys outside menus jump here automatically.\n"
-                "Tab can reach the dialogue tape; Up/Down/PageUp/PageDown scroll it when focused.\n"
+                "Tab can reach the dialogue tape and Hum Live pane; Up/Down/PageUp/PageDown scroll the focused viewport.\n"
                 "Ctrl+S send | F9 ingest | F8 aperture | F5 new session | Shift+Tab header controls | F7 review | F10 atlas"
             )
         return Panel(text, title="Message Input", border_style=NEON if self.app.focused and getattr(self.app.focused, 'id', None) == "composer_input" else AMBER, style=f"on {SHADE_ALT}")
@@ -3443,11 +3467,7 @@ class ChatScreen(Screen):
         form = self._inline_feedback_form_state()
         verdict = form["verdict"]
         if verdict is None:
-            self.app.ui_state.last_feedback = "Review code must be A, E, R, or S before confirmation."
-            self.refresh_panels()
-            return
-        if form["confirm"] != "Y":
-            self.app.ui_state.last_feedback = "Type Y in confirm to commit the review."
+            self.app.ui_state.last_feedback = "Review code must be A, E, R, or S."
             self.refresh_panels()
             return
         await self.submit_feedback(
@@ -3457,7 +3477,6 @@ class ChatScreen(Screen):
         )
 
     @on(Input.Changed, "#inline_feedback_verdict_input")
-    @on(Input.Changed, "#inline_feedback_confirm_input")
     def handle_inline_feedback_input_changed(self, _event: Input.Changed) -> None:
         self._sync_inline_feedback_surface()
         self.query_one("#inline_feedback_status_panel", Static).update(self.main_inline_feedback_status_panel())
@@ -3468,18 +3487,28 @@ class ChatScreen(Screen):
         self.query_one("#inline_feedback_status_panel", Static).update(self.main_inline_feedback_status_panel())
 
     @on(Input.Submitted, "#inline_feedback_verdict_input")
-    def handle_inline_feedback_verdict_submitted(self, _event: Input.Submitted) -> None:
+    async def handle_inline_feedback_verdict_submitted(self, _event: Input.Submitted) -> None:
         verdict, _ = self._inline_feedback_intent()
         if verdict == "skip":
-            self.query_one("#inline_feedback_confirm_input", Input).focus()
+            await self._submit_inline_feedback_from_fields()
             return
         if verdict in {"accept", "edit", "reject"}:
             self.query_one("#inline_feedback_explanation_input", TextArea).focus()
             return
+        self.app.ui_state.last_feedback = "Review code must be A, E, R, or S."
+        self.refresh_panels()
         self.query_one("#inline_feedback_verdict_input", Input).focus()
 
-    @on(Input.Submitted, "#inline_feedback_confirm_input")
-    async def handle_inline_feedback_confirm_submitted(self, _event: Input.Submitted) -> None:
+    @on(ReviewTextArea.Submitted, "#inline_feedback_explanation_input")
+    async def handle_inline_feedback_explanation_submitted(self, _event: ReviewTextArea.Submitted) -> None:
+        verdict, _ = self._inline_feedback_intent()
+        if verdict == "edit":
+            self.query_one("#inline_feedback_corrected_input", TextArea).focus()
+            return
+        await self._submit_inline_feedback_from_fields()
+
+    @on(ReviewTextArea.Submitted, "#inline_feedback_corrected_input")
+    async def handle_inline_feedback_corrected_submitted(self, _event: ReviewTextArea.Submitted) -> None:
         await self._submit_inline_feedback_from_fields()
 
     async def _send_turn(self) -> None:
@@ -4096,6 +4125,25 @@ class ChatScreen(Screen):
         self.query_one("#runtime_status_strip", Static).update(self.main_action_status_panel())
         self.query_one("#composer_hint_panel", Static).update(self.main_composer_hint_panel())
 
+    def _handle_scroll_keys(self, event: events.Key) -> bool:
+        focused_id = getattr(self.app.focused, "id", None)
+        if focused_id not in {"chat_tape", "thinking_scroller"}:
+            return False
+        viewport = self.query_one(f"#{focused_id}", VerticalScroll)
+        action = {
+            "up": viewport.scroll_up,
+            "down": viewport.scroll_down,
+            "pageup": viewport.scroll_page_up,
+            "pagedown": viewport.scroll_page_down,
+            "home": viewport.scroll_home,
+            "end": viewport.scroll_end,
+        }.get(event.key)
+        if action is None:
+            return False
+        action(animate=False)
+        event.stop()
+        return True
+
     def on_key(self, event) -> None:
         if event.key == "escape":
             message = "Composer focused."
@@ -4107,32 +4155,8 @@ class ChatScreen(Screen):
             self.refresh_panels()
             event.stop()
             return
-        if self.app.focused and getattr(self.app.focused, "id", None) == "chat_tape":
-            tape = self.query_one("#chat_tape", VerticalScroll)
-            if event.key == "up":
-                tape.scroll_up(animate=False)
-                event.stop()
-                return
-            if event.key == "down":
-                tape.scroll_down(animate=False)
-                event.stop()
-                return
-            if event.key == "pageup":
-                tape.scroll_page_up(animate=False)
-                event.stop()
-                return
-            if event.key == "pagedown":
-                tape.scroll_page_down(animate=False)
-                event.stop()
-                return
-            if event.key == "home":
-                tape.scroll_home(animate=False)
-                event.stop()
-                return
-            if event.key == "end":
-                tape.scroll_end(animate=False)
-                event.stop()
-                return
+        if self._handle_scroll_keys(event):
+            return
         if self._route_printable_to_composer(event):
             return
         if event.key == "enter" and self.app.focused and getattr(self.app.focused, "id", None) == "runtime_action_menu":
@@ -4298,9 +4322,27 @@ class EdenTuiApp(App):
         width: 1fr;
         margin-bottom: 0;
     }}
-    #thinking_panel {{
+    #thinking_scroller {{
         height: 12;
         min-height: 10;
+        background: {CHIARO_SHADOW};
+        scrollbar-gutter: stable;
+        scrollbar-size-vertical: 2;
+        scrollbar-color: {AMBER};
+        scrollbar-color-hover: {ICE};
+        scrollbar-color-active: {TEXT};
+        scrollbar-background: #17101a;
+        scrollbar-background-hover: #1d1420;
+        scrollbar-background-active: #231b27;
+        scrollbar-corner-color: {CHIARO_SHADOW};
+    }}
+    #thinking_scroller:focus {{
+        background: #14090d;
+    }}
+    #thinking_panel {{
+        width: 100%;
+        min-height: 100%;
+        margin-bottom: 0;
     }}
     #runtime_chyron_panel {{
         height: 6;
@@ -4556,6 +4598,19 @@ class EdenTuiApp(App):
     }}
     .look-typewriter-light #chat_tape:focus {{
         border: tall {TYPEWRITER_LIGHT.ice};
+    }}
+    .look-typewriter-light #thinking_scroller {{
+        background: {TYPEWRITER_LIGHT.marble_light};
+        scrollbar-color: {TYPEWRITER_LIGHT.amber};
+        scrollbar-color-hover: {TYPEWRITER_LIGHT.ice};
+        scrollbar-color-active: {TYPEWRITER_LIGHT.text};
+        scrollbar-background: #e8dece;
+        scrollbar-background-hover: #dfd3c0;
+        scrollbar-background-active: #d5c6b1;
+        scrollbar-corner-color: {TYPEWRITER_LIGHT.marble_light};
+    }}
+    .look-typewriter-light #thinking_scroller:focus {{
+        background: {TYPEWRITER_LIGHT.shade};
     }}
     .look-typewriter-light #composer_input {{
         background: {TYPEWRITER_LIGHT.marble_light};

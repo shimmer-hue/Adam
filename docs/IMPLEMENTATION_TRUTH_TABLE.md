@@ -24,7 +24,7 @@
 | Conversation atlas archive surface | Implemented | modal archive browser exposes all saved sessions through sort/filter plus virtual folder/tag projections stored in session metadata; the `F10`/binding path now opens it through the same worker-safe flow as the action bus |
 | Fixed local-MLX runtime contract | Implemented | the live TUI no longer exposes backend selection on the primary surface; local MLX is the normal runtime contract |
 | Deck + Review secondary surfaces | Implemented | detailed budget / thinking / history remain in `Deck`; explicit feedback remains in `Review` |
-| Dedicated model reasoning panel | Implemented | MLX/Qwen reasoning is kept on and surfaced separately from the final answer, with direct reasoning, chain-like, and hum-live lenses in the prime TUI plus a browser reasoning radio group in the observatory continuity strip |
+| Dedicated model reasoning panel | Implemented | MLX/Qwen reasoning is kept on and surfaced separately from the final answer, with direct reasoning, chain-like, and hum-live lenses in the prime TUI plus a browser reasoning radio group in the observatory continuity strip; the prime-TUI reasoning pane is now a focusable scroll viewport for longer live traces |
 | Operator-label turn persistence | Implemented | saved turns and graph-ingested operator text are punctuated as `Brian the operator: ...` |
 | Session-start inference profile flow | Implemented | new-session and blank/seeded session modal |
 | Manual inference mode | Implemented | persisted in session metadata and surfaced per turn |
