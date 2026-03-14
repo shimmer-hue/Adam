@@ -21,5 +21,7 @@ exports/*/graph_knowledge_base.json
 exports/*/
 models/
 data/cannonical_secondary_sources/
+assets/cannonical_secondary_sources/
+assets/cannonical_secondary_sources.zip
 web/observatory/node_modules/
 web/observatory/node_modules/.vite/

@@ -2618,3 +2618,39 @@ Remaining uncertainties:
 The functional path is proved. Only live operator preference remains outside automated proof.
 Next shortest proof path:
 Launch the TUI, review one `accept`, one `skip`, and one `edit` turn manually, and confirm the flow now feels obvious without reading the inline status strip.
+## [2026-03-14] PRE-FLIGHT
+Operator task: Add `assets/cannonical_secondary_sources/` to `.gitignore` so generated secondary sources under assets are not tracked.
+Task checksum: Ignore path addition in repo root `.gitignore`.
+Repo situation: Working tree was clean prior to this edit.
+Relevant spec surfaces read: AGENTS.md
+Natural-language contracts in force: runtime operational workflow and repo-local conventions; no normative spec surface changes required for gitignore-only update.
+Files/modules likely in scope: .gitignore
+Status register:
+- Implemented:
+- Instrumented:
+- Conceptual:
+- Unknown:
+Risks / invariants:
+- Ignore pattern may be too broad/narrow depending on placement; choose exact rooted path to target only requested directory.
+- Avoid accidentally tracking already untracked files already in history.
+Evidence plan:
+- Confirm `.gitignore` contains `assets/cannonical_secondary_sources/` line after edit.
+- No runtime tests planned for ignore-only change.
+Shortest proof path:
+- Edit `.gitignore`, then run `git status` and attempt commit flow to verify the directory is omitted.
+## [2026-03-14] POST-FLIGHT
+Files changed: .gitignore
+Specs changed: None
+Natural-language contracts added/revised/preserved: No spec/doc updates required for this ignore-list change.
+Behavior implemented or modified: Added `assets/cannonical_secondary_sources/` to repository `.gitignore`.
+Evidence produced (tests / traces / commands / exports): `apply_patch` completed successfully updating `.gitignore`.
+Status register changes:
+- Implemented: Ignore rule added so Git excludes `assets/cannonical_secondary_sources/` by default.
+- Instrumented:
+- Conceptual:
+- Unknown:
+Truth-table / limitations updates: Not applicable.
+Remaining uncertainties: Existing tracked files under this path will remain tracked until removed from index if already committed.
+Next shortest proof path:
+- Run `git status --short` after creating files in that directory to confirm they are ignored.
+- If files under that path are currently tracked, run `git rm -r --cached assets/cannonical_secondary_sources/` then commit.
