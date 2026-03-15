@@ -3434,3 +3434,65 @@ Remaining uncertainties:
 - The compact reviewed-state line is behaviorally proved; its exact visual feel in the terminal still needs human judgment.
 Next shortest proof path:
 Launch `.venv/bin/python -m eden`, submit one feedback event, confirm the compact stored-feedback line reads clearly in the dialogue bay, then send the next turn and verify the inline form reappears only for that new pending review.
+## [2026-03-15 14:47:37 EDT] PRE-FLIGHT
+Operator task:
+Fix the TUI freeze/crash after document ingest returns from the modal to the chat screen; the observed traceback shows `IngestModal.handle_ingest_confirm()` calling `dismiss()` after the screen stack has already returned to the default screen.
+Task checksum:
+Remove the modal-dismiss race in the ingest flow without changing the ingest contract or losing the framing prompt payload.
+Repo situation:
+Worktree already contains the earlier inline-feedback cleanup plus an unrelated `.DS_Store` modification. Relevant implementation is in `/Users/brianray/Adam/eden/tui/app.py`; current TUI coverage exercises direct `ingest_path()` but not the modal round-trip that just failed live.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`.
+Natural-language contracts in force:
+The ingest modal remains a keyboard-first path that collects an absolute document path plus an operator framing prompt, then returns the operator to the same live session/chat surface. The TUI remains primary and should not freeze or drop the operator onto an invalid screen stack.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - `ingest_path()` ingests documents graph-side and refreshes the chat surface.
+  - The modal currently collects the path and prompt fields.
+- Instrumented:
+  - TUI smoke coverage proves direct ingest via `ingest_path()`, not the modal submit/dismiss return path.
+- Conceptual:
+  - A payload-returning ingest modal that closes before the long-running ingest executes.
+- Unknown:
+  - Whether any additional focus restoration is needed after the modal closes and ingest completes.
+Risks / invariants:
+- Do not regress the framing-prompt payload or session-scoped ingest target.
+- Do not leave the modal waiting on long-running ingest work before dismissal.
+- Keep the operator on the chat screen with a usable composer after ingest.
+Evidence plan:
+- Refactor the ingest modal to dismiss with payload only, and move the actual ingest execution into `ChatScreen.handle_ingest()` after `push_screen_wait()` returns.
+- Add a TUI smoke test that opens the modal, submits a real sample path + framing note, and proves the app lands back on `ChatScreen` without a stack error.
+- Run focused smoke coverage first, then the full suite.
+Shortest proof path:
+- Make modal submit close immediately with `(path, prompt)`, run ingest afterward on the chat screen, prove the modal round-trip in `tests/test_tui_smoke.py`, then rerun `./.venv/bin/pytest -q`.
+## [2026-03-15 14:50:31 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+None.
+Natural-language contracts added/revised/preserved:
+Preserved the existing ingest contract: the modal still captures absolute path plus framing prompt, and the operator returns to the same live chat session afterward. The behavioral fix is implementation-only: dismissal now happens before ingest work resumes, which removes the invalid screen-pop race.
+Behavior implemented or modified:
+`IngestModal.handle_ingest_confirm()` now dismisses with a payload instead of awaiting ingest and then trying to pop itself. `ChatScreen.handle_ingest()` now waits for that payload with `push_screen_wait()`, performs the ingest after the modal is closed, and restores composer focus on return to chat. Added a TUI smoke test that exercises the real modal round-trip and proves the screen returns cleanly to `ChatScreen`.
+Evidence produced (tests / traces / commands / exports):
+`python3.12 -m py_compile /Users/brianray/Adam/eden/tui/app.py /Users/brianray/Adam/tests/test_tui_smoke.py` -> success
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py` -> `15 passed in 45.68s`
+`./.venv/bin/pytest -q` -> `73 passed in 58.24s`
+Status register changes:
+- Implemented:
+  - Ingest modal submit no longer crashes on return to the chat screen.
+  - Modal-path smoke coverage now proves the ingest round-trip instead of only direct `ingest_path()` calls.
+- Instrumented:
+  - The new smoke test covers stack return, payload carry-forward, and composer focus restoration after ingest.
+- Conceptual:
+  - No new conceptual surface added in this turn.
+- Unknown:
+  - None on the stack-pop defect itself; the observed traceback maps directly to the fixed code path.
+Truth-table / limitations updates:
+No truth-table or limitations update was needed because the capability status did not change; only the broken return path was repaired and covered.
+Remaining uncertainties:
+- `.DS_Store` remains modified in the worktree and is unrelated to this fix.
+Next shortest proof path:
+Launch `.venv/bin/python -m eden`, press `F9`, ingest the same Austin PDF with a framing note, and verify the modal closes immediately, the chat screen remains responsive during/after ingest, and focus lands back in the composer with the status line updated.

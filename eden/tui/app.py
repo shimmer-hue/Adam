@@ -1437,7 +1437,7 @@ class DeckModal(ModalScreen[None]):
             self.dismiss(None)
 
 
-class IngestModal(ModalScreen[None]):
+class IngestModal(ModalScreen[dict[str, str] | None]):
     def __init__(self, chat_screen: "ChatScreen") -> None:
         super().__init__()
         self.chat_screen = chat_screen
@@ -1483,13 +1483,12 @@ class IngestModal(ModalScreen[None]):
         self.call_after_refresh(lambda: self.query_one("#ingest_path_input", Input).focus())
 
     @on(Button.Pressed, "#ingest_confirm_btn")
-    async def handle_ingest_confirm(self) -> None:
+    def handle_ingest_confirm(self) -> None:
         path = self.query_one("#ingest_path_input", Input).value.strip()
         prompt = self.query_one("#ingest_prompt_input", TextArea).text.strip()
         if not path:
             return
-        await self.chat_screen.ingest_path(path, briefing=prompt)
-        self.dismiss(None)
+        self.dismiss({"path": path, "briefing": prompt})
 
     @on(Button.Pressed, "#ingest_cancel_btn")
     def handle_close(self) -> None:
@@ -4343,7 +4342,11 @@ class ChatScreen(Screen):
         self._schedule_preview_refresh()
 
     async def handle_ingest(self) -> None:
-        await self.app.push_screen(IngestModal(self))
+        payload = await self.app.push_screen_wait(IngestModal(self))
+        if not payload:
+            return
+        await self.ingest_path(str(payload.get("path") or "").strip(), briefing=str(payload.get("briefing") or ""))
+        self.focus_composer()
 
     @on(Button.Pressed, "#reasoning_mode_reasoning_btn")
     def handle_reasoning_mode_reasoning(self) -> None:

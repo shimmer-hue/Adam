@@ -9,7 +9,7 @@ import pytest
 from textual.widgets import Button, Input, Select, Static, TextArea
 
 from eden.browser import BrowserOpenResult
-from eden.tui.app import ActionStrip, ChatScreen, ConversationAtlasModal, DeckModal, EdenTuiApp, SessionConfigModal
+from eden.tui.app import ActionStrip, ChatScreen, ConversationAtlasModal, DeckModal, EdenTuiApp, IngestModal, SessionConfigModal
 
 
 @pytest.mark.asyncio
@@ -201,6 +201,32 @@ async def test_inline_feedback_edit_walks_explanation_then_corrected_on_enter(ru
         assert "EDIT recorded" in app.ui_state.last_feedback
         assert getattr(app.focused, "id", None) == "composer_input"
         assert runtime.graph_health(app.ui_state.experiment_id)["feedback"] == 1
+
+
+@pytest.mark.asyncio
+async def test_ingest_modal_returns_cleanly_to_chat(runtime, sample_files) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(200, 60)) as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        chat_screen = app.screen
+        chat_screen.run_worker(chat_screen.handle_ingest(), exclusive=True, group="ingest_test")
+        await pilot.pause(0.2)
+
+        assert isinstance(app.screen, IngestModal)
+        modal = app.screen
+        modal.query_one("#ingest_path_input", Input).value = str(sample_files["pdf"])
+        modal.query_one("#ingest_prompt_input", TextArea).load_text(
+            "Treat this as a durable source for the current session and keep the framing prompt in recall."
+        )
+        modal.handle_ingest_confirm()
+        await pilot.pause(0.6)
+
+        assert isinstance(app.screen, ChatScreen)
+        assert app.ui_state.last_ingest_result is not None
+        assert app.ui_state.last_ingest_result["title"] == sample_files["pdf"].name
+        assert getattr(app.focused, "id", None) == "composer_input"
 
 
 @pytest.mark.asyncio
