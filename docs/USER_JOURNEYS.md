@@ -54,11 +54,11 @@ Expected result:
 - Your prompt is added to `Adam Dialogue`.
 - Adam's reply appears above the composer in the same transcript tape.
 - A markdown conversation log is written for the active session.
-- Focus stays in the composer while the review popup opens for feedback after a reply.
+- Focus stays in chat while the inline review surface is armed for feedback after a reply.
 
 Verified notes:
 
-- After a reply exists, the popup review opens and can be revisited with `F7`.
+- After a reply exists, the inline review surface is armed and can be revisited with `F7`.
 - `Esc` returns focus to the composer if you want to keep chatting.
 
 Caveats:
@@ -236,8 +236,10 @@ Steps:
   - `E`
   - `R`
   - `S`
-3. Type `Y` in confirm.
-4. Press `Enter`.
+3. Press `Enter`.
+4. Fill explanation when required.
+5. Fill corrected text when using `E`.
+6. Press `Enter` in the active review field to submit.
 
 Expected result:
 
@@ -268,7 +270,7 @@ Verified focus behavior:
 - Initial launch focus: `composer_input`
 - First `Tab` from the composer lands on the top action shelf.
 - Continued `Tab` navigation moves through the other interactive chat surfaces and wraps back around.
-- After an Adam reply, the popup review is launched separately and focus stays in chat controls.
+- After an Adam reply, the inline review surface stays inside chat controls.
 
 Verified key behaviors:
 

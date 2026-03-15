@@ -1034,6 +1034,16 @@ class EdenRuntime:
         model = self._get_model_adapter()
         self.runtime_log.emit(
             "INFO",
+            "turn_preview_ready",
+            "Assembled active set and prompt.",
+            experiment_id=experiment_id,
+            session_id=session_id,
+            active_set_size=len(active_set["items"]),
+            profile_name=profile["profile_name"],
+            budget_pressure=budget["pressure_level"],
+        )
+        self.runtime_log.emit(
+            "INFO",
             "generation_start",
             "Generating Adam response.",
             experiment_id=experiment_id,

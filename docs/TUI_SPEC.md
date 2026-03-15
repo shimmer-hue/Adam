@@ -75,12 +75,13 @@ Primary split:
   - multiline `TextArea` composer for Brian the operator with strong focus styling
   - keyboard-scrollable tape container so the operator can move up/down through the session history
 - right secondary telemetry bay:
+  - top-row live turn-status strip between the action shelf and aperture panel on wide terminals, so generation/finalization phases remain visible while Adam is composing
   - top-right aperture / active-set slice beside the action shelf on wide terminals, so the current retrieval surface stays visible without consuming the lower telemetry stack
   - enlarged slower-pulsing signal field / memgraph bus with explicit symbol legend and live update explanation
   - lower reasoning/feed slice with three operator lenses:
-    - `Reasoning`: current linguistic condition, output contract, budget/scope, membrane record, and live consideration trace
-    - `Chain-Like`: numbered turn-assembly telemetry derived from live runtime state rather than raw model prose
-    - `Hum Live`: bounded continuity telemetry derived from the persisted hum artifact plus live membrane/feedback state
+    - `Reasoning`: response material first, then any non-boilerplate visible reasoning signal, plus runtime condition, membrane record, and live consideration trace
+    - `Chain-Like`: numbered beats cut from the operator-facing answer, with optional non-boilerplate reasoning residue and live assembly anchors
+    - `Hum Live`: bounded hum entries, `[HUM_STATS]`, `[HUM_METRICS]`, `[HUM_TABLE]`, and carryover/memory anchors derived from the persisted hum artifact; on first-turn / no-recurrence states it remains seed-state rather than inventing recurrence
     - focusable scroll viewport so longer reasoning or hum-live traces can be read in-place from the prime chat surface, directly beneath the memgraph bus
 - bottom runtime drawer:
   - merged runtime/event chyron with loop phase, active-set summary, feedback state, transcript pointer, and latest event flow
@@ -111,8 +112,8 @@ Secondary surfaces:
   - operator framing prompt that is indexed prior to later retrieval
   - keyboard-first submit / cancel flow
 - `Review` action:
-  - opens a dedicated terminal popup bound to Adam's latest answer
-  - popup applies graph-backed `accept` / `edit` / `reject` / `skip` feedback through the existing runtime API
+  - focuses the inline explicit-feedback surface bound to Adam's latest answer
+  - inline review applies graph-backed `accept` / `edit` / `reject` / `skip` feedback through the existing runtime API
 - `Conversation Atlas` modal:
   - `all_texts` root shelf over every persisted session transcript
   - relational lenses for folders, tags, experiments, and experiment modes
@@ -144,25 +145,26 @@ Secondary surfaces:
 - the action strip is a single focusable runtime control rather than a dropdown; it now owns the full topbar when the aperture drawer is closed
 - choosing an action now means selecting it in the strip and pressing `Enter`, typing its number then pressing `Enter`, or clicking it directly
 - the strip renders fully spelled-out numbered actions as brighter button-like chips and carries the runtime/session/progress lines directly beneath them
+- the topbar also carries a dedicated live turn-status strip so the operator can see Adam move through preflight, prompt-ready, generating, finalizing, and review phases without losing the aperture surface
 - `Open Browser Observatory` stays repeatable from the strip without forcing a reset back to review focus
 - multiline composition is first-class
 - `Esc` returns focus to the composer, and printable keys pressed outside editable widgets are routed back into the composer automatically
 - the dialogue tape is scrollable and can be navigated by focusing it, then using `Up`, `Down`, `PageUp`, `PageDown`, `Home`, or `End`
 - the reasoning / hum-live viewport is also scrollable when focused, using the same navigation keys as the dialogue tape
 - operator turns are persisted and graph-ingested as `Brian the operator: ...`
-- MLX/Qwen model-emitted thinking is kept out of the main Adam response; the prime feed now emphasizes runtime linguistic condition, membrane behavior, continuity, and active consideration telemetry, while deeper raw reasoning remains a secondary surface
+- MLX/Qwen model-emitted thinking is kept out of the main Adam response; the prime feed now combines response material, filtered visible reasoning/hum artifacts, runtime linguistic condition, membrane behavior, continuity, and active consideration telemetry, while suppressing prompt-mirror scaffolding and avoiding any claim about hidden reasoning
 - the signal field is explicitly explanatory: it renders a live orthographic memgraph slice using active-set nodes, recall anchors, recent trace events, and ingest roots while remaining separate from any claim about hidden activations
 - the memgraph bus keeps an always-visible legend for its glyph vocabulary so the operator can read it as a tool rather than decorative telemetry
 - the aperture is rendered as both a compact top-right bus-to-active-set read and a wider pull-down readable scan with natural-language summaries plus a ranked queue
-- the prime surface keeps transcript, composer, aperture, memgraph, and reasoning/feed lenses visible while the operator types; the standalone hum fact box is removed from the prime screen, while `Hum Live` remains available as a reasoning/feed lens and Deck still carries the detailed trace and budget surfaces
+- the prime surface keeps transcript, composer, aperture, memgraph, and reasoning/feed lenses visible while the operator types; the standalone hum fact box is removed from the prime screen, while `Hum Live` now renders bounded hum entries, stats, metrics, and token-table carryover inside the feed lens
 - on compact terminals, the prime surface prioritizes transcript + composer + runtime chyron trigger and hides the right telemetry stack until the operator explicitly opens aperture/deeper surfaces
-- feedback is integrated through a dedicated terminal popup launched from `Review` / `F7`
-- explicit review is now collected in that popup; it opens automatically after each successful turn submission, with `F7` available to reopen when needed
-- popup review reuses the graph-backed feedback path and therefore updates regard, reward, risk, and edit channels
-- `Review` only opens the popup when Adam has already replied; otherwise the composer keeps focus and the status line explains that there is nothing to review yet
+- feedback is integrated inline inside the chat column through the explicit-feedback surface directly above the composer
+- explicit review is collected there after each successful turn submission; `Review` / `F7` focuses the inline surface when a reply exists
+- inline review reuses the graph-backed feedback path and therefore updates regard, reward, risk, and edit channels
+- `Review` only focuses the inline surface when Adam has already replied; otherwise the composer keeps focus and the status line explains that there is nothing to review yet
 - conversation logs are written as markdown artifacts under `exports/conversations/` for the active session and surfaced on-screen plus via `Open Conversation Log`
 - the conversation atlas treats saved sessions as a relational transcript library: all logs remain under the single export root while folder/tag organization is stored as session metadata and projected in the atlas
-- conversation boundaries are explicit through the top action shelf status lines, transcript state, automatic popup review after each assistant turn, and new-session flow: ask or ingest, review when Adam answers, and end by opening a new session
+- conversation boundaries are explicit through the top action shelf status lines, transcript state, inline review after each assistant turn, and new-session flow: ask or ingest, review when Adam answers, and end by opening a new session
 - budget changes remain visible, but now live in Deck instead of the prime chat pane
 - latest-session resume restores the latest persisted session surface without forcing a new session flow first
 - keyboard-only navigation is supported through top action-strip focus, digit jump or `Left` / `Right` selection, `Enter` execution, `Tab` / `Shift+Tab` focus cycling, and the function-key bindings
@@ -196,7 +198,7 @@ Secondary surfaces:
 - `F4`: toggle low-motion in the current session request
 - `F5`: open the new-session inference-profile flow
 - `F6`: open the utilities deck
-- `F7`: open the latest-turn review popup in a separate terminal
+- `F7`: focus the latest-turn inline review surface in chat
 - `F8`: toggle the full-width aperture drawer
 - `F9`: open document ingest with framing prompt
 - `F10`: open the conversation atlas

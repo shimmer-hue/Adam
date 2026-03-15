@@ -18,6 +18,9 @@ HUM_REQUIRED_FIELDS = {
     "continuity",
     "metrics",
     "text_surface",
+    "surface_lines",
+    "surface_stats",
+    "token_table",
 }
 
 
@@ -52,10 +55,15 @@ def test_first_turn_emits_bounded_session_scoped_hum_artifacts(runtime) -> None:
     assert payload["metrics"]["line_count"] <= payload["boundedness"]["max_lines"]
     assert payload["metrics"]["turn_window_size"] == 1
     assert payload["status"]["cross_turn_recurrence_present"] is False
-    assert payload["text_surface"].startswith("seed-state:")
+    assert payload["surface_lines"]
+    assert payload["surface_lines"][0].startswith("[T0] hum:")
+    assert payload["surface_stats"]["entries"] == 1
+    assert payload["surface_stats"]["words"] >= 2
+    assert payload["token_table"]
+    assert payload["text_surface"].startswith("[T0] hum:")
 
     markdown = markdown_path.read_text(encoding="utf-8")
-    assert "hum:" in markdown
+    assert "[T0] hum:" in markdown
     assert "[HUM_STATS]" in markdown
     assert "[HUM_METRICS]" in markdown
     assert "[HUM_TABLE]" in markdown
@@ -77,7 +85,8 @@ def test_second_turn_updates_overlap_and_recurrence_metrics(runtime) -> None:
     assert overlap["previous_turn_id"] == payload["turn_ids"][-2]
     assert isinstance(overlap["count"], int)
     assert isinstance(payload["status"]["cross_turn_recurrence_present"], bool)
-    assert "continuity:" in payload["text_surface"]
+    assert payload["surface_stats"]["entries"] == 2
+    assert payload["text_surface"].count("[T") >= 2
 
 
 def test_feedback_refreshes_hum_without_prompt_injection(runtime) -> None:
@@ -136,3 +145,4 @@ def test_session_snapshot_and_observatory_surfaces_reference_hum(runtime, tmp_pa
     assert observatory_index["hum"]["json_path"] == snapshot["hum"]["json_path"]
     assert "### Hum" in conversation_log
     assert snapshot["hum"]["artifact_version"] == "hum.v1"
+    assert snapshot["hum"]["surface_lines"]

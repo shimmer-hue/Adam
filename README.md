@@ -113,7 +113,7 @@ Useful flags:
 7. Press `F8` to pull down the full-width aperture drawer. It occupies the top band of the screen and renders a wider natural-language scan of the active set.
 8. The large left column is the Adam dialogue surface: scrolling Brian/Adam tape, inline reply-review strip, and always-visible composer.
 9. Transcript cards now use static chiaroscuro shading instead of animated decorative glyph bands inside the chat surface.
-10. On wide terminals the top row now pairs the action shelf with `Aperture / Active Set`, while the right column keeps only the memgraph bus and the lower reasoning/feed surface.
+10. On wide terminals the top row now pairs the action shelf with a live turn-status strip and `Aperture / Active Set`, while the right column keeps only the memgraph bus and the lower reasoning/feed surface.
 11. The memgraph bus includes a visible glyph legend so `D`, `o`, `^`, `M`, `@`, `R`, `*`, `!`, and `?` can be read directly on-screen.
 12. The runtime loop and session/event summary now ride in a merged bottom chyron instead of taking a full telemetry square.
 13. Type into the visible composer at the bottom of the left dialogue column and send with `Ctrl+S`.
@@ -138,7 +138,7 @@ Useful flags:
 - `runtime_auto`: chooses a bounded preset per turn from transparent heuristics.
 - `adam_auto`: mock mode uses a bounded preset picker; MLX currently falls back to `runtime_auto` and logs that fact.
 - `temperature`, `top_p`, and `repetition_penalty` are passed through on the MLX path using local `mlx-lm` sampler/logits controls.
-- Qwen thinking is left enabled on the MLX path. EDEN keeps the final answer in the main response panel while the prime feed shows runtime constraints, membrane behavior, continuity, and consideration telemetry; the deeper raw reasoning artifact remains a secondary surface.
+- Qwen thinking is left enabled on the MLX path. EDEN keeps the final answer in the main response panel while the prime feed now suppresses prompt-mirror scaffolding and mixes response-first material, bounded visible reasoning/hum artifacts, runtime constraints, membrane behavior, continuity, and consideration telemetry; it still does not claim hidden reasoning access.
 - Prompt budget is an EDEN-side working budget estimate, not a claim about the model’s absolute maximum context window.
 - Token counts are exact when a tokenizer-backed counter is available; otherwise EDEN uses an explicit heuristic and labels it that way.
 

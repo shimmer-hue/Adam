@@ -4,9 +4,9 @@ This document governs what `the hum` means in the current EDEN/ADAM build, where
 
 ## Status Register
 
-Implemented: The current build generates a bounded persisted hum artifact after turn persistence and after explicit feedback persistence. It is written per session as `logs/hum_state/<experiment_id>/<session_id>/current_hum.md` and `current_hum.json`, and surfaced read-only through `session_state_snapshot()`, observatory overview/session-turn payloads, `observatory_index.json`, the prime-TUI `Hum Live` feed lens, the observatory continuity strip, and the conversation-log footer.  
-Instrumented: Historical hum artifact evidence still exists in `/Users/brianray/Desktop/adam_hum_ALL.md`, and the current build now records hum provenance, continuity summaries, and bounded metrics in machine-readable form.  
-Conceptual: Anything richer than the current bounded read-only artifact remains conceptual, including prompt injection, membrane consumption of hum, generation-input use, and a fuller historical-style compressed motif channel.  
+Implemented: The current build generates a bounded persisted hum artifact after turn persistence and after explicit feedback persistence. It is written per session as `logs/hum_state/<experiment_id>/<session_id>/current_hum.md` and `current_hum.json`, and surfaced read-only through `session_state_snapshot()`, observatory overview/session-turn payloads, `observatory_index.json`, the prime-TUI `Hum Live` feed lens, the observatory continuity strip, and the conversation-log footer. The artifact now carries bounded motif-style hum entries plus stats and token-table surfaces derived from persisted continuity inputs.  
+Instrumented: Historical hum artifact evidence still exists in `/Users/brianray/Desktop/adam_hum_ALL.md`, and the current build records hum provenance, continuity summaries, bounded motif lines, and machine-readable stats/table rows for comparison.  
+Conceptual: Prompt injection, membrane consumption of hum, generation-input use, and any claim of full historical parity remain conceptual.  
 Unknown: Whether the hum should later grow beyond the current bounded observability surface, and how much higher-order recurrence the present derivation can truthfully support across broader workloads.
 
 ## Contract Boundaries
@@ -57,11 +57,14 @@ The JSON artifact contract includes:
 - `continuity`
 - `metrics`
 - `text_surface`
+- `surface_lines`
+- `surface_stats`
+- `token_table`
 
 The markdown artifact contract includes:
 
 - session/experiment/timestamp/provenance header lines
-- one `hum:` line containing the bounded text surface
+- bounded per-turn-style `hum:` entry lines
 - `[HUM_STATS]`
 - `[HUM_METRICS]`
 - `[HUM_TABLE]`
@@ -90,16 +93,16 @@ The current hum is also registered in `export_artifacts` as:
 
 ## What The Current Hum Says
 
-The current hum is intentionally small. On the first persisted turn it reports a seed-state rather than inventing recurrence. On later turns it reports only what the persisted surfaces justify: active-set overlap, recurring node IDs when they actually recur, recent feedback summaries, recent membrane summaries, and a bounded text surface describing continuity in plain language.
+The current hum now renders a bounded motif-style continuity surface from persisted active-set labels plus recent feedback and membrane summaries. On the first persisted turn it emits a seed-state entry rather than inventing recurrence. On later turns it adds recurring-item / overlap anchors when the persisted surfaces justify them. The artifact includes bounded `surface_lines`, `surface_stats`, and `token_table` fields in JSON, and mirrors those through `[HUM_STATS]`, `[HUM_METRICS]`, and `[HUM_TABLE]` in markdown.
 
-Compression in this implementation means bounded summaries and truncation, not historical-style vowel-stripping or hidden encoding.
+Compression in this implementation means deterministic token reduction over persisted continuity surfaces. It is historical-style in presentation, but it is still bounded observability rather than hidden encoding or a generation-side control channel.
 
 ## What Remains Unimplemented
 
 - hum as a generation input
 - prompt injection of hum
 - membrane stripping of hum
-- a richer historical-style compressed motif channel
+- full historical parity with older hum logs
 - any claim that the hum alone reconstructs persona
 
 The reasoning lenses that render `Hum Live` are presentation-only views over the same bounded `text_surface`. They do not promote the hum into a generation input or hidden cognition channel.

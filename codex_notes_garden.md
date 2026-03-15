@@ -3211,3 +3211,162 @@ Evidence plan:
 - Patch the topbar compose/layout and feed rendering, update the TUI/docs truthfully, add smoke coverage for the new topbar status and artifact-first feed content, and rerun `./.venv/bin/pytest -q`.
 Shortest proof path:
 - Add a small `#turn_status_panel` between the action shelf and aperture panel, track send-turn progress phases in UI state plus runtime-log polling, rework `main_thinking_panel()` to surface visible reasoning excerpts / numbered reasoning beats / detailed hum artifact content, then update docs/tests and rerun pytest.
+## [2026-03-14 16:03:16 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/eden/runtime.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/README.md`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/README.md`.
+Natural-language contracts added/revised/preserved:
+Revised the prime-screen feed contract again so it no longer leads with generic constraints alone. Preserved the bounded/read-only hum and no-hidden-chain-of-thought contracts while moving visible reasoning excerpts, answer-beat reductions, and detailed hum-memory surfaces into the prime feed. Added a topbar live turn-status strip as an operator-facing progress surface only.
+Behavior implemented or modified:
+Inserted `#turn_status_panel` between the action shelf and aperture panel on wide terminals. Added `turn_progress` UI state plus progress syncing from runtime-log events so send-turn flow now visibly steps through preflight, prompt-ready, generating, finalizing, continuity refresh, and review. Added a new `turn_preview_ready` runtime-log event in `runtime.chat()`. Reworked `main_thinking_panel()` so `Reasoning` now shows visible reasoning excerpt + answer excerpt + runtime condition, `Chain-Like` now shows numbered beats from the visible reasoning artifact (or answer fallback), and `Hum Live` now shows hum text surface plus recurring carryover, feedback memory, and membrane memory.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python -m py_compile /Users/brianray/Adam/eden/tui/app.py /Users/brianray/Adam/eden/runtime.py /Users/brianray/Adam/tests/test_tui_smoke.py`
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py -k "reasoning_mode_buttons or turn_status_panel or boots_blank_mode or hum_live"` -> `4 passed, 10 deselected`
+`./.venv/bin/pytest -q` -> `72 passed in 55.12s`
+Status register changes:
+- Implemented:
+  - Wide topbar now includes a dedicated live turn-status strip.
+  - Prime feed tabs now foreground actual captured reasoning/hum material instead of mostly constraint summaries.
+  - `Chain-Like` falls back to answer-beat reduction when no visible reasoning artifact exists, rather than inventing hidden reasoning.
+  - Smoke coverage now locks the turn-status strip and artifact-first feed content.
+- Instrumented:
+  - Runtime log now emits `turn_preview_ready` before generation begins, improving truthful live status visibility.
+- Conceptual:
+  - Deeper decoder-level generation telemetry remains conceptual until the backend emits it truthfully.
+- Unknown:
+  - Whether the operator will want even more granular per-token/per-chunk progress from the MLX path once this higher-level status strip is in daily use.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` so they now describe the topbar status strip and the artifact-first feed truthfully.
+Remaining uncertainties:
+- The current live status strip is phase-based, not token-stream-based.
+- `Hum Live` remains bounded by the present `hum.v1` artifact; richer continuity material would require a hum-spec change, not just a TUI tweak.
+Next shortest proof path:
+Launch `.venv/bin/python -m eden`, send a live turn on the normal MLX path, and confirm the topbar status strip feels sufficient during the generation pause. If not, the next bounded step is backend instrumentation for chunk- or token-level progress events.
+## [2026-03-14 16:06:22 EDT] PRE-FLIGHT
+Operator task:
+Correct the prime feed again because it is still not useful in practice: `Reasoning` and `Chain-Like` are showing prompt-mirror scaffolding, and `Hum Live` is still too sparse on a first persisted turn.
+Task checksum:
+Keep the live turn-status strip and the bounded/no-hidden-chain-of-thought contract, but change the lower-right feed so it suppresses prompt-echo reasoning, centers answer-anchored material, and gives `Hum Live` a useful first-turn seed packet from the actual active set.
+Repo situation:
+The previous turn's topbar status strip and artifact-first feed changes are already in the working tree and passed full pytest. This is a direct corrective refinement inside the same patch cycle. Append-only notes file remains in scope.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`, `/Users/brianray/Adam/docs/HUM_SPEC.md`.
+Natural-language contracts in force:
+Prime-screen telemetry must help Brian the operator inspect Adam's live linguistic condition and alignment without fabricating hidden cognition. Visible reasoning artifacts may be surfaced, but prompt-mirror scaffolding should not be confused with useful model signal. The hum remains bounded and read-only; first-turn continuity should still be presented truthfully.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/README.md`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Wide topbar live turn-status strip.
+  - Prime feed can surface visible reasoning excerpts, answer excerpts, and hum continuity details.
+- Instrumented:
+  - Runtime log now emits `turn_preview_ready`, `generation_start`, `generation_complete`, and `hum_refreshed`.
+- Conceptual:
+  - Prompt-mirror reasoning suppression and stronger answer-anchored feed semantics.
+  - Useful first-turn `Hum Live` seed content derived from the current active set.
+- Unknown:
+  - Exact prompt-mirror patterns emitted by the current MLX/Qwen path across different turns.
+Risks / invariants:
+- Do not discard genuinely useful visible reasoning signal while filtering prompt mirror.
+- Do not imply access to hidden chain-of-thought; answer-anchored reductions must stay operator-visible and truthful.
+- Do not violate the bounded hum contract; any first-turn seed content must stay clearly tied to the current active set and persisted turn surfaces.
+Evidence plan:
+- Patch `main_thinking_panel()` and helpers, update smoke coverage to prove prompt-mirror suppression / answer-anchored chain view / hum seed packet behavior, then rerun `./.venv/bin/pytest -q`.
+Shortest proof path:
+- Add a prompt-mirror filter for visible reasoning, make `Chain-Like` prefer answer beats plus terse reasoning-signal notes, make `Hum Live` render a current-turn seed packet from active-set labels when recurrence is not yet available, then update docs/tests and rerun pytest.
+## [2026-03-14 16:12:32 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/README.md`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/README.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the no-hidden-chain-of-thought and bounded-hum contracts, but revised the prime feed contract so it no longer treats prompt-mirror reasoning as operator-valuable material. `Reasoning` is now response-first, `Chain-Like` is answer-anchored, and `Hum Live` now stays useful on first-turn sessions via a clearly-labeled active-set seed packet.
+Behavior implemented or modified:
+Added `_normalize_reasoning_line()`, `_is_prompt_mirror_line()`, and `_useful_reasoning_lines()` to suppress visible reasoning lines that merely echo the prompt scaffold. Reworked `main_thinking_panel()` so `Reasoning` now shows response material first and only non-boilerplate reasoning signal second, `Chain-Like` now shows answer beats plus optional filtered reasoning residue, and `Hum Live` now swaps the dead-end `seed-state only` message for a current-turn seed packet derived from the active set when recurrence is not yet available.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/python -m py_compile /Users/brianray/Adam/eden/tui/app.py /Users/brianray/Adam/tests/test_tui_smoke.py`
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py -k "reasoning_mode_buttons or hum_live or turn_status_panel"` -> `3 passed, 11 deselected`
+`./.venv/bin/pytest -q` -> `72 passed in 55.76s`
+Status register changes:
+- Implemented:
+  - Prompt-mirror reasoning scaffolding is now suppressed in the prime feed.
+  - `Chain-Like` is now answer-anchored rather than reasoning-artifact-anchored.
+  - `Hum Live` now produces useful first-turn seed content from the current active set.
+- Instrumented:
+  - No new backend instrumentation in this corrective turn.
+- Conceptual:
+  - Decoder-level or token-stream generation telemetry remains conceptual.
+- Unknown:
+  - Whether the current suppression patterns cover every prompt-mirror variant the MLX/Qwen path may emit across broader workloads.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` so they describe prompt-mirror suppression and first-turn hum seed behavior truthfully.
+Remaining uncertainties:
+- The reasoning filter is pattern-based. If the backend starts emitting a different prompt-mirror shape, it may need one more pass.
+- `Hum Live` first-turn seed content is useful and truthful, but richer continuity still depends on multiple persisted turns.
+Next shortest proof path:
+Launch `.venv/bin/python -m eden`, reproduce the same single-turn scenario from the screenshots, and verify that `Reasoning` now leads with the answer, `Chain-Like` no longer shows `Analyze the Request` / `Context` scaffolding, and `Hum Live` shows the active-set seed packet instead of only saying recurrence is absent.
+## [2026-03-14 17:29:43 EDT] PRE-FLIGHT
+Operator task:
+Move explicit feedback back into the chat dialogue instead of a popup, and make `Hum Live` look/behave more like the historical hum artifact in `/Users/brianray/Library/Mobile Documents/com~apple~CloudDocs/iCloud DEV BACKUPS/Eden/logs/hum_state/adam_hum_ALL.md`.
+Task checksum:
+Keep the bounded/no-hidden-chain-of-thought contract, remove TUI popup review behavior, restore visible inline review controls in chat, and replace the current hum summary-style feed with a bounded motif/stats/table artifact and matching TUI presentation.
+Repo situation:
+Working tree already contains the prior prime-feed corrective changes and they passed full pytest. This turn is a direct follow-on. This PRE-FLIGHT is appended late; contents reflect the actual task framing used before edits.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HUM_SPEC.md`.
+Natural-language contracts in force:
+Explicit feedback must remain structured and graph-backed. `Hum Live` must remain a truthful observability surface rather than hidden cognition, but it should resemble the repo's historical hum artifact more closely in form and usefulness.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/eden/hum.py`, `/Users/brianray/Adam/tests/test_hum_runtime.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HUM_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/docs/USER_JOURNEYS.md`.
+Status register:
+- Implemented:
+  - In-chat inline feedback widgets still exist in the TUI compose tree.
+  - `Hum Live` already reads the persisted hum payload.
+- Instrumented:
+  - Historical hum evidence exists on disk and exposes `[HUM_STATS]`, `[HUM_METRICS]`, and `[HUM_TABLE]` markers for comparison.
+- Conceptual:
+  - Inline-only review path with no popup launcher.
+  - Bounded hum artifact with motif-style entry lines plus stats/table content rendered directly in `Hum Live`.
+- Unknown:
+  - Whether the current hum derivation inputs are sufficient to produce useful hum-like output without expanding beyond active-set/feedback/membrane sources.
+Risks / invariants:
+- Do not regress the explicit-feedback semantics (`accept` / `edit` / `reject` / `skip`).
+- Do not imply hidden chain-of-thought or claim full historical hum parity.
+- Keep the hum bounded and deterministic.
+Evidence plan:
+- Patch `eden/tui/app.py` to remove popup behavior and restore visible inline review.
+- Patch `eden/hum.py` to emit bounded hum entries, stats, and token-table rows.
+- Update smoke/runtime tests and rerun `./.venv/bin/pytest -q`.
+Shortest proof path:
+- Make `Review` / `F7` focus inline feedback only, make the inline surface visibly mounted in chat after a reply, generate bounded motif-style hum entries from persisted continuity inputs, and prove both via TUI smoke tests plus hum runtime tests.
+## [2026-03-14 17:29:43 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`, `/Users/brianray/Adam/eden/hum.py`, `/Users/brianray/Adam/tests/test_hum_runtime.py`, `/Users/brianray/Adam/tests/test_tui_smoke.py`, `/Users/brianray/Adam/docs/HUM_SPEC.md`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/docs/USER_JOURNEYS.md`, append-only `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/HUM_SPEC.md`, `/Users/brianray/Adam/docs/TUI_SPEC.md`, `/Users/brianray/Adam/docs/HOW_TO_USE_ADAM_TUI.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`, `/Users/brianray/Adam/docs/USER_JOURNEYS.md`.
+Natural-language contracts added/revised/preserved:
+Revised the chat-surface contract so explicit feedback is inline-only rather than popup-launched. Revised the hum contract so `hum.v1` now includes bounded motif-style entry lines, stats, and token-table rows while preserving the existing bounded/read-only/no-generation-input constraints. Preserved the no-hidden-chain-of-thought boundary for all feed lenses.
+Behavior implemented or modified:
+Removed the popup review path from `ChatScreen.handle_review()` and restored visible inline feedback in the chat deck above the composer. Updated post-turn/status messaging so review is described as inline. Extended `eden/hum.py` so the persisted hum artifact now renders bounded `[Tn] hum:` motif lines, `[HUM_STATS]`, `[HUM_METRICS]`, and a token table derived from persisted `active_set_json`, `feedback_events`, and membrane events. Reworked `Hum Live` to display those artifact surfaces directly instead of the prior summary/seed-packet block.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_hum_runtime.py` -> `4 passed in 0.41s`
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py` -> `14 passed in 43.27s`
+`./.venv/bin/pytest -q` -> `72 passed in 55.96s`
+Status register changes:
+- Implemented:
+  - `Review` / `F7` now focuses an inline explicit-feedback surface in chat rather than launching a terminal popup.
+  - `Hum Live` now renders a bounded motif-style hum artifact with stats and token counts.
+- Instrumented:
+  - Historical hum comparison remains an instrumented lineage surface rather than proof of parity.
+- Conceptual:
+  - Full parity with historical hum logs remains conceptual.
+- Unknown:
+  - Whether the bounded motif derivation will feel sufficient across longer sessions without expanding the hum inputs further.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to reflect inline review and the richer bounded hum artifact truthfully.
+Remaining uncertainties:
+- The new hum surface is closer to the historical artifact in form, but it is still bounded by the current `hum.v1` derivation inputs and size limits.
+- Older archaeology docs may still describe popup-era behavior; normative/user-facing surfaces were updated in this turn.
+Next shortest proof path:
+Launch `.venv/bin/python -m eden`, send a fresh Adam turn, verify that review now stays in the chat column, and inspect `Hum Live` against the referenced historical hum file to decide whether the current bounded motif/channel is sufficient or whether the derivation inputs need to grow in a future spec change.

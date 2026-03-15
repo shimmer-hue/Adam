@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -24,6 +25,7 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         assert app.screen.query_one("#signal_field").parent is chat_secondary
         assert app.screen.query_one("#aperture_drawer_panel").display is True
         assert app.screen.query_one("#active_aperture_panel").display is False
+        assert app.screen.query_one("#turn_status_panel").display is True
         assert app.screen.query_one_optional("#hum_panel") is None
         menu = app.screen.query_one("#runtime_action_menu", ActionStrip)
         assert menu.value == "review"
@@ -63,6 +65,7 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         assert app.ui_state.last_response
         assert "Answer:" not in app.ui_state.last_response
         assert "Basis:" not in app.ui_state.last_response
+        assert app.screen.query_one("#inline_feedback_surface").display is True
         chat_group = app.screen.main_chat_exchange_panel()
         assert getattr(chat_group.renderables[0], "style", None) == "on #000000"
         assert getattr(chat_group.renderables[1], "style", None) == "on #321221"
@@ -87,6 +90,7 @@ async def test_tui_boots_blank_mode_and_uses_multiline_composer(runtime, sample_
         await app.action_show_review()
         await pilot.pause(0.2)
         assert getattr(app.focused, "id", None) == "inline_feedback_verdict_input"
+        assert "popup" not in app.ui_state.last_feedback.lower()
         assert app.screen.query_one_optional("#inline_feedback_confirm_input") is None
         verdict = app.screen.query_one("#inline_feedback_verdict_input", Input)
         verdict.value = "A"
@@ -235,11 +239,28 @@ async def test_tui_hum_live_pane_scrolls_when_focused(runtime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_reasoning_mode_buttons_switch_feed_titles(runtime) -> None:
+async def test_reasoning_mode_buttons_switch_feed_titles(runtime, tmp_path) -> None:
     app = EdenTuiApp(runtime)
     async with app.run_test(size=(140, 44)) as pilot:
         await pilot.pause(1.0)
-        app.ui_state.last_reasoning = "First visible reasoning beat.\nSecond visible reasoning beat."
+        app.ui_state.last_reasoning = (
+            "Thinking Process:\n"
+            "1. **Analyze the Request:**\n"
+            "**User:** Brian the operator.\n"
+            "**Context:** Brian is starting Adam's curriculum.\n"
+            "**Constraints:** Return one clean operator-facing reply."
+        )
+        app.ui_state.last_response = (
+            "Greetings, Brian.\n"
+            "I am ready to begin the first module.\n"
+            "We can start with Austin and Butler today."
+        )
+        app.ui_state.last_active_set = [
+            {"label": "language philosophy", "selection": 4.2, "regard": 3.8, "activation": 0.81, "domain": "knowledge", "node_kind": "meme"},
+            {"label": "curriculum start", "selection": 3.6, "regard": 3.2, "activation": 0.81, "domain": "behavior", "node_kind": "meme"},
+            {"label": "teaching plan", "selection": 2.7, "regard": 2.1, "activation": 0.66, "domain": "behavior", "node_kind": "memode"},
+        ]
+        app.ui_state.last_trace = list(app.ui_state.last_active_set)
         app.ui_state.current_profile = {
             "profile_name": "manual-balanced",
             "requested_mode": "manual",
@@ -254,16 +275,60 @@ async def test_reasoning_mode_buttons_switch_feed_titles(runtime) -> None:
             "remaining_input_tokens": 900,
             "count_method": "heuristic",
         }
+        hum_json = tmp_path / "hum.json"
+        hum_json.write_text(
+            json.dumps(
+                {
+                    "surface_lines": [
+                        "[T0] hum: lngg phlsph / crrclm strt / pssthrgh",
+                        "[T1] hum: tchg pln / lngg phlsph / mmbrn stdy",
+                    ],
+                    "surface_stats": {
+                        "entries": 2,
+                        "lines_total": 2,
+                        "words": 6,
+                        "unique_tokens": 5,
+                        "repeated_tokens": 1,
+                        "hapax_tokens": 4,
+                        "type_token_ratio": 0.833,
+                        "avg_token_len": 5.17,
+                        "avg_line_words": 3.0,
+                        "chars_total": 78,
+                        "top10_coverage_pct": 100.0,
+                    },
+                    "token_table": [
+                        {"token": "lngg", "count": 2, "pct_of_all_tokens": 0.333},
+                        {"token": "phlsph", "count": 1, "pct_of_all_tokens": 0.167},
+                        {"token": "crrclm", "count": 1, "pct_of_all_tokens": 0.167},
+                    ],
+                    "continuity": {
+                        "recurring_items": [],
+                        "active_set_overlap": {"labels": []},
+                        "feedback_summary": {"recent": []},
+                        "membrane_summary": {
+                            "recent": [
+                                {
+                                    "event_type": "PASSTHROUGH",
+                                    "detail": "Response passed the membrane unchanged.",
+                                }
+                            ]
+                        },
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
 
         def hum_snapshot(_session_id: str) -> dict[str, object]:
             return {
                 "present": True,
                 "artifact_version": "hum.v1",
                 "generated_at": "2026-03-13T21:10:00Z",
+                "json_path": str(hum_json),
                 "latest_turn_id": "turn-hum",
                 "turn_window_size": 3,
                 "cross_turn_recurrence_present": True,
-                "text_surface": "continuity beat one\ncontinuity beat two\ncontinuity beat three",
+                "text_surface": "[T0] hum: lngg phlsph / crrclm strt / pssthrgh\n[T1] hum: tchg pln / lngg phlsph / mmbrn stdy",
             }
 
         runtime.hum_snapshot = hum_snapshot  # type: ignore[method-assign]
@@ -277,25 +342,67 @@ async def test_reasoning_mode_buttons_switch_feed_titles(runtime) -> None:
         await pilot.pause(0.2)
 
         assert str(app.screen.main_thinking_panel().title) == "Reasoning"
-        assert "Output contract" in app.screen.main_thinking_panel().renderable.plain
+        assert "Response material" in app.screen.main_thinking_panel().renderable.plain
+        assert "Greetings, Brian." in app.screen.main_thinking_panel().renderable.plain
+        assert "prompt scaffolding" in app.screen.main_thinking_panel().renderable.plain
+        assert "Analyze the Request" not in app.screen.main_thinking_panel().renderable.plain
         assert "Membrane record" in app.screen.main_thinking_panel().renderable.plain
 
         app.screen.query_one("#reasoning_mode_chain_btn", Button).press()
         await pilot.pause(0.2)
         assert app.ui_state.reasoning_mode == "chain_like"
         assert str(app.screen.main_thinking_panel().title) == "Chain-Like Trace"
-        assert "Turn assembly" in app.screen.main_thinking_panel().renderable.plain
+        assert "Response beats" in app.screen.main_thinking_panel().renderable.plain
+        assert "1. Greetings, Brian." in app.screen.main_thinking_panel().renderable.plain
+        assert "Analyze the Request" not in app.screen.main_thinking_panel().renderable.plain
 
         app.screen.query_one("#reasoning_mode_hum_btn", Button).press()
         await pilot.pause(0.2)
         assert app.ui_state.reasoning_mode == "hum_live"
         assert str(app.screen.main_thinking_panel().title) == "Hum Live Trace"
-        assert "Continuity telemetry" in app.screen.main_thinking_panel().renderable.plain
+        hum_panel = app.screen.main_thinking_panel().renderable.plain
+        assert "Hum entries" in hum_panel
+        assert "[HUM_STATS]" in hum_panel
+        assert "[HUM_TABLE]" in hum_panel
+        assert "[T0] hum:" in hum_panel
+        assert "1. lngg x2" in hum_panel
 
         app.screen.query_one("#reasoning_mode_reasoning_btn", Button).press()
         await pilot.pause(0.2)
         assert app.ui_state.reasoning_mode == "reasoning"
         assert str(app.screen.main_thinking_panel().title) == "Reasoning"
+
+
+@pytest.mark.asyncio
+async def test_turn_status_panel_tracks_live_turn_progress(runtime) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(140, 44)) as pilot:
+        await pilot.pause(1.0)
+        app.ui_state.turn_progress = {
+            "phase": "assembling",
+            "detail": "assembling active set and prompt context",
+            "started_at": time.monotonic() - 1.2,
+        }
+        app.screen.refresh_panels()
+        await pilot.pause(0.2)
+
+        panel_text = app.screen.main_turn_status_panel().renderable.plain
+        assert "assembling" in panel_text
+        assert "elapsed=" in panel_text
+
+        runtime.runtime_log.emit(
+            "INFO",
+            "generation_start",
+            "Generating Adam response.",
+            backend="mock",
+            profile_name="manual-balanced",
+            effective_mode="manual",
+        )
+        app.screen._poll_logs()
+
+        panel_text = app.screen.main_turn_status_panel().renderable.plain
+        assert "generating" in panel_text
+        assert "mock composing" in panel_text
 
 
 @pytest.mark.asyncio

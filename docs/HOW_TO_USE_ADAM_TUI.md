@@ -43,7 +43,7 @@ When the tape has focus and there is enough history to scroll, `PageUp` and `Pag
 
 ### Reply Review
 
-The post-reply feedback surface is a dedicated popup (not inline).
+The post-reply feedback surface is inline in the chat column.
 
 Use it to judge the latest answer:
 
@@ -52,8 +52,8 @@ Use it to judge the latest answer:
  - `R` = reject
  - `S` = skip
 
-- `F7` opens the review popup after an Adam reply.
-- `A`, `E`, and `R` use popup-required fields.
+- `F7` focuses the inline review surface after an Adam reply.
+- `A`, `E`, and `R` use inline required fields.
 - If there is no Adam reply yet, `F7` keeps you in the composer and tells you to send a turn first.
 
 ### Composer
@@ -94,22 +94,24 @@ Use it to answer practical questions like:
 
 Verified terminal behavior:
 
-- wide terminals: the compact aperture panel sits at the top right beside the action shelf, and `F8` expands that top panel into the wider drawer view
+- wide terminals: the compact aperture panel sits at the top right beside the action shelf, with a dedicated live turn-status strip between them; `F8` expands the aperture panel into the wider drawer view
 - compact terminals: `F8` swaps the main view into an aperture-focused screen and `Esc` returns to dialogue
 
 ### Thinking / Reasoning
 
-The lower-right feed surface for Adam's live linguistic condition and alignment constraints.
+The lower-right feed surface for Adam's visible reasoning/continuity artifacts plus live linguistic condition.
 
 Use it when you want to inspect:
 
-- the current output contract
-- prompt-budget and scope pressure
+- visible model-emitted reasoning excerpts when the backend emitted them
+- chain-like reductions of the current reasoning artifact or reply
+- bounded hum carryover, feedback memory, and membrane memory
+- prompt-budget / scope pressure
 - recent membrane behavior
 - live consideration trace
-- bounded continuity state through `Hum Live`
+- the operator-facing answer in relation to the current reasoning artifact
 
-`Reasoning`, `Chain-Like`, and `Hum Live` are all views into this same feed surface. They now render structured runtime telemetry rather than dumping raw reasoning prose into the prime screen. There is no separate prime-screen hum box anymore; use `Hum Live` when you want the bounded continuity artifact in feed form.
+`Reasoning`, `Chain-Like`, and `Hum Live` are all views into this same feed surface. They no longer lead with generic constraints alone: they foreground response material, suppress prompt-mirror reasoning scaffolding, and keep the runtime condition as supporting context. There is no separate prime-screen hum box anymore; use `Hum Live` when you want the bounded continuity artifact in artifact form, including hum entries, stats, metrics, and motif counts.
 
 ### Runtime / Event Chyron
 
@@ -151,7 +153,7 @@ Verified focus rules:
   - action strip
   - dialogue tape
   - composer
-- After Adam replies, the popup review is the dedicated review path; focus remains keyboard-first in chat.
+- After Adam replies, the inline review surface is the dedicated review path; focus remains keyboard-first in chat.
 - `Esc` returns to the composer.
 
 Best recovery rule:
@@ -164,7 +166,7 @@ Best recovery rule:
 2. Press `Ctrl+S`.
 3. Read Adam's reply in `Adam Dialogue`.
 4. Either:
-   - review it immediately in the popup
+   - review it immediately in the inline feedback surface
    - or press `Esc` and continue chatting
 
 ## How To Ingest Documents
@@ -211,7 +213,7 @@ Important:
 ### Review
 
 - Press `F7` after Adam replies.
-- Fill the popup fields: verdict, explanation, and corrected text (for edit) as prompted.
+- Fill the inline fields: verdict, explanation, and corrected text (for edit) as prompted.
 
 ### Deck
 

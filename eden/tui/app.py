@@ -3,9 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
-import shlex
-import subprocess
-import sys
+import re
 from time import monotonic
 from dataclasses import dataclass
 from functools import partial
@@ -230,6 +228,7 @@ class UiState:
     action_progress: dict[str, Any] | None = None
     last_action_summary: str | None = None
     reasoning_mode: str = "reasoning"
+    turn_progress: dict[str, Any] | None = None
 
 
 class ReviewTextArea(TextArea):
@@ -523,12 +522,12 @@ class HelpModal(ModalScreen[None]):
             "F8 opens a full-width aperture drawer for a wider active-set scan.\n"
             "F9 opens the ingest bay so you can load a PDF or other document with a framing prompt.\n"
             "The large left column is the Adam dialogue: longer scrolling transcript tape and live composer.\n"
-            "The right column stacks the memgraph bus, a persistent hum fact box, a larger aperture/active-set read, and a lower reasoning surface with chain-like and hum-live lenses.\n"
+            "The right column stacks the memgraph bus, the aperture/active-set read, and a lower reasoning surface with chain-like and hum-live lenses.\n"
             "The runtime loop and session/event state live in a bottom-docked runtime/event chyron drawer that is hidden until pulled up.\n"
             "Use the action strip -> Open Conversation Log to open the saved markdown transcript for the live session.\n"
             "Use the action strip -> Open Conversation Atlas to browse saved sessions through folder and tag projections.\n"
             "Open Utilities Deck for detailed budget, thinking, history, ingest, launch utilities, and the UI look selector.\n"
-            "Review Last Reply opens a dedicated terminal popup for graph-backed feedback on Adam's latest answer.\n\n"
+            "Review Last Reply focuses the inline explicit-feedback controls inside the chat column.\n\n"
             "[bold]F1[/] help overlay\n"
             "[bold]Enter[/] send current input (or [bold]Ctrl+S[/] as a shortcut)\n"
             "[bold]F2[/] export graph, basin, and geometry artifacts\n"
@@ -536,7 +535,7 @@ class HelpModal(ModalScreen[None]):
             "[bold]F4[/] toggle low motion for the current session request\n"
             "[bold]F5[/] open the new-session inference-profile flow\n"
             "[bold]F6[/] open the operator deck\n"
-            "[bold]F7[/] open reply review in a dedicated terminal popup\n"
+            "[bold]F7[/] focus inline review for Adam's latest reply\n"
             "[bold]F8[/] toggle the narrower top-band aperture drawer\n"
             "[bold]F9[/] open document ingest with framing prompt\n"
             "[bold]F10[/] open the conversation atlas\n"
@@ -2261,6 +2260,7 @@ class ChatScreen(Screen):
         with Vertical(id="runtime_frame"):
             with Horizontal(id="runtime_topbar"):
                 yield ActionStrip(value="review", id="runtime_action_menu")
+                yield Static(id="turn_status_panel")
                 yield Static(id="aperture_drawer_panel")
             with Horizontal(id="chat_shell"):
                 with Vertical(id="chat_primary"):
@@ -2318,6 +2318,7 @@ class ChatScreen(Screen):
             self._sync_aperture_drawer()
             self._sync_runtime_chyron_drawer()
             self._sync_header_controls()
+            self.query_one("#turn_status_panel", Static).update(self.main_turn_status_panel())
             top_aperture = self.main_aperture_drawer_panel() if self.app.ui_state.aperture_drawer_open else self.main_aperture_panel()
             self.query_one("#aperture_drawer_panel", Static).update(top_aperture)
             self.query_one("#active_aperture_panel", Static).update(top_aperture)
@@ -2335,6 +2336,7 @@ class ChatScreen(Screen):
             return
         try:
             self.query_one("#runtime_action_menu", ActionStrip).refresh()
+            self.query_one("#turn_status_panel", Static).update(self.main_turn_status_panel())
             self.query_one("#chat_exchange_panel", Static).update(self.main_chat_exchange_panel())
         except NoMatches:
             return
@@ -2348,6 +2350,7 @@ class ChatScreen(Screen):
         assert isinstance(app, EdenTuiApp)
         topbar = self.query_one("#runtime_topbar", Horizontal)
         action_strip = self.query_one("#runtime_action_menu", ActionStrip)
+        turn_status = self.query_one("#turn_status_panel", Static)
         aperture_drawer = self.query_one("#aperture_drawer_panel", Static)
         chat_primary = self.query_one("#chat_primary", Vertical)
         chat_secondary = self.query_one("#chat_secondary", Vertical)
@@ -2362,6 +2365,8 @@ class ChatScreen(Screen):
         if compact:
             action_strip.styles.width = "1fr"
             action_strip.styles.min_width = 0
+            turn_status.display = False
+            turn_status.styles.width = 0
             aperture_drawer.styles.width = 0
             topbar.styles.height = action_strip.preferred_height(max(32, (self.size.width or 80) - 4))
             chat_deck.styles.min_height = 0
@@ -2399,15 +2404,19 @@ class ChatScreen(Screen):
             if app.ui_state.aperture_drawer_open:
                 action_strip.styles.width = "44%"
                 action_strip.styles.min_width = 42
-                aperture_drawer.styles.width = "56%"
+                turn_status.display = True
+                turn_status.styles.width = "14%"
+                aperture_drawer.styles.width = "42%"
                 action_width = max(42, int((self.size.width or 120) * 0.44) - 4)
                 drawer_height = max(13, int((self.size.height or 40) * 0.30))
                 topbar.styles.height = max(action_strip.preferred_height(action_width), drawer_height)
             else:
-                action_strip.styles.width = "68%"
-                action_strip.styles.min_width = 68
-                aperture_drawer.styles.width = "32%"
-                action_width = max(42, int((self.size.width or 120) * 0.68) - 4)
+                action_strip.styles.width = "57%"
+                action_strip.styles.min_width = 57
+                turn_status.display = True
+                turn_status.styles.width = "13%"
+                aperture_drawer.styles.width = "30%"
+                action_width = max(42, int((self.size.width or 120) * 0.57) - 4)
                 topbar.styles.height = max(action_strip.preferred_height(action_width), 11)
             chat_deck.styles.min_height = 28
             chat_primary.styles.width = "60%"
@@ -2664,6 +2673,16 @@ class ChatScreen(Screen):
             }
         return app.runtime.hum_snapshot(app.ui_state.session_id)
 
+    def _current_hum_payload(self) -> dict[str, Any]:
+        hum = self._current_hum_snapshot()
+        json_path = str(hum.get("json_path") or "").strip()
+        if not hum.get("present") or not json_path:
+            return {}
+        try:
+            return json.loads(Path(json_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+
     def _recent_membrane_events(self, *, limit: int = 4) -> list[dict[str, Any]]:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -2680,6 +2699,53 @@ class ChatScreen(Screen):
         if not segments and text.strip():
             segments = [segment.strip() for segment in text.split(". ") if segment.strip()]
         return [f"{index + 1}. {safe_excerpt(segment, limit=line_limit)}" for index, segment in enumerate(segments[:limit])]
+
+    def _artifact_excerpt_lines(self, text: str, *, limit: int = 8, line_limit: int = 108) -> list[str]:
+        normalized = str(text or "").replace("\r", "\n").strip()
+        if not normalized:
+            return []
+        segments = [segment.strip() for segment in normalized.splitlines() if segment.strip()]
+        if len(segments) <= 1:
+            segments = [segment.strip() for segment in re.split(r"(?<=[.!?])\s+", normalized) if segment.strip()]
+        return [safe_excerpt(segment, limit=line_limit) for segment in segments[:limit]]
+
+    def _normalize_reasoning_line(self, text: str) -> str:
+        normalized = re.sub(r"\*\*", "", str(text or "").strip()).lower()
+        normalized = re.sub(r"^[\-\*\d\.\)\s:]+", "", normalized)
+        normalized = re.sub(r"\s+", " ", normalized)
+        return normalized.strip()
+
+    def _is_prompt_mirror_line(self, text: str) -> bool:
+        normalized = self._normalize_reasoning_line(text)
+        if not normalized:
+            return True
+        mirror_prefixes = (
+            "thinking process",
+            "analyze the request",
+            "user:",
+            "context:",
+            "role:",
+            "constraints:",
+            "constraint:",
+            "input data:",
+            "tone/persona:",
+            "tone persona:",
+        )
+        if any(normalized.startswith(prefix) for prefix in mirror_prefixes):
+            return True
+        mirror_fragments = (
+            "return one clean operator-facing reply",
+            "no headings",
+            "brian the operator",
+            "adam, the first graph-conditioned agent",
+            "active set memes show",
+        )
+        return any(fragment in normalized for fragment in mirror_fragments)
+
+    def _useful_reasoning_lines(self, reasoning_text: str, *, limit: int = 6, line_limit: int = 108) -> list[str]:
+        raw_lines = self._artifact_excerpt_lines(reasoning_text, limit=limit * 3, line_limit=line_limit)
+        useful = [line for line in raw_lines if not self._is_prompt_mirror_line(line)]
+        return useful[:limit]
 
     def _dominant_active_lane(self, active_items: list[dict[str, Any]]) -> str:
         if not active_items:
@@ -2712,6 +2778,24 @@ class ChatScreen(Screen):
             event_type = str(event.get("event_type") or "UNKNOWN").upper()
             detail = safe_excerpt(str(event.get("detail") or "no detail"), limit=line_limit)
             lines.append(f"{event_type} :: {detail}")
+        return lines
+
+    def _hum_surface_lines(self, hum_payload: dict[str, Any], hum_snapshot: dict[str, Any]) -> list[str]:
+        lines = [safe_excerpt(str(line), limit=112) for line in hum_payload.get("surface_lines") or [] if str(line).strip()]
+        if lines:
+            return lines
+        return self._artifact_excerpt_lines(str(hum_snapshot.get("text_surface") or ""), limit=4, line_limit=112)
+
+    def _hum_table_lines(self, hum_payload: dict[str, Any]) -> list[str]:
+        rows = list(hum_payload.get("token_table") or [])
+        if not rows:
+            return []
+        lines: list[str] = []
+        for index, row in enumerate(rows[:6], start=1):
+            token = safe_excerpt(str(row.get("token") or "seed"), limit=20)
+            count = int(row.get("count", 0) or 0)
+            pct = float(row.get("pct_of_all_tokens", 0.0) or 0.0) * 100
+            lines.append(f"{index}. {token} x{count} ({pct:.1f}%)")
         return lines
 
     def _sync_runtime_chyron_drawer(self) -> None:
@@ -2815,11 +2899,14 @@ class ChatScreen(Screen):
         assert isinstance(app, EdenTuiApp)
         surface = self.query_one("#inline_feedback_surface", Vertical)
         has_reply = bool(app.ui_state.last_turn_id)
-        surface.display = False
         if not has_reply:
+            surface.display = False
             surface.styles.height = 0
+            surface.styles.min_height = 0
             return
-        surface.styles.height = 0
+        surface.display = True
+        surface.styles.height = "auto"
+        surface.styles.min_height = 11
 
     def _inline_feedback_intent(self) -> tuple[str | None, str]:
         raw_code = self.query_one("#inline_feedback_verdict_input", Input).value.strip().upper()
@@ -2868,7 +2955,7 @@ class ChatScreen(Screen):
         if draft:
             return ("ask", "Draft ready. Press Enter to send.")
         if feedback_state == "pending":
-            return ("review", "Adam replied. Popup review opens automatically after submission; press F7 to reopen it if needed.")
+            return ("review", "Adam replied. Inline review is armed in chat; press F7 to focus it if needed.")
         if turns:
             return ("continue", "Conversation active. Keep typing below, or press F5 for a clean session.")
         return ("start", "Session is armed. Begin when ready.")
@@ -3066,6 +3153,70 @@ class ChatScreen(Screen):
     def _selected_runtime_action(self) -> str:
         return self.query_one("#runtime_action_menu", ActionStrip).value or "review"
 
+    def _set_turn_progress(self, *, phase: str, detail: str, feedback: str | None = None) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        current = app.ui_state.turn_progress or {}
+        app.ui_state.turn_progress = {
+            "phase": phase,
+            "detail": detail,
+            "started_at": current.get("started_at", monotonic()),
+        }
+        if feedback:
+            app.ui_state.last_feedback = feedback
+        if self.is_mounted:
+            self.refresh_panels()
+
+    def _clear_turn_progress(self) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        app.ui_state.turn_progress = None
+        if self.is_mounted:
+            self.refresh_panels()
+
+    def _sync_turn_progress_from_log_event(self, event: Any) -> None:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        if app.ui_state.turn_progress is None:
+            return
+        payload = getattr(event, "payload", {}) or {}
+        event_name = str(getattr(event, "event", "") or "").lower()
+        if event_name == "turn_preview_ready":
+            self._set_turn_progress(
+                phase="prompt ready",
+                detail=(
+                    f"active_set={payload.get('active_set_size', '?')} "
+                    f"profile={payload.get('profile_name', 'pending')} "
+                    f"pressure={payload.get('budget_pressure', 'n/a')}"
+                ),
+            )
+        elif event_name == "generation_start":
+            self._set_turn_progress(
+                phase="generating",
+                detail=(
+                    f"{payload.get('backend', 'backend')} composing "
+                    f"profile={payload.get('profile_name', 'pending')} "
+                    f"mode={payload.get('effective_mode', 'n/a')}"
+                ),
+            )
+        elif event_name == "generation_complete":
+            self._set_turn_progress(
+                phase="finalizing",
+                detail=(
+                    f"turn={safe_excerpt(str(payload.get('turn_id') or 'pending'), limit=18)} "
+                    f"active_set={payload.get('active_set_size', '?')} "
+                    f"pressure={payload.get('budget_pressure', 'n/a')}"
+                ),
+            )
+        elif event_name == "hum_refreshed":
+            self._set_turn_progress(
+                phase="continuity",
+                detail=(
+                    f"hum refreshed recurring={payload.get('recurring_item_count', 0)} "
+                    f"membrane={payload.get('membrane_event_count', 0)}"
+                ),
+            )
+
     def _set_runtime_action_progress(
         self,
         *,
@@ -3119,6 +3270,7 @@ class ChatScreen(Screen):
         selected = ACTION_MENU_LABELS.get(selected_value, selected_value.replace("_", " "))
         log_state = "ready" if app.ui_state.conversation_log_path else "pending"
         action_progress = app.ui_state.action_progress or {}
+        turn_progress = app.ui_state.turn_progress or {}
         runtime_line = (
             f"runtime={self._active_backend_label()} stage={model_status.get('stage', 'n/a')} "
             f"session={safe_excerpt(str(app.ui_state.session_title or app.ui_state.session_id or 'arming'), limit=28)} "
@@ -3143,6 +3295,21 @@ class ChatScreen(Screen):
                     ICE,
                 ),
             ]
+        if turn_progress:
+            started_at = float(turn_progress.get("started_at", monotonic()))
+            elapsed = _format_elapsed(monotonic() - started_at)
+            detail_limit = max(18, max_width - 48)
+            return [
+                (safe_excerpt(runtime_line, limit=max_width), TEXT),
+                (
+                    safe_excerpt(
+                        f"turn=Adam reply | phase={turn_progress.get('phase', 'working')} | elapsed={elapsed} | "
+                        f"{safe_excerpt(str(turn_progress.get('detail', 'working')), limit=detail_limit)}",
+                        limit=max_width,
+                    ),
+                    ICE,
+                ),
+            ]
         last_summary = app.ui_state.last_action_summary or app.ui_state.last_feedback or "No action has run yet."
         summary_limit = max(24, max_width - 62)
         action_line = (
@@ -3155,25 +3322,59 @@ class ChatScreen(Screen):
             (safe_excerpt(action_line, limit=max_width), ICE if focus_id == "runtime_action_menu" else MUTED),
         ]
 
+    def main_turn_status_panel(self) -> Panel:
+        app = self.app
+        assert isinstance(app, EdenTuiApp)
+        progress = app.ui_state.turn_progress or {}
+        active_items = self._active_items()
+        phase, stage_note = self._conversation_stage()
+        model_status = self._model_status()
+        if progress:
+            started_at = float(progress.get("started_at", monotonic()))
+            spinner = "|/-\\"[int(monotonic() * 4) % 4]
+            text = Text.from_markup(
+                f"[bold {ICE}]Adam status[/]\n"
+                f"{spinner} {safe_excerpt(str(progress.get('phase', 'working')), limit=18)}\n"
+                f"elapsed={_format_elapsed(monotonic() - started_at)}\n"
+                f"{safe_excerpt(str(progress.get('detail', 'working')), limit=72)}\n"
+                f"items={len(active_items)} review={'armed' if self._feedback_loop_state()[0] == 'pending' else 'clear'}"
+            )
+            return Panel(text, title="Live Turn Status", border_style=ICE, style=f"on {SHADE_ALT}")
+        reasoning_state = "present" if app.ui_state.last_reasoning else "quiet"
+        text = Text.from_markup(
+            f"[bold {AMBER}]Adam status[/]\n"
+            f"phase={phase}\n"
+            f"{safe_excerpt(stage_note, limit=72)}\n"
+            f"model={model_status.get('stage', 'n/a')} reasoning={reasoning_state}\n"
+            f"items={len(active_items)} review={'armed' if self._feedback_loop_state()[0] == 'pending' else 'clear'}"
+        )
+        return Panel(text, title="Live Turn Status", border_style=AMBER, style=f"on {SHADE_ALT}")
+
     def main_thinking_panel(self) -> Panel:
         app = self.app
         assert isinstance(app, EdenTuiApp)
         profile = app.ui_state.current_profile or {}
         budget = app.ui_state.current_budget or {}
         hum = self._current_hum_snapshot()
+        hum_payload = self._current_hum_payload()
         reasoning_mode = app.ui_state.reasoning_mode
         active_items = self._active_items()
         membrane_events = self._recent_membrane_events(limit=4)
         latest_feedback = self._recent_feedback_entries(limit=1)
         latest_feedback_entry = latest_feedback[0] if latest_feedback else None
         feedback_phrase = self._feedback_status_phrase(latest_feedback_entry)
-        reasoning_chars = len((app.ui_state.last_reasoning or "").strip())
+        reasoning_text = (app.ui_state.last_reasoning or "").strip()
+        answer_text = (app.ui_state.last_response or "").strip()
+        reasoning_chars = len(reasoning_text)
         dominant_lane = self._dominant_active_lane(active_items)
         focus_item = (
             max(active_items, key=lambda item: float(item.get("selection", 0.0)))
             if active_items
             else {"label": "none yet", "selection": 0.0, "regard": 0.0, "activation": 0.0}
         )
+        reasoning_lines = self._useful_reasoning_lines(reasoning_text, limit=6, line_limit=118)
+        answer_lines = self._artifact_excerpt_lines(answer_text, limit=5, line_limit=118)
+        answer_beats = self._chain_like_lines(answer_text, limit=8, line_limit=112)
         trace_lines = [
             f">> {item.get('label', 'untitled')} sel={float(item.get('selection', 0.0)):.2f} "
             f"reg={float(item.get('regard', 0.0)):.2f} act={float(item.get('activation', 0.0)):.2f}"
@@ -3182,61 +3383,143 @@ class ChatScreen(Screen):
         if not trace_lines:
             trace_lines = [">> no active consideration trace yet"]
         state = "draft-armed" if self._composer_text().strip() else "persisted"
-        body = Text.from_markup(
-            f"[bold {AMBER}]Linguistic condition[/]\n"
-            f"state={state} profile={profile.get('profile_name', 'pending')} mode={profile.get('requested_mode', 'pending')} -> {profile.get('effective_mode', 'pending')}\n"
-            f"pressure={budget.get('pressure_level', 'n/a')} response_cap={profile.get('response_char_cap', 'n/a')} retrieval_depth={profile.get('retrieval_depth', 'n/a')}\n"
-            f"lane={dominant_lane} focus={safe_excerpt(str(focus_item.get('label', 'none yet')), limit=32)} reasoning_artifact={'present' if reasoning_chars else 'quiet'} lens={reasoning_mode}\n\n"
-        )
+        body = Text()
         if reasoning_mode == "hum_live":
-            hum_lines = self._chain_like_lines(hum.get("text_surface") or "", limit=5, line_limit=88)
-            body.append("Continuity telemetry\n", style=f"bold {ICE}")
-            body.append(
-                f"artifact={hum.get('artifact_version', 'hum.v1')} generated={hum.get('generated_at') or 'pending'}\n"
-                f"latest_turn={hum.get('latest_turn_id') or 'none'} window={hum.get('turn_window_size', 0)} recurrence={'yes' if hum.get('cross_turn_recurrence_present') else 'no'}\n"
-                f"feedback={feedback_phrase} | membrane_events={len(membrane_events)}\n\n",
-                style=TEXT,
-            )
-            if hum_lines:
-                body.append("Hum-live continuity beats\n", style=f"bold {ICE}")
-                body.append("\n".join(hum_lines), style=ICE)
-                body.append("\n\n", style=TEXT)
+            continuity = hum_payload.get("continuity", {}) if isinstance(hum_payload, dict) else {}
+            recurring_items = list(continuity.get("recurring_items") or [])
+            overlap = continuity.get("active_set_overlap") or {}
+            feedback_recent = list(((continuity.get("feedback_summary") or {}).get("recent")) or [])
+            membrane_recent = list(((continuity.get("membrane_summary") or {}).get("recent")) or [])
+            surface_stats = dict(hum_payload.get("surface_stats") or {})
+            surface_lines = self._hum_surface_lines(hum_payload, hum)
+            token_lines = self._hum_table_lines(hum_payload)
+            body.append("Hum entries\n", style=f"bold {ICE}")
+            if surface_lines:
+                body.append("\n".join(surface_lines), style=ICE)
             else:
                 body.append(
-                    "No bounded hum artifact yet. Once persisted continuity exists, this lens reports the bounded continuity record rather than model prose.\n\n",
+                    "No bounded hum artifact yet. Persist another turn or explicit feedback to create one.",
                     style=MUTED,
                 )
-            body.append("Membrane record\n", style=f"bold {NEON}")
-            body.append("\n".join(f"- {line}" for line in self._membrane_record_lines(membrane_events, limit=3)), style=TEXT)
+            body.append("\n\n", style=TEXT)
+            body.append("[HUM_STATS]\n", style=f"bold {NEON}")
+            if surface_stats:
+                body.append(
+                    f"entries={surface_stats.get('entries', 0)} lines_total={surface_stats.get('lines_total', 0)} "
+                    f"words={surface_stats.get('words', 0)} unique_tokens={surface_stats.get('unique_tokens', 0)} "
+                    f"repeated_tokens={surface_stats.get('repeated_tokens', 0)} hapax_tokens={surface_stats.get('hapax_tokens', 0)}\n"
+                    f"type_token_ratio={float(surface_stats.get('type_token_ratio', 0.0) or 0.0):.3f} "
+                    f"avg_token_len={float(surface_stats.get('avg_token_len', 0.0) or 0.0):.2f} "
+                    f"avg_line_words={float(surface_stats.get('avg_line_words', 0.0) or 0.0):.2f} "
+                    f"chars_total={surface_stats.get('chars_total', 0)}",
+                    style=TEXT,
+                )
+            else:
+                body.append("Hum stats are not available yet.", style=MUTED)
+            body.append("\n\n", style=TEXT)
+            body.append("[HUM_METRICS]\n", style=f"bold {AMBER}")
+            body.append(
+                f"window={hum.get('turn_window_size', 0)} recurring={len(recurring_items)} overlap={int(overlap.get('count', 0) or 0)} "
+                f"feedback={len(feedback_recent)} membrane={len(membrane_recent)}\n"
+                f"feedback_state={feedback_phrase}",
+                style=TEXT,
+            )
+            body.append("\n\n", style=TEXT)
+            body.append("[HUM_TABLE]\n", style=f"bold {ICE}")
+            if token_lines:
+                body.append("\n".join(token_lines), style=TEXT)
+            else:
+                body.append("No motif counts are recorded yet.", style=MUTED)
+            body.append("\n\n", style=TEXT)
+            body.append("Carryover anchors\n", style=f"bold {NEON}")
+            if recurring_items:
+                body.append(
+                    "\n".join(
+                        f"- {safe_excerpt(str(item.get('label') or 'untitled'), limit=52)} across T{', '.join(str(value) for value in item.get('turn_indices', [])[:3])}"
+                        for item in recurring_items[:3]
+                    ),
+                    style=TEXT,
+                )
+            elif overlap.get("labels"):
+                body.append(
+                    "- latest overlap: " + " | ".join(safe_excerpt(str(label), limit=24) for label in overlap.get("labels", [])[:3]),
+                    style=TEXT,
+                )
+            else:
+                body.append(
+                    f"- seed-state only; focus={safe_excerpt(str(focus_item.get('label', 'none yet')), limit=44)}\n"
+                    f"- lane={dominant_lane} items={len(active_items)}",
+                    style=TEXT,
+                )
+            body.append("\n\n", style=TEXT)
+            body.append("Membrane / feedback\n", style=f"bold {AMBER}")
+            memory_lines: list[str] = []
+            if feedback_recent:
+                memory_lines.extend(
+                    f"- T{item.get('turn_index', '?')} {str(item.get('verdict') or 'skip').upper()} :: {safe_excerpt(str(item.get('explanation') or 'no explanation'), limit=88)}"
+                    for item in feedback_recent[:2]
+                )
+            else:
+                memory_lines.append(f"- {feedback_phrase}")
+            if membrane_recent:
+                memory_lines.extend(
+                    f"- {str(item.get('event_type') or 'UNKNOWN').upper()} :: {safe_excerpt(str(item.get('detail') or 'no detail'), limit=88)}"
+                    for item in membrane_recent[:2]
+                )
+            else:
+                memory_lines.extend(f"- {line}" for line in self._membrane_record_lines(membrane_events, limit=2))
+            body.append("\n".join(memory_lines), style=TEXT)
             body.append("\n\n", style=TEXT)
         elif reasoning_mode == "chain_like":
-            chain_steps = [
-                f"Session is {state}; profile {profile.get('profile_name', 'pending')} keeps mode {profile.get('requested_mode', 'pending')} -> {profile.get('effective_mode', 'pending')}.",
-                f"Retrieval is {dominant_lane} with {len(active_items)} active items; current focus is {safe_excerpt(str(focus_item.get('label', 'none yet')), limit=44)}.",
-                f"Output contract holds one operator-facing reply in Adam's voice with response cap {profile.get('response_char_cap', 'n/a')}; headings and hidden reasoning stay blocked.",
-                f"Budget pressure is {budget.get('pressure_level', 'n/a')} with remaining_input={budget.get('remaining_input_tokens', 'n/a')} and count_method={budget.get('count_method', 'n/a')}.",
-                f"Feedback state is {feedback_phrase}.",
-                f"Membrane record shows {', '.join(str(event.get('event_type') or 'UNKNOWN').upper() for event in membrane_events[:3]) or 'no events yet'}.",
-                f"Continuity signal is {'present' if hum.get('present') else 'not yet present'} with recurrence={'yes' if hum.get('cross_turn_recurrence_present') else 'no'}.",
-            ]
-            body.append("Turn assembly\n", style=f"bold {NEON}")
-            body.append("\n".join(f"{index + 1}. {safe_excerpt(step, limit=118)}" for index, step in enumerate(chain_steps[:6])), style=TEXT)
+            body.append("Response beats\n", style=f"bold {NEON}")
+            if answer_beats:
+                body.append("\n".join(answer_beats), style=TEXT)
+            else:
+                body.append("No operator-facing answer is available for beat reduction yet.", style=MUTED)
+            body.append("\n\n", style=TEXT)
+            if reasoning_lines:
+                body.append("Reasoning signal\n", style=f"bold {ICE}")
+                body.append("\n".join(f"- {line}" for line in reasoning_lines[:3]), style=TEXT)
+                body.append("\n\n", style=TEXT)
+            body.append("Assembly anchors\n", style=f"bold {AMBER}")
+            body.append(
+                f"- focus={safe_excerpt(str(focus_item.get('label', 'none yet')), limit=44)} lane={dominant_lane} items={len(active_items)}\n"
+                f"- pressure={budget.get('pressure_level', 'n/a')} remaining_input={budget.get('remaining_input_tokens', 'n/a')} count_method={budget.get('count_method', 'n/a')}\n"
+                f"- feedback={feedback_phrase}\n"
+                f"- membrane={', '.join(str(event.get('event_type') or 'UNKNOWN').upper() for event in membrane_events[:3]) or 'no events yet'}",
+                style=TEXT,
+            )
             body.append("\n\n", style=TEXT)
         else:
-            body.append("Output contract\n", style=f"bold {NEON}")
+            body.append("Response material\n", style=f"bold {NEON}")
+            if answer_lines:
+                body.append("\n".join(answer_lines), style=TEXT)
+            else:
+                body.append("No operator-facing answer is persisted yet.", style=MUTED)
+            body.append("\n\n", style=TEXT)
+            body.append("Reasoning signal\n", style=f"bold {AMBER}")
+            if reasoning_lines:
+                body.append("\n".join(reasoning_lines), style=TEXT)
+            elif reasoning_text:
+                body.append(
+                    "Visible reasoning was captured, but it mostly echoed prompt scaffolding for this turn, so it is suppressed here.",
+                    style=MUTED,
+                )
+            else:
+                body.append(
+                    "No model-emitted reasoning artifact was captured for this turn.",
+                    style=MUTED,
+                )
+            body.append("\n\n", style=TEXT)
+            body.append("Runtime condition\n", style=f"bold {ICE}")
             body.append(
-                f"- Adam voice stays operator-facing and single-reply bounded.\n"
-                f"- Headings such as Answer / Basis / Next Step are scrubbed if emitted.\n"
-                f"- Hidden reasoning stays out of the visible answer; artifact stored separately={('yes' if reasoning_chars else 'no')} chars={reasoning_chars}.\n"
-                f"- Recent feedback stays binding for the next reply: {feedback_phrase}.\n\n",
+                f"- state={state} profile={profile.get('profile_name', 'pending')} mode={profile.get('requested_mode', 'pending')} -> {profile.get('effective_mode', 'pending')}\n"
+                f"- pressure={budget.get('pressure_level', 'n/a')} response_cap={profile.get('response_char_cap', 'n/a')} retrieval_depth={profile.get('retrieval_depth', 'n/a')}\n"
+                f"- lane={dominant_lane} focus={safe_excerpt(str(focus_item.get('label', 'none yet')), limit=40)} reasoning_chars={reasoning_chars}\n"
+                f"- feedback={feedback_phrase}",
                 style=TEXT,
             )
-            body.append("Budget / scope\n", style=f"bold {AMBER}")
-            body.append(
-                f"- prompt_budget={budget.get('prompt_budget_tokens', 'n/a')} remaining_input={budget.get('remaining_input_tokens', 'n/a')} count_method={budget.get('count_method', 'n/a')}\n"
-                f"- retrieval_depth={profile.get('retrieval_depth', 'n/a')} max_context={profile.get('max_context_items', 'n/a')} active_items={len(active_items)}\n\n",
-                style=TEXT,
-            )
+            body.append("\n\n", style=TEXT)
             body.append("Membrane record\n", style=f"bold {ICE}")
             body.append("\n".join(f"- {line}" for line in self._membrane_record_lines(membrane_events, limit=3)), style=TEXT)
             body.append("\n\n", style=TEXT)
@@ -3281,7 +3564,7 @@ class ChatScreen(Screen):
             for item in reversed(recent_feedback)
         ]
         if not feedback_lines:
-            feedback_lines = ["No feedback events yet. Press F7 to open the latest-turn review popup in a separate terminal."]
+            feedback_lines = ["No feedback events yet. Press F7 to focus the inline review fields in chat."]
         recent_events = self._event_lines[-6:]
         if not recent_events:
             recent_events = ["[INFO] Event bus is quiet. Start a turn or ingest a document to populate it."]
@@ -3426,8 +3709,6 @@ class ChatScreen(Screen):
 
     def main_inline_feedback_status_panel(self) -> Panel:
         state, latest_entry = self._feedback_loop_state()
-        app = self.app
-        assert isinstance(app, EdenTuiApp)
         form = self._inline_feedback_form_state()
         if state == "pending":
             text = Text.from_markup(
@@ -3449,13 +3730,14 @@ class ChatScreen(Screen):
             text = Text.from_markup(
                 f"Latest stored verdict={str(latest_entry.get('verdict', 'skip')).upper()} | "
                 f"turn=T{latest_entry.get('turn_index', '?')} | "
-                f"{safe_excerpt(latest_entry.get('explanation') or 'no explanation', limit=96)}"
+                f"{safe_excerpt(latest_entry.get('explanation') or 'no explanation', limit=96)} | "
+                "edit fields below to append another review event if needed"
             )
             border = NEON if str(latest_entry.get("verdict", "")).lower() == "accept" else AMBER
         else:
             text = Text.from_markup("Reply review unlocks after Adam answers.")
             border = AMBER
-        return Panel(text, title="Graph Impact", border_style=border, style=f"on {SHADE_ALT}")
+        return Panel(text, title="Explicit Feedback", border_style=border, style=f"on {SHADE_ALT}")
 
     def deck_summary_panel(self) -> Panel:
         app = self.app
@@ -3593,6 +3875,7 @@ class ChatScreen(Screen):
             if payload and payload != "{}":
                 line += f" | {payload}"
             self._record_event_line(line)
+            self._sync_turn_progress_from_log_event(event)
         self._seen_log_count = len(events)
         latest_feedback = self._recent_feedback_entries(limit=1)
         feedback_signature = None
@@ -3622,6 +3905,9 @@ class ChatScreen(Screen):
             if self.is_mounted:
                 self.refresh_panels()
         if app.ui_state.action_progress is not None and self.is_mounted:
+            self.query_one("#runtime_action_menu", ActionStrip).refresh()
+        if app.ui_state.turn_progress is not None and self.is_mounted:
+            self.query_one("#turn_status_panel", Static).update(self.main_turn_status_panel())
             self.query_one("#runtime_action_menu", ActionStrip).refresh()
 
     def _composer_text(self) -> str:
@@ -3755,31 +4041,56 @@ class ChatScreen(Screen):
         text = self._composer_text().strip()
         if not text or not app.ui_state.session_id:
             return
-        if not await self._ensure_backend_ready(prepare=True):
-            return
-        outcome = await asyncio.to_thread(partial(app.runtime.chat, session_id=app.ui_state.session_id, user_text=text))
-        app.ui_state.last_turn_id = outcome.turn["id"]
-        app.ui_state.last_user_text = text
-        app.ui_state.last_response = outcome.turn["membrane_text"]
-        app.ui_state.last_reasoning = outcome.reasoning_text
-        app.ui_state.last_active_set = outcome.active_set
-        app.ui_state.last_trace = outcome.trace
-        app.ui_state.preview_active_set = outcome.active_set
-        app.ui_state.preview_trace = outcome.trace
-        app.ui_state.current_budget = outcome.budget
-        app.ui_state.current_profile = outcome.profile
-        self._mark_graph_dirty()
-        app.ui_state.last_feedback = f"Saved turn T{outcome.turn['turn_index']} from Brian. Opening review popup..."
-        self._write_forensic(
-            f"[INFO] Turn T{outcome.turn['turn_index']} stored :: active_set={len(outcome.active_set)} pressure={outcome.budget.get('pressure_level', 'n/a')}"
+        self._set_turn_progress(
+            phase="preflight",
+            detail="binding current draft and checking backend readiness",
+            feedback="Dispatching Adam reply...",
         )
-        self._set_text_area("#composer_input", "")
-        await self._sync_conversation_log()
-        self.refresh_panels()
-        await self.handle_review()
-        self.focus_composer()
-        self._scroll_chat_to_end()
-        self._schedule_preview_refresh()
+        try:
+            if not await self._ensure_backend_ready(prepare=True):
+                self._clear_turn_progress()
+                return
+            self._set_turn_progress(
+                phase="assembling",
+                detail="assembling active set and prompt context",
+            )
+            outcome = await asyncio.to_thread(partial(app.runtime.chat, session_id=app.ui_state.session_id, user_text=text))
+            app.ui_state.last_turn_id = outcome.turn["id"]
+            app.ui_state.last_user_text = text
+            app.ui_state.last_response = outcome.turn["membrane_text"]
+            app.ui_state.last_reasoning = outcome.reasoning_text
+            app.ui_state.last_active_set = outcome.active_set
+            app.ui_state.last_trace = outcome.trace
+            app.ui_state.preview_active_set = outcome.active_set
+            app.ui_state.preview_trace = outcome.trace
+            app.ui_state.current_budget = outcome.budget
+            app.ui_state.current_profile = outcome.profile
+            self._mark_graph_dirty()
+            self._set_turn_progress(
+                phase="review",
+                detail=f"T{outcome.turn['turn_index']} stored; arming inline review",
+            )
+            app.ui_state.last_feedback = (
+                f"Saved turn T{outcome.turn['turn_index']} from Brian. "
+                "Inline review is armed in chat."
+            )
+            self._write_forensic(
+                f"[INFO] Turn T{outcome.turn['turn_index']} stored :: active_set={len(outcome.active_set)} pressure={outcome.budget.get('pressure_level', 'n/a')}"
+            )
+            self._set_text_area("#composer_input", "")
+            await self._sync_conversation_log()
+            self.refresh_panels()
+            await self.handle_review()
+            self.focus_composer()
+            self._scroll_chat_to_end()
+            self._schedule_preview_refresh()
+        except Exception as exc:
+            app.ui_state.last_feedback = f"Turn failed: {exc}"
+            self._write_forensic(f"[ERROR] Turn failed :: {type(exc).__name__}: {exc}")
+            self.refresh_panels()
+            return
+        finally:
+            self._clear_turn_progress()
 
     @on(ComposerTextArea.Submitted, "#composer_input")
     async def handle_composer_submitted(self, _event: ComposerTextArea.Submitted) -> None:
@@ -3953,42 +4264,6 @@ class ChatScreen(Screen):
         app.ui_state.last_feedback = f"Opened transcript log at {path}"
         self.refresh_panels()
 
-    def _feedback_popup_command(self) -> str:
-        app = self.app
-        assert isinstance(app, EdenTuiApp)
-        python_bin = self.app.repo_root / ".venv" / "bin" / "python"
-        return (
-            f"cd {shlex.quote(str(self.app.repo_root))} && "
-            f"{shlex.quote(str(python_bin))} -m eden feedback "
-            f"{shlex.quote(str(app.ui_state.session_id or ''))} "
-            f"{shlex.quote(str(app.ui_state.last_turn_id or ''))}; exit"
-        )
-
-    def _launch_feedback_popup(self) -> tuple[bool, str]:
-        python_bin = self.app.repo_root / ".venv" / "bin" / "python"
-        if not python_bin.exists():
-            return False, f"Missing repo-local Python at {python_bin}."
-        command = self._feedback_popup_command()
-        if sys.platform == "darwin":
-            escaped = command.replace("\\", "\\\\").replace('"', '\\"')
-            script = (
-                'tell application "Terminal"\n'
-                f'    do script "{escaped}"\n'
-                "    activate\n"
-                "end tell"
-            )
-            try:
-                subprocess.Popen(
-                    ["osascript", "-e", script],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-                return True, "Opened review popup in Terminal."
-            except Exception as exc:
-                return False, f"Failed to open Terminal feedback popup: {exc}"
-        return False, "Feedback popup launch is currently wired for Terminal.app on macOS."
-
     def focus_inline_feedback(self) -> None:
         try:
             self.query_one("#inline_feedback_verdict_input", Input).focus()
@@ -4003,13 +4278,22 @@ class ChatScreen(Screen):
             app.ui_state.last_feedback = "No Adam reply is available to review yet. Send a turn first."
             self.refresh_panels()
             return
-        ok, detail = await asyncio.to_thread(self._launch_feedback_popup)
-        app.ui_state.last_feedback = (
-            f"{detail} Review latest reply there and return here for the refreshed hum and transcript."
-            if ok
-            else detail
+        state, latest_entry = self._feedback_loop_state()
+        if state == "pending":
+            app.ui_state.last_feedback = (
+                "Inline review focused in chat. Type A, E, R, or S; explanation is required for A/E/R, "
+                "and corrected text is required for E."
+            )
+        elif latest_entry is not None:
+            app.ui_state.last_feedback = (
+                f"Latest review stays inline in chat. Current verdict={str(latest_entry.get('verdict', 'skip')).upper()} "
+                f"for T{latest_entry.get('turn_index', '?')}."
+            )
+        else:
+            app.ui_state.last_feedback = "Inline review is available in chat for Adam's latest reply."
+        self._write_forensic(
+            f"[INFO] Inline review focus :: turn={app.ui_state.last_turn_id} state={state}"
         )
-        self._write_forensic(f"[INFO] Feedback popup :: {detail}")
         self.refresh_panels()
         if open_inline_feedback:
             self.call_after_refresh(self.focus_inline_feedback)
@@ -4440,6 +4724,11 @@ class EdenTuiApp(App):
         margin: 0 0 1 1;
         min-width: 34;
     }}
+    #turn_status_panel {{
+        display: none;
+        margin: 0 0 1 1;
+        min-width: 24;
+    }}
     #startup_topbar {{
         height: 8;
         padding: 0 1 1 1;
@@ -4598,6 +4887,14 @@ class EdenTuiApp(App):
     }}
     #inline_feedback_command_row {{
         height: 3;
+    }}
+    #inline_feedback_explanation_input,
+    #inline_feedback_corrected_input {{
+        height: 4;
+        min-height: 4;
+        background: #11070d;
+        border: tall {AMBER};
+        color: {TEXT};
     }}
     #composer_input {{
         height: 5;
@@ -5002,6 +5299,7 @@ class EdenTuiApp(App):
         self.ui_state.current_budget = snapshot.get("current_budget")
         self.ui_state.current_graph_health = None
         self.ui_state.last_ingest_result = None
+        self.ui_state.turn_progress = None
 
     async def on_mount(self) -> None:
         self.apply_ui_look(self.runtime.ui_appearance().get("look"))
