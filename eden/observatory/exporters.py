@@ -43,6 +43,23 @@ OBSERVATORY_EXPORT_FORMATS = [
 ]
 
 
+def _uuid_like(value: str) -> bool:
+    parts = value.strip().split("-")
+    if len(parts) != 5:
+        return False
+    lengths = [8, 4, 4, 4, 12]
+    return all(len(part) == expected and all(char in "0123456789abcdefABCDEF" for char in part) for part, expected in zip(parts, lengths))
+
+
+def _semantic_export_label(*candidates: Any, fallback: str, limit: int = 140) -> str:
+    for candidate in candidates:
+        text = str(candidate or "").strip()
+        if not text or _uuid_like(text):
+            continue
+        return safe_excerpt(text, limit=limit)
+    return fallback
+
+
 OBSERVATORY_LAYOUT_FAMILIES = [
     {
         "id": "force_directed",
@@ -1184,13 +1201,23 @@ class ObservatoryExporter:
             feedback_by_turn[feedback["turn_id"]].append(feedback)
 
         def add_node(node_id: str, label: str, kind: str, **extra: Any) -> None:
-            node = {"id": node_id, "label": label, "kind": kind, **extra}
+            export_label = str(extra.pop("export_label", "") or "").strip() or label
+            node = {"id": node_id, "label": label, "export_label": export_label, "kind": kind, **extra}
             nodes.append(node)
             graph.add_node(node_id, **node)
             directed.add_node(node_id, **node)
 
         for agent in snapshot["agents"]:
-            add_node(agent["id"], agent["name"], "agent", domain="behavior", source_kind="agent", summary=agent["name"], session_id="")
+            add_node(
+                agent["id"],
+                agent["name"],
+                "agent",
+                domain="behavior",
+                source_kind="agent",
+                summary=agent["name"],
+                export_label=_semantic_export_label(agent["name"], fallback=agent["name"], limit=96),
+                session_id="",
+            )
         for session in snapshot["sessions"]:
             meta = session_meta.get(session["id"], {})
             add_node(
@@ -1200,6 +1227,7 @@ class ObservatoryExporter:
                 domain="behavior",
                 source_kind="session",
                 summary=session["title"],
+                export_label=_semantic_export_label(session["title"], fallback=session["title"], limit=110),
                 session_id=session["id"],
                 created_at=session["created_at"],
                 requested_mode=meta.get("requested_mode", ""),
@@ -1219,6 +1247,7 @@ class ObservatoryExporter:
                 domain="knowledge",
                 source_kind=document["kind"],
                 summary=document["path"],
+                export_label=_semantic_export_label(document["title"], metadata.get("source_path"), document["path"], fallback=document["title"], limit=120),
                 session_id="",
                 created_at=document["created_at"],
                 provenance=metadata.get("source_path", document["path"]),
@@ -1236,6 +1265,12 @@ class ObservatoryExporter:
                 domain="behavior",
                 source_kind="turn",
                 summary=safe_excerpt(turn["user_text"], limit=140),
+                export_label=_semantic_export_label(
+                    safe_excerpt(turn["user_text"], limit=140),
+                    safe_excerpt(turn.get("membrane_text") or turn.get("response_text") or "", limit=140),
+                    fallback=f"T{turn['turn_index']}",
+                    limit=140,
+                ),
                 session_id=turn["session_id"],
                 created_at=turn["created_at"],
                 requested_mode=inference.get("requested_mode", ""),
@@ -1258,6 +1293,12 @@ class ObservatoryExporter:
                 domain="behavior",
                 source_kind="feedback",
                 summary=safe_excerpt(feedback["explanation"], limit=140),
+                export_label=_semantic_export_label(
+                    safe_excerpt(feedback["explanation"], limit=140),
+                    feedback["verdict"].upper(),
+                    fallback=feedback["verdict"].upper(),
+                    limit=140,
+                ),
                 session_id=feedback["session_id"],
                 created_at=feedback["created_at"],
                 verdicts=[feedback["verdict"]],
@@ -1278,6 +1319,13 @@ class ObservatoryExporter:
                 source_kind=meme["source_kind"],
                 scope=meme["scope"],
                 summary=safe_excerpt(meme["text"], limit=160),
+                export_label=_semantic_export_label(
+                    safe_excerpt(meme["text"], limit=160),
+                    meme["label"],
+                    metadata.get("title"),
+                    fallback=meme["label"],
+                    limit=160,
+                ),
                 evidence=float(meme["evidence_n"]),
                 reward=float(meme["reward_ema"]),
                 risk=float(meme["risk_ema"]),
@@ -1301,6 +1349,13 @@ class ObservatoryExporter:
                 source_kind="memode",
                 scope=memode["scope"],
                 summary=safe_excerpt(memode["summary"], limit=160),
+                export_label=_semantic_export_label(
+                    safe_excerpt(memode["summary"], limit=160),
+                    memode["label"],
+                    metadata.get("invariance_summary"),
+                    fallback=memode["label"],
+                    limit=160,
+                ),
                 evidence=float(memode["evidence_n"]),
                 reward=float(memode["reward_ema"]),
                 risk=float(memode["risk_ema"]),
@@ -1319,6 +1374,7 @@ class ObservatoryExporter:
                 created_at=memode["created_at"],
                 verdicts=[item["verdict"] for item in feedback_by_turn.get(turn_id, [])],
             )
+        node_by_id = {node["id"]: node for node in nodes}
         for edge in snapshot["edges"]:
             if edge["src_id"] not in graph or edge["dst_id"] not in graph:
                 continue
@@ -1422,6 +1478,15 @@ class ObservatoryExporter:
             edge["evidence_label"] = provenance.get("evidence_label", "AUTO_DERIVED")
             edge["operator_label"] = provenance.get("operator_label", "")
             edge["confidence"] = float(provenance.get("confidence", 1.0 if edge["assertion_origin"] == "auto_derived" else 0.6) or 0.0)
+            source_node = node_by_id.get(edge["source"])
+            target_node = node_by_id.get(edge["target"])
+            edge["export_label"] = _semantic_export_label(
+                provenance.get("operator_label"),
+                f"{edge['type']}: {(source_node or {}).get('export_label') or (source_node or {}).get('label') or edge['source']} -> {(target_node or {}).get('export_label') or (target_node or {}).get('label') or edge['target']}",
+                edge["type"],
+                fallback=edge["type"],
+                limit=200,
+            )
         filters = {
             "sessions": sorted({node.get("session_id", "") for node in nodes if node.get("session_id")}),
             "kinds": sorted({node["kind"] for node in nodes}),

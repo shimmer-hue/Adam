@@ -71,9 +71,23 @@ export function nodeLabel(node: GraphNode | null | undefined): string {
   return String(node?.label ?? node?.id ?? "unknown node");
 }
 
+export function nodeExportLabel(node: GraphNode | null | undefined): string {
+  return String(node?.export_label ?? node?.label ?? node?.summary ?? node?.id ?? "unknown node");
+}
+
 export function edgeLabel(edge: GraphEdge | null | undefined, nodeLookup: Map<string, GraphNode>): string {
   const sourceLabel = nodeLabel(nodeLookup.get(String(edge?.source ?? "")));
   const targetLabel = nodeLabel(nodeLookup.get(String(edge?.target ?? "")));
+  return `${String(edge?.type ?? "EDGE")}: ${sourceLabel} -> ${targetLabel}`;
+}
+
+export function edgeExportLabel(edge: GraphEdge | null | undefined, nodeLookup: Map<string, GraphNode>): string {
+  if (edge?.export_label) return String(edge.export_label);
+  const sourceNode = nodeLookup.get(String(edge?.source ?? ""));
+  const targetNode = nodeLookup.get(String(edge?.target ?? ""));
+  if (!sourceNode || !targetNode) return String(edge?.type ?? "EDGE");
+  const sourceLabel = nodeExportLabel(sourceNode);
+  const targetLabel = nodeExportLabel(targetNode);
   return `${String(edge?.type ?? "EDGE")}: ${sourceLabel} -> ${targetLabel}`;
 }
 
@@ -333,7 +347,11 @@ export function csvForNodes(nodes: GraphNode[]): string {
   ];
   return [
     columns.map(([header]) => header).join(","),
-    ...nodes.map((node) => columns.map(([, column]) => csvEscape(node[column] ?? (column === "label" ? nodeLabel(node) : ""))).join(",")),
+    ...nodes.map((node) =>
+      columns
+        .map(([, column]) => csvEscape(column === "label" ? nodeExportLabel(node) : node[column]))
+        .join(","),
+    ),
   ].join("\n");
 }
 
@@ -342,13 +360,24 @@ export function csvForEdges(edges: GraphEdge[]): string {
     ["Id", "id"],
     ["Source", "source"],
     ["Target", "target"],
+    ["Label", "label"],
     ["Type", "type"],
     ["Weight", "weight"],
     ["EvidenceLabel", "evidence_label"],
     ["AssertionOrigin", "assertion_origin"],
     ["Confidence", "confidence"],
   ];
-  return [columns.map(([header]) => header).join(","), ...edges.map((edge) => columns.map(([, column]) => csvEscape(edge[column])).join(","))].join("\n");
+  const nodeLookup = buildNodeLookup(
+    dedupeNodesFromEdges(edges).map((id) => ({ id })),
+  );
+  return [
+    columns.map(([header]) => header).join(","),
+    ...edges.map((edge) =>
+      columns
+        .map(([, column]) => csvEscape(column === "label" ? edgeExportLabel(edge, nodeLookup) : edge[column]))
+        .join(","),
+    ),
+  ].join("\n");
 }
 
 export function jsonForSelection(nodes: GraphNode[], edges: GraphEdge[], selectedNodeIds: string[]): string {
@@ -360,6 +389,7 @@ export function jsonForSelection(nodes: GraphNode[], edges: GraphEdge[], selecte
 
 export function graphMLForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
   const header = `<?xml version="1.0" encoding="UTF-8"?>`;
+  const nodeLookup = buildNodeLookup(nodes);
   const keys = [
     `<key id="node_label" for="node" attr.name="label" attr.type="string"/>`,
     `<key id="node_kind" for="node" attr.name="kind" attr.type="string"/>`,
@@ -376,7 +406,7 @@ export function graphMLForGraph(nodes: GraphNode[], edges: GraphEdge[]): string 
   const nodeXml = nodes
     .map(
       (node) =>
-        `<node id="${xmlEscape(node.id)}"><data key="node_label">${xmlEscape(nodeLabel(node))}</data><data key="node_kind">${xmlEscape(
+        `<node id="${xmlEscape(node.id)}"><data key="node_label">${xmlEscape(nodeExportLabel(node))}</data><data key="node_kind">${xmlEscape(
           String(node.kind ?? ""),
         )}</data><data key="node_domain">${xmlEscape(String(node.domain ?? ""))}</data><data key="node_source_kind">${xmlEscape(
           String(node.source_kind ?? ""),
@@ -387,7 +417,7 @@ export function graphMLForGraph(nodes: GraphNode[], edges: GraphEdge[]): string 
     .map(
       (edge) =>
         `<edge id="${xmlEscape(edge.id || edgeKey(edge))}" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}"><data key="edge_label">${xmlEscape(
-          String(edge.type ?? ""),
+          edgeExportLabel(edge, nodeLookup),
         )}</data><data key="edge_type">${xmlEscape(String(edge.type ?? ""))}</data><data key="edge_weight">${xmlEscape(
           String(numericValue(edge.weight, 1)),
         )}</data><data key="edge_evidence_label">${xmlEscape(String(edge.evidence_label ?? ""))}</data><data key="edge_assertion_origin">${xmlEscape(
@@ -399,6 +429,7 @@ export function graphMLForGraph(nodes: GraphNode[], edges: GraphEdge[]): string 
 }
 
 export function gexfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
+  const nodeLookup = buildNodeLookup(nodes);
   const nodeAttributes = [
     `<attribute id="kind" title="kind" type="string"/>`,
     `<attribute id="domain" title="domain" type="string"/>`,
@@ -414,7 +445,7 @@ export function gexfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
   const nodeXml = nodes
     .map(
       (node) =>
-        `<node id="${xmlEscape(node.id)}" label="${xmlEscape(nodeLabel(node))}"><attvalues><attvalue for="kind" value="${xmlEscape(
+        `<node id="${xmlEscape(node.id)}" label="${xmlEscape(nodeExportLabel(node))}"><attvalues><attvalue for="kind" value="${xmlEscape(
           String(node.kind ?? ""),
         )}"/><attvalue for="domain" value="${xmlEscape(String(node.domain ?? ""))}"/><attvalue for="source_kind" value="${xmlEscape(
           String(node.source_kind ?? ""),
@@ -426,7 +457,7 @@ export function gexfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
       (edge, index) =>
         `<edge id="${xmlEscape(edge.id || `edge-${index}`)}" source="${xmlEscape(edge.source)}" target="${xmlEscape(edge.target)}" type="directed" weight="${xmlEscape(
           String(numericValue(edge.weight, 1)),
-        )}" label="${xmlEscape(String(edge.type ?? ""))}"><attvalues><attvalue for="type" value="${xmlEscape(
+        )}" label="${xmlEscape(edgeExportLabel(edge, nodeLookup))}"><attvalues><attvalue for="type" value="${xmlEscape(
           String(edge.type ?? ""),
         )}"/><attvalue for="evidence_label" value="${xmlEscape(String(edge.evidence_label ?? ""))}"/><attvalue for="assertion_origin" value="${xmlEscape(
           String(edge.assertion_origin ?? ""),
@@ -439,10 +470,11 @@ export function gexfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
 export function gdfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
   const nodeHeader = "nodedef>name VARCHAR,label VARCHAR,kind VARCHAR,domain VARCHAR,source_kind VARCHAR,cluster_signature VARCHAR,degree DOUBLE,recent_active_set_presence DOUBLE";
   const edgeHeader = "edgedef>node1 VARCHAR,node2 VARCHAR,label VARCHAR,weight DOUBLE,evidence_label VARCHAR,assertion_origin VARCHAR,confidence DOUBLE";
+  const nodeLookup = buildNodeLookup(nodes);
   const nodeRows = nodes.map((node) =>
     [
       csvEscape(node.id),
-      csvEscape(nodeLabel(node)),
+      csvEscape(nodeExportLabel(node)),
       csvEscape(node.kind),
       csvEscape(node.domain),
       csvEscape(node.source_kind),
@@ -455,7 +487,7 @@ export function gdfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
     [
       csvEscape(edge.source),
       csvEscape(edge.target),
-      csvEscape(edge.type),
+      csvEscape(edgeExportLabel(edge, nodeLookup)),
       numericValue(edge.weight, 1),
       csvEscape(edge.evidence_label),
       csvEscape(edge.assertion_origin),
@@ -466,11 +498,12 @@ export function gdfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
 }
 
 export function gmlForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
+  const nodeLookup = buildNodeLookup(nodes);
   const nodeBlocks = nodes
     .map(
       (node) => `  node [
     id ${gmlValue(node.id)}
-    label ${gmlValue(nodeLabel(node))}
+    label ${gmlValue(nodeExportLabel(node))}
     kind ${gmlValue(String(node.kind ?? ""))}
     domain ${gmlValue(String(node.domain ?? ""))}
     source_kind ${gmlValue(String(node.source_kind ?? ""))}
@@ -483,7 +516,7 @@ export function gmlForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
       (edge) => `  edge [
     source ${gmlValue(edge.source)}
     target ${gmlValue(edge.target)}
-    label ${gmlValue(String(edge.type ?? ""))}
+    label ${gmlValue(edgeExportLabel(edge, nodeLookup))}
     weight ${numericValue(edge.weight, 1)}
     evidence_label ${gmlValue(String(edge.evidence_label ?? ""))}
     assertion_origin ${gmlValue(String(edge.assertion_origin ?? ""))}
@@ -495,10 +528,11 @@ export function gmlForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
 }
 
 export function graphVizDotForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
+  const nodeLookup = buildNodeLookup(nodes);
   const nodeLines = nodes
     .map(
       (node) =>
-        `  ${dotValue(node.id)} [label=${dotValue(nodeLabel(node))}, kind=${dotValue(String(node.kind ?? ""))}, domain=${dotValue(
+        `  ${dotValue(node.id)} [label=${dotValue(nodeExportLabel(node))}, kind=${dotValue(String(node.kind ?? ""))}, domain=${dotValue(
           String(node.domain ?? ""),
         )}, source_kind=${dotValue(String(node.source_kind ?? ""))}];`,
     )
@@ -506,7 +540,7 @@ export function graphVizDotForGraph(nodes: GraphNode[], edges: GraphEdge[]): str
   const edgeLines = edges
     .map(
       (edge) =>
-        `  ${dotValue(edge.source)} -> ${dotValue(edge.target)} [label=${dotValue(String(edge.type ?? ""))}, weight=${dotValue(
+        `  ${dotValue(edge.source)} -> ${dotValue(edge.target)} [label=${dotValue(edgeExportLabel(edge, nodeLookup))}, weight=${dotValue(
           String(numericValue(edge.weight, 1)),
         )}, evidence_label=${dotValue(String(edge.evidence_label ?? ""))}, assertion_origin=${dotValue(String(edge.assertion_origin ?? ""))}];`,
     )
@@ -516,7 +550,7 @@ export function graphVizDotForGraph(nodes: GraphNode[], edges: GraphEdge[]): str
 
 export function pajekNetForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
   const nodeIndex = new Map(nodes.map((node, index) => [node.id, index + 1]));
-  const vertexLines = nodes.map((node, index) => `${index + 1} "${pajekEscape(nodeLabel(node))}"`);
+  const vertexLines = nodes.map((node, index) => `${index + 1} "${pajekEscape(nodeExportLabel(node))}"`);
   const edgeLines = edges
     .filter((edge) => nodeIndex.has(edge.source) && nodeIndex.has(edge.target))
     .map((edge) => `${nodeIndex.get(edge.source)} ${nodeIndex.get(edge.target)} ${numericValue(edge.weight, 1)}`);
@@ -524,10 +558,11 @@ export function pajekNetForGraph(nodes: GraphNode[], edges: GraphEdge[]): string
 }
 
 export function netdrawVnaForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
+  const nodeLookup = buildNodeLookup(nodes);
   const nodeLines = nodes.map((node) =>
     [
       vnaValue(node.id),
-      vnaValue(nodeLabel(node)),
+      vnaValue(nodeExportLabel(node)),
       vnaValue(String(node.kind ?? "")),
       vnaValue(String(node.domain ?? "")),
       vnaValue(String(node.source_kind ?? "")),
@@ -538,7 +573,7 @@ export function netdrawVnaForGraph(nodes: GraphNode[], edges: GraphEdge[]): stri
       vnaValue(edge.source),
       vnaValue(edge.target),
       numericValue(edge.weight, 1),
-      vnaValue(String(edge.type ?? "")),
+      vnaValue(edgeExportLabel(edge, nodeLookup)),
       vnaValue(String(edge.evidence_label ?? "")),
       vnaValue(String(edge.assertion_origin ?? "")),
     ].join("\t"),
@@ -574,12 +609,13 @@ export function tulipTlpForGraph(nodes: GraphNode[], edges: GraphEdge[]): string
 }
 
 export function tgfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
+  const nodeLookup = buildNodeLookup(nodes);
   const ids = new Map(nodes.map((node, index) => [node.id, whitespaceSafeId(node.id, `n${index + 1}`)]));
-  const nodeLines = nodes.map((node) => `${ids.get(node.id)} ${tgfLabel(node)}`.trimEnd());
+  const nodeLines = nodes.map((node) => `${ids.get(node.id)} ${tgfLabel(nodeExportLabel(node))}`.trimEnd());
   const edgeLines = edges
     .filter((edge) => ids.has(edge.source) && ids.has(edge.target))
     .map((edge) => {
-      const label = tgfEdgeLabel(edge);
+      const label = tgfEdgeLabel(edgeExportLabel(edge, nodeLookup), edge);
       return `${ids.get(edge.source)} ${ids.get(edge.target)}${label ? ` ${label}` : ""}`;
     });
   return [...nodeLines, "#", ...edgeLines].join("\n");
@@ -675,13 +711,22 @@ function whitespaceSafeId(value: string, fallback: string): string {
   return fallback;
 }
 
-function tgfEdgeLabel(edge: GraphEdge): string {
-  const segments = [String(edge.type ?? "").trim()];
+function tgfEdgeLabel(label: string, edge: GraphEdge): string {
+  const segments = [label.trim()];
   const weight = numericValue(edge.weight, 1);
   if (weight !== 1) segments.push(`weight=${weight}`);
   return segments.filter(Boolean).join(" | ");
 }
 
-function tgfLabel(node: GraphNode): string {
-  return nodeLabel(node).replace(/\s+/g, " ").trim();
+function tgfLabel(label: string): string {
+  return label.replace(/\s+/g, " ").trim();
+}
+
+function dedupeNodesFromEdges(edges: GraphEdge[]): string[] {
+  const seen = new Set<string>();
+  for (const edge of edges) {
+    seen.add(edge.source);
+    seen.add(edge.target);
+  }
+  return [...seen];
 }

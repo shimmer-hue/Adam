@@ -18,7 +18,8 @@ import {
 const nodes = [
   {
     id: "meme-1",
-    label: "Persistent meme",
+    label: "meme key phrase",
+    export_label: "Persistent meme semantic content",
     kind: "meme",
     domain: "knowledge",
     source_kind: "operator",
@@ -28,7 +29,8 @@ const nodes = [
   },
   {
     id: "meme-2",
-    label: "Adaptive meme",
+    label: "adaptive key phrase",
+    export_label: "Adaptive meme semantic content",
     kind: "meme",
     domain: "behavior",
     source_kind: "document",
@@ -44,6 +46,7 @@ const edges = [
     source: "meme-1",
     target: "meme-2",
     type: "CO_OCCURS_WITH",
+    export_label: "CO_OCCURS_WITH: Persistent meme semantic content -> Adaptive meme semantic content",
     weight: 0.75,
     evidence_label: "OBSERVED",
     assertion_origin: "operator",
@@ -57,7 +60,9 @@ describe("graph export serializers", () => {
     const edgeCsv = csvForEdges([...edges]);
 
     expect(nodeCsv).toContain("Id,Label,Kind,Domain,SourceKind,ClusterSignature,Degree,RecentActiveSetPresence");
-    expect(edgeCsv).toContain("Id,Source,Target,Type,Weight,EvidenceLabel,AssertionOrigin,Confidence");
+    expect(nodeCsv).toContain("Persistent meme semantic content");
+    expect(edgeCsv).toContain("Id,Source,Target,Label,Type,Weight,EvidenceLabel,AssertionOrigin,Confidence");
+    expect(edgeCsv).toContain("CO_OCCURS_WITH: Persistent meme semantic content -> Adaptive meme semantic content");
   });
 
   it("serializes rich Gephi XML and attribute formats", () => {
@@ -66,8 +71,10 @@ describe("graph export serializers", () => {
     const gdf = gdfForGraph([...nodes], [...edges]);
 
     expect(graphml).toContain('<key id="node_label"');
+    expect(graphml).toContain("<data key=\"node_label\">Persistent meme semantic content</data>");
     expect(graphml).toContain('<data key="edge_assertion_origin">operator</data>');
     expect(gexf).toContain('<attributes class="edge">');
+    expect(gexf).toContain('label="Persistent meme semantic content"');
     expect(gexf).toContain('attvalue for="confidence" value="0.8"');
     expect(gdf).toContain("nodedef>name VARCHAR,label VARCHAR");
     expect(gdf).toContain("edgedef>node1 VARCHAR,node2 VARCHAR,label VARCHAR,weight DOUBLE");
@@ -83,10 +90,11 @@ describe("graph export serializers", () => {
     const tgf = tgfForGraph([...nodes], [...edges]);
 
     expect(gml).toContain('graph [');
-    expect(gml).toContain('source "meme-1"');
+    expect(gml).toContain('label "Persistent meme semantic content"');
     expect(dot).toContain("digraph eden");
-    expect(dot).toContain('"meme-1" -> "meme-2"');
+    expect(dot).toContain('label="CO_OCCURS_WITH: Persistent meme semantic content -> Adaptive meme semantic content"');
     expect(pajek).toContain("*Vertices 2");
+    expect(pajek).toContain('"Persistent meme semantic content"');
     expect(pajek).toContain("*Arcs");
     expect(vna).toContain("*node data");
     expect(vna).toContain("*tie data");
@@ -94,6 +102,6 @@ describe("graph export serializers", () => {
     expect(ucinet).toContain("labels:");
     expect(tulip).toContain('(tlp "2.0"');
     expect(tgf).toContain("#");
-    expect(tgf).toContain("meme-1 meme-2 CO_OCCURS_WITH");
+    expect(tgf).toContain("meme-1 Persistent meme semantic content");
   });
 });

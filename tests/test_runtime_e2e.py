@@ -60,6 +60,13 @@ def test_single_graph_bootstrap_chat_feedback_and_exports(runtime, tmp_path) -> 
     assert (tmp_path / "exports" / "tanakh_surface.json").exists()
     assert (tmp_path / "exports" / "tanakh_render_validation.json").exists()
     assert export_paths["graph_html"].endswith(".html")
+    graph_payload = json.loads((tmp_path / "exports" / "graph_knowledge_base.json").read_text())
+    assert graph_payload["semantic_nodes"]
+    assert any(
+        node.get("export_label") and node["export_label"] != node["id"] and node["export_label"] != node.get("label")
+        for node in graph_payload["semantic_nodes"]
+    )
+    assert any(edge.get("export_label") and edge["export_label"] != edge.get("type") for edge in graph_payload["semantic_edges"])
     geometry_payload = json.loads((tmp_path / "exports" / "geometry_diagnostics.json").read_text())
     assert "local_reports" in geometry_payload
 

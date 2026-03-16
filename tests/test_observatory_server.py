@@ -99,6 +99,8 @@ def test_observatory_server_exposes_live_api(runtime, tmp_path) -> None:
         with urllib.request.urlopen(f"{status['url']}api/experiments/{experiment['id']}/graph?session_id={session['id']}") as response:
             graph_payload = json.loads(response.read().decode("utf-8"))
         assert graph_payload["semantic_nodes"]
+        assert any(node.get("export_label") and node["export_label"] != node["id"] for node in graph_payload["semantic_nodes"])
+        assert any(edge.get("export_label") for edge in graph_payload["semantic_edges"])
         assert "cluster_summaries" in graph_payload
         assert graph_payload["layout_families"][0]["label"] == "1. Force-Directed Layout Algorithms"
         assert graph_payload["layout_catalog"]["kamada_kawai"]["familyId"] == "force_directed"

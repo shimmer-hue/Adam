@@ -114,6 +114,7 @@ Generated per experiment under `exports/<experiment_id>/`:
 ## Public browser payload contract
 
 - graph payloads expose layout, appearance, filter, statistics, and export capability metadata so the React shell can stay declarative instead of hard-coding instrument assumptions
+- graph payload nodes and edges can expose `export_label` alongside stable internal ids so graph-document downloads can carry semantic labels into Gephi without sacrificing referential identity
 - graph payload layout metadata includes:
   - `layout_families`
   - `layout_catalog`

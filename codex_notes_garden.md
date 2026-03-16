@@ -3890,3 +3890,82 @@ Remaining uncertainties:
 - `tulip tlp`, `pajek net`, and `tgf` serializers are intentionally minimal/topology-first; richer EDEN metadata is better preserved through `gexf`, `graphml`, or `gdf`.
 Next shortest proof path:
 Open a fresh observatory export in Gephi itself and validate at least `gexf`, `graphml`, `gdf`, `gml`, and `pajek net` import behavior end-to-end against the current unified Adam graph, then add an operator-facing recommendation badge for the highest-fidelity formats.
+## [2026-03-16 11:43:24 EDT] PRE-FLIGHT
+Operator task:
+Fix Gephi exports so node and edge labels show semantic content instead of internal UUID-like ids.
+Task checksum:
+`9cf915a98a78f85b0246f0d3033e6ad5948207ea6876510429c731f144d425d2`
+Repo situation:
+Working tree remains dirty from the single-graph refactor and the Gephi-format export pass. Current observatory downloads exist, but Gephi screenshot shows imported labels collapsing to internal ids. Export serializers already read `node.label`; likely root issue is missing/weak semantic export labels or Gephi importer-specific label mapping.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+Natural-language contracts in force:
+Keep stable internal graph ids; browser-visible export remains non-authoritative; Gephi-targeted downloads should surface semantic content for human inspection; code/spec/tests must stay aligned.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_observatory_server.py`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Status register:
+- Implemented:
+  - Gephi-format downloads are present in the observatory.
+  - Graph payload nodes already carry compact observatory labels and summaries.
+- Instrumented:
+  - Export format metadata and frontend tests already exercise the download surface.
+- Conceptual:
+  - Semantic export labels distinct from observatory-UI labels are not yet implemented.
+- Unknown:
+  - Which Gephi importer path the operator used from the screenshot, and whether the importer ignored custom label fields or the payload lacked a stronger semantic display label.
+Risks / invariants:
+Do not replace stable ids with human labels. Avoid degrading observatory readability by making in-browser node labels too long. Keep Gephi export labels semantic while preserving machine-stable ids and existing browser graph behavior.
+Evidence plan:
+Add dedicated node/edge `export_label` derivation in the graph payload, switch serializers to prefer it, update docs/tests, rebuild the frontend bundle, and rerun frontend plus repo tests.
+Shortest proof path:
+Derive semantic `export_label` from summaries/text at graph-model build time, use it in every graph-document serializer, assert it in runtime/server/frontend tests, rebuild, and run `npm --prefix web/observatory run test` plus `./.venv/bin/pytest -q`.
+## [2026-03-16 11:48:17 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_observatory_server.py`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Preserved stable internal node/edge ids as the authoritative graph identity. Added a separate semantic `export_label` contract for Gephi-facing graph-document downloads so operator inspection does not collapse onto UUIDs. Preserved the observatory's compact in-browser labels as a separate concern from export labels.
+Behavior implemented or modified:
+Graph-model export now derives `export_label` for nodes from semantic summaries/text where available and derives edge `export_label` from relation type plus labeled endpoints. Browser graph-document serializers now prefer `export_label` over compact observatory labels or ids for CSV, GEXF, GraphML, GDF, GML, DOT, VNA, Pajek, TGF, and related Gephi-targeted downloads. Runtime/server tests now assert semantic export labels are present in graph payloads. Rebuilt the checked-in observatory bundle so the served app uses the new label behavior.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix /Users/brianray/Adam/web/observatory run test` -> `2 passed (7 tests)`
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_runtime_e2e.py /Users/brianray/Adam/tests/test_observatory_server.py` -> `11 passed`
+`npm --prefix /Users/brianray/Adam/web/observatory run build`
+`./.venv/bin/pytest -q` -> `75 passed in 60.47s`
+Status register changes:
+- Implemented:
+  - Gephi downloads now carry semantic export labels distinct from stable internal ids.
+  - Runtime/server regression tests now ratchet that export-label contract.
+- Instrumented:
+  - None added.
+- Conceptual:
+  - None added.
+- Unknown:
+  - Exact importer behavior inside a live Gephi session remains format-dependent; this turn proves payload/serializer output and repo tests, not an in-Gephi import replay.
+Truth-table / limitations updates:
+Updated observatory spec and limitations to record `export_label` as a graph-payload/download concern and to recommend `gexf` / `gdf` as the highest-confidence Gephi label path.
+Remaining uncertainties:
+- `.DS_Store` and unrelated prior dirty files remain in the worktree.
+- Some Gephi importers, especially topology-first formats, may still flatten richer EDEN metadata even though semantic labels are now exported.
+Next shortest proof path:
+Generate a fresh GEXF and GDF from the observatory, import both into Gephi, and verify the Node/Edge Data Table `Label` columns now show semantic export labels rather than UUIDs.
