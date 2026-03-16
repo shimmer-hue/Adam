@@ -26,7 +26,7 @@
 | Deck + Review secondary surfaces | Implemented | detailed budget / thinking / history remain in `Deck`; explicit feedback remains in `Review` |
 | Dedicated runtime reasoning/feed surface | Implemented | MLX/Qwen reasoning is kept separate from the final answer, the prime TUI feed suppresses prompt-mirror scaffolding while surfacing response-first material, answer-beat reductions, useful hum continuity or first-turn seed details, runtime condition, membrane record, and consideration-trace telemetry in a focusable lower-right viewport, and the `Reasoning` lens now streams visible model reasoning live during generation when the backend emits it |
 | Operator-label turn persistence | Implemented | saved turns and graph-ingested operator text are punctuated as `Brian the operator: ...` |
-| Session-start inference profile flow | Implemented | new-session and resume flows use one shared session modal against the persistent graph, and the tuning apparatus now includes a bounded conversation-history-turn control that persists per session and drives prompt-history assembly |
+| Session-start inference profile flow | Implemented | new-session and resume flows use one shared session modal against the persistent graph, and the tuning apparatus now includes a bounded `history_turns` control (`1..256`) that persists per session; actual injected recent history is budget-bounded at prompt-assembly time |
 | Manual inference mode | Implemented | persisted in session metadata and surfaced per turn |
 | Runtime auto inference mode | Implemented | deterministic bounded heuristics; tested |
 | Adam auto inference mode | Implemented with bounded fallback | mock path chooses bounded presets; MLX path falls back to `runtime_auto` and logs it |

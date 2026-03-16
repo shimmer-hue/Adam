@@ -86,7 +86,8 @@ Manual numeric fields:
 - `repetition_penalty`: higher values suppress repeated phrasing more strongly; lower values allow more reuse
 - `retrieval_depth`: lower values inspect fewer recall candidates; higher values inspect more
 - `max_context_items`: lower values admit fewer retrieved items into the active prompt; higher values admit more at added prompt-budget cost
-- `history_turns`: lower values keep the prompt history tighter; higher values preserve more recent Brian/Adam turns at added prompt-budget cost
+- `history_turns`: lower values keep the prompt history tighter; higher values preserve more recent Brian/Adam turns at added prompt-budget cost; current manual clamp is `1..256`
+- requested `history_turns` is not identical to injected history every turn: EDEN now trims the actual recent-history block against the active prompt-budget envelope after active set, feedback, and operator text are accounted for
 - `response_char_cap`: lower values enforce tighter post-generation operator-facing replies; higher values allow fuller replies
 
 ## MLX pass-through

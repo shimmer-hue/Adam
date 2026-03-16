@@ -58,7 +58,8 @@ Session-start modal:
   - `repetition_penalty`: discourages token reuse; higher suppresses loops more aggressively
   - `retrieval_depth`: number of recall candidates inspected before prompt assembly; lower is narrower/faster, higher searches deeper
   - `max_context_items`: number of retrieved items allowed into the active prompt; lower keeps the aperture tighter, higher spends more prompt budget
-  - `history_turns`: number of recent Brian/Adam turns carried into prompt history; lower keeps conversation context tighter, higher preserves more continuity at added prompt-budget cost
+  - `history_turns`: number of recent Brian/Adam turns requested for prompt history; lower keeps conversation context tighter, higher preserves more continuity at added prompt-budget cost; current manual clamp is `1..256`
+  - EDEN trims the actually injected recent-history block to the active prompt-budget envelope after active set, feedback, and operator text are accounted for, so requested history and injected history can differ on dense turns
   - `response_char_cap`: post-generation operator-facing character cap; lower forces tighter replies, higher allows fuller answers
   - `Profile Summary` reflects the clamped request values that will actually be persisted
   - `low_motion`: `On` reduces terminal animation only; it does not change retrieval or sampling

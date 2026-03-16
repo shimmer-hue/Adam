@@ -76,3 +76,46 @@ def test_history_turns_limits_prompt_history_window(runtime) -> None:
     assert "T2 Brian the operator: Turn two about feedback loops." in preview.history_context
     assert preview.profile["history_turns"] == 2
     assert preview.budget["history_turns"] == 2
+
+
+def test_history_turns_clamps_to_two_hundred_fifty_six(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(
+        experiment["id"],
+        title="Extended History Window",
+        profile_request={"mode": "manual", "budget_mode": "wide", "history_turns": 999},
+    )
+
+    profile = runtime.session_profile_request(session["id"])
+
+    assert profile["history_turns"] == 256
+
+
+def test_recent_history_injection_respects_prompt_budget(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(
+        experiment["id"],
+        title="Budget Bounded History",
+        profile_request={"mode": "manual", "budget_mode": "tight", "history_turns": 256},
+    )
+    for index in range(6):
+        runtime.chat(
+            session_id=session["id"],
+            user_text=f"Turn {index} " + ("continuity signal " * 32),
+        )
+
+    history_context, injected_turns = runtime._recent_history_context(
+        session["id"],
+        limit=256,
+        prompt_budget_tokens=160,
+        system_prompt="system prompt",
+        active_set_context="active set context",
+        feedback_context="feedback context",
+        user_text="recap request",
+        token_counter=lambda text: len(text.split()),
+    )
+
+    assert injected_turns < 6
+    assert injected_turns >= 1
+    assert "T5 Brian the operator: Turn 5" in history_context
+    assert "T0 Brian the operator: Turn 0" not in history_context

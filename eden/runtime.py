@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from .budget import BudgetEstimate, estimate_budget
+from .budget import BudgetEstimate, estimate_budget, heuristic_token_count
 from .config import DEFAULT_MLX_MODEL_DIR, EXPORT_DIR, LOG_DIR, RUNTIME_LOG_PATH, RuntimeSettings, TANAKH_CACHE_DIR
 from .hum import HumService
 from .inference import (
@@ -417,7 +417,6 @@ class EdenRuntime:
         resolved = self._resolved_profile(session_id=session_id, query=user_text)
         request: InferenceProfileRequest = resolved["request"]
         profile = resolved["profile"]
-        history_context = self._recent_history_context(session_id, limit=profile.history_turns)
         feedback_context = self._recent_feedback_context(session_id)
         retrieval_settings = runtime_settings_for_profile(self.settings, profile)
         active_set = self.retrieval_service.retrieve(
@@ -426,15 +425,24 @@ class EdenRuntime:
             query=user_text,
             settings=retrieval_settings,
         )
-        system_prompt, conversation_prompt = self._build_prompts(
-            user_text=user_text,
-            active_set=active_set,
-            session_id=session_id,
-            history_context=history_context,
-            feedback_context=feedback_context,
-            profile=profile,
-        )
         token_counter = self._budget_token_counter()
+        system_prompt = self._system_prompt(profile=profile)
+        history_context, injected_history_turns = self._recent_history_context(
+            session_id,
+            limit=profile.history_turns,
+            prompt_budget_tokens=profile.prompt_budget_tokens,
+            system_prompt=system_prompt,
+            active_set_context=active_set["prompt_context"],
+            feedback_context=feedback_context,
+            user_text=user_text,
+            token_counter=token_counter,
+        )
+        conversation_prompt = self._conversation_prompt(
+            active_set_context=active_set["prompt_context"],
+            feedback_context=feedback_context,
+            history_context=history_context,
+            user_text=user_text,
+        )
         previous = BudgetEstimate(**previous_budget) if previous_budget else None
         budget = estimate_budget(
             prompt_budget_tokens=profile.prompt_budget_tokens,
@@ -446,7 +454,7 @@ class EdenRuntime:
             user_text=user_text,
             response_char_cap=profile.response_char_cap,
             active_set_items=len(active_set["items"]),
-            history_turns=min(profile.history_turns, len(self.store.list_turns(session_id, limit=profile.history_turns))),
+            history_turns=injected_history_turns,
             token_counter=token_counter,
             previous=previous,
         )
@@ -828,15 +836,56 @@ class EdenRuntime:
         self.settings.debug = updated.debug
         return updated.to_dict()
 
-    def _recent_history_context(self, session_id: str, *, limit: int) -> str:
-        turns = list(reversed(self.store.list_turns(session_id, limit=max(1, limit))))
+    def _recent_history_context(
+        self,
+        session_id: str,
+        *,
+        limit: int,
+        prompt_budget_tokens: int | None = None,
+        system_prompt: str = "",
+        active_set_context: str = "",
+        feedback_context: str = "",
+        user_text: str = "",
+        token_counter: Callable[[str], int] | None = None,
+    ) -> tuple[str, int]:
+        turns = list(self.store.list_turns(session_id, limit=max(1, limit)))
         if not turns:
-            return "No prior turns."
-        parts = []
+            return "No prior turns.", 0
+        if prompt_budget_tokens is None:
+            ordered_turns = list(reversed(turns))
+            parts = []
+            for turn in ordered_turns:
+                parts.append(f"T{turn['turn_index']} {safe_excerpt(turn['user_text'], limit=220)}")
+                parts.append(f"T{turn['turn_index']} ADAM: {safe_excerpt(turn['membrane_text'], limit=220)}")
+            return "\n".join(parts), len(ordered_turns)
+
+        counter = token_counter or heuristic_token_count
+        base_prompt = self._conversation_prompt(
+            active_set_context=active_set_context,
+            feedback_context=feedback_context,
+            history_context="",
+            user_text=user_text,
+        )
+        remaining_history_tokens = max(0, int(prompt_budget_tokens) - counter(system_prompt) - counter(base_prompt))
+        selected_blocks: list[str] = []
         for turn in turns:
-            parts.append(f"T{turn['turn_index']} {safe_excerpt(turn['user_text'], limit=220)}")
-            parts.append(f"T{turn['turn_index']} ADAM: {safe_excerpt(turn['membrane_text'], limit=220)}")
-        return "\n".join(parts)
+            block = "\n".join(
+                [
+                    f"T{turn['turn_index']} {safe_excerpt(turn['user_text'], limit=220)}",
+                    f"T{turn['turn_index']} ADAM: {safe_excerpt(turn['membrane_text'], limit=220)}",
+                ]
+            )
+            block_tokens = counter(block)
+            if block_tokens > remaining_history_tokens:
+                if selected_blocks:
+                    break
+                continue
+            selected_blocks.append(block)
+            remaining_history_tokens -= block_tokens
+        if not selected_blocks:
+            return "No prior turns fit current prompt budget.", 0
+        selected_blocks.reverse()
+        return "\n".join(selected_blocks), len(selected_blocks)
 
     def _recent_feedback_context(self, session_id: str) -> str:
         feedback = list(reversed(self.store.recent_feedback(session_id, limit=3)))
@@ -850,17 +899,8 @@ class EdenRuntime:
                 parts.append(f"CORRECTED: {safe_excerpt(corrected, limit=180)}")
         return "\n".join(parts)
 
-    def _build_prompts(
-        self,
-        *,
-        user_text: str,
-        active_set: dict[str, Any],
-        session_id: str,
-        history_context: str,
-        feedback_context: str,
-        profile,
-    ) -> tuple[str, str]:
-        system_prompt = (
+    def _system_prompt(self, *, profile) -> str:
+        return (
             f"You are {self.agent_profile['name']}, the first graph-conditioned agent in EDEN.\n"
             "Your persistent identity is externalized into a memetic graph.\n"
             "If the model emits an explicit reasoning block, EDEN may surface it separately as operator-visible model thinking.\n"
@@ -870,16 +910,24 @@ class EdenRuntime:
             "Treat recent feedback as binding context when relevant.\n"
             f"Inference profile={profile.profile_name} mode={profile.effective_mode} response_char_cap={profile.response_char_cap}."
         )
-        conversation_prompt = (
+
+    def _conversation_prompt(
+        self,
+        *,
+        active_set_context: str,
+        feedback_context: str,
+        history_context: str,
+        user_text: str,
+    ) -> str:
+        return (
             "ACTIVE SET\n"
-            f"{active_set['prompt_context']}\n\n"
+            f"{active_set_context}\n\n"
             "RECENT FEEDBACK\n"
             f"{feedback_context}\n\n"
             "RECENT HISTORY\n"
             f"{history_context}\n\n"
             f"{self._operator_utterance(user_text)}"
         )
-        return system_prompt, conversation_prompt
 
     def _operator_utterance(self, user_text: str) -> str:
         cleaned = (user_text or "").strip()

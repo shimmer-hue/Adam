@@ -624,7 +624,7 @@ async def test_session_config_modal_labels_history_and_clamped_summary(runtime) 
         modal.query_one("#repetition_penalty_input", Input).value = "-4"
         modal.query_one("#retrieval_depth_input", Input).value = "99"
         modal.query_one("#max_context_items_input", Input).value = "2"
-        modal.query_one("#history_turns_input", Input).value = "99"
+        modal.query_one("#history_turns_input", Input).value = "999"
         modal.query_one("#response_char_cap_input", Input).value = "5000"
         await pilot.pause(0.3)
 
@@ -635,7 +635,7 @@ async def test_session_config_modal_labels_history_and_clamped_summary(runtime) 
         assert "repetition_penalty=0.00" in summary_text
         assert "retrieval_depth=32" in summary_text
         assert "max_context_items=4" in summary_text
-        assert "history_turns=12" in summary_text
+        assert "history_turns=256" in summary_text
         assert "max_output_tokens=128" in summary_text
         assert "response_char_cap=3200" in summary_text
 
@@ -679,7 +679,7 @@ async def test_tune_session_modal_restores_title_edit_and_recent_titles(runtime)
         assert title_input.value == "Field Notes"
 
         title_input.value = "June Session Revised"
-        modal.query_one("#history_turns_input", Input).value = "9"
+        modal.query_one("#history_turns_input", Input).value = "64"
         await pilot.pause(0.2)
         assert history_select.value == Select.NULL
 
@@ -690,15 +690,15 @@ async def test_tune_session_modal_restores_title_edit_and_recent_titles(runtime)
         assert app.ui_state.session_title == "June Session Revised"
         assert runtime.store.get_session(current_session["id"])["title"] == "June Session Revised"
         assert runtime.session_profile_request(current_session["id"])["title"] == "June Session Revised"
-        assert runtime.session_profile_request(current_session["id"])["history_turns"] == 9
+        assert runtime.session_profile_request(current_session["id"])["history_turns"] == 64
         assert "Updated session profile: June Session Revised" in app.ui_state.last_feedback
-        assert "history_turns=9" in app.ui_state.last_feedback
+        assert "history_turns=64" in app.ui_state.last_feedback
 
         app.screen.begin_edit_profile_flow()
         await pilot.pause(0.5)
         assert isinstance(app.screen, SessionConfigModal)
         reopened_modal = app.screen
-        assert reopened_modal.query_one("#history_turns_input", Input).value == "9"
+        assert reopened_modal.query_one("#history_turns_input", Input).value == "64"
 
 
 @pytest.mark.asyncio

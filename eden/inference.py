@@ -8,6 +8,7 @@ from .utils import now_utc
 
 
 INFERENCE_MODES = {"manual", "runtime_auto", "adam_auto"}
+MAX_HISTORY_TURNS = 256
 PROFILE_PRESETS: dict[str, dict[str, float | int]] = {
     "tight": {
         "prompt_budget_tokens": 3072,
@@ -138,7 +139,7 @@ def clamp_request(request: InferenceProfileRequest) -> InferenceProfileRequest:
         repetition_penalty=max(0.0, min(2.5, request.repetition_penalty)),
         retrieval_depth=max(4, min(32, request.retrieval_depth)),
         max_context_items=max(4, min(16, request.max_context_items)),
-        history_turns=max(1, min(12, request.history_turns)),
+        history_turns=max(1, min(MAX_HISTORY_TURNS, request.history_turns)),
         response_char_cap=max(600, min(3200, request.response_char_cap)),
         budget_mode=budget_mode,
         title=request.title.strip() or "Operator Session",

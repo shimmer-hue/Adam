@@ -4357,3 +4357,162 @@ Remaining uncertainties:
 - Other pre-existing changes in the worktree were preserved.
 Next shortest proof path:
 Manual operator check in the TUI: open `Tune Session`, set `Conversation History Turns` to a non-default value, apply, reopen `Tune Session`, and confirm the field and top-level feedback line match the saved number.
+
+## [2026-03-16 17:42:08 EDT] PRE-FLIGHT
+Operator task:
+Allow `Conversation History Turns` to go above the current silent `12` cap when the operator has prompt budget headroom in the chat TUI.
+Task checksum:
+`3583286c984b6e02bea8d49d1d256efb95b48fac2d3a5cecac66ae0c06d9b856`
+Repo situation:
+Worktree is effectively clean for tracked task files; unrelated `.DS_Store` remains modified. No active spec/code merge conflict observed yet.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+Natural-language contracts in force:
+`history_turns` is a bounded session profile field that persists per session and carries recent Brian/Adam turns into prompt history. The spec states that manual values are clamped for local safety, but it does not currently publish the upper bound.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/inference.py`
+`/Users/brianray/Adam/tests/test_inference_profiles.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - `history_turns` is persisted in session metadata and used as the recent-history window for prompt assembly.
+- Instrumented:
+  - The topbar context widget reports used/remaining prompt-budget estimate, including history contribution indirectly through the budget surface.
+- Conceptual:
+  - A higher operator-facing `history_turns` ceiling that better matches observed prompt headroom.
+- Unknown:
+  - The best safe upper bound that expands continuity without undermining the current bounded-local contract.
+Risks / invariants:
+Maintain the existing v1 loop and bounded local-safety doctrine. Do not imply dynamic budget-aware auto-expansion that the runtime does not actually perform. If the bound changes, align docs/tests in the same turn and keep the topbar estimate described as an estimate, not a hard admission-control gate.
+Evidence plan:
+Change the clamp in `eden/inference.py`, update the TUI and inference ratchets, update the relevant spec/limitations/truth-table surfaces if the visible capability changes, then run targeted tests followed by the full suite.
+Shortest proof path:
+Raise the explicit `history_turns` clamp to a higher bounded value, add regression assertions that values above `12` persist and render in the modal summary, then prove with `./.venv/bin/pytest -q tests/test_inference_profiles.py tests/test_tui_smoke.py` and `./.venv/bin/pytest -q`.
+
+## [2026-03-16 17:45:51 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/inference.py`
+`/Users/brianray/Adam/tests/test_inference_profiles.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Revised the published `history_turns` bound from an implicit implementation detail to an explicit operator contract: the manual `Conversation History Turns` control now clamps to `1..24`. Preserved the separate limitation that the topbar context meter is an estimate and does not dynamically govern the history-turn ceiling.
+Behavior implemented or modified:
+Raised the `history_turns` clamp in `eden/inference.py` from `12` to `24`. Updated TUI/inference ratchets so the modal summary now clamps oversized input to `24`, and Tune Session round-trips a value above the old ceiling (`21`) without reversion. Updated docs/truth-table/limitations surfaces to make the new bound explicit and to state that spare estimated prompt budget does not auto-expand the ceiling.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q tests/test_inference_profiles.py tests/test_tui_smoke.py` -> `23 passed in 53.57s`
+`./.venv/bin/pytest -q` -> `81 passed in 65.82s (0:01:05)`
+Status register changes:
+- Implemented:
+  - `history_turns` manual clamp is now `1..24` instead of `1..12`.
+  - Tune Session now persists and reopens values above the old `12` ceiling within the new bound.
+- Instrumented:
+  - Documentation now explicitly states that the topbar context meter is informative only and does not auto-raise the history-turn ceiling.
+- Conceptual:
+  - Dynamic history-turn ceilings based on live budget headroom remain unimplemented.
+- Unknown:
+  - Whether an even higher bound than `24` would remain comfortably inside local prompt-budget discipline across heavier real-session traces; this turn only proves the bounded `24` path.
+Truth-table / limitations updates:
+Updated truth-table and limitations surfaces because the operator-visible `history_turns` capability changed and the previous hidden `12` cap was materially confusing.
+Remaining uncertainties:
+- `.DS_Store` remains an unrelated modified file and was left untouched.
+- The topbar used/remaining meter still estimates prompt headroom; it does not enforce or auto-negotiate `history_turns`.
+Next shortest proof path:
+Manual TUI check on a real long-running session: set `Conversation History Turns` to a value between `13` and `24`, apply, reopen Tune Session, verify it persists, then watch the topbar budget strip and Deck history contribution while composing longer turns.
+
+## [2026-03-16 17:45:51 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/inference.py`
+`/Users/brianray/Adam/tests/test_inference_profiles.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Revised the `history_turns` contract to separate requested recent-history depth from actual injected history. The requested control now clamps to `1..256`, while injected history is trimmed against the active prompt-budget envelope after active set, feedback, and operator text are accounted for. Preserved the limitation that EDEN's prompt-budget surfaces are bounded runtime policy, not a direct mirror of model-native maximum context.
+Behavior implemented or modified:
+Raised the requested `history_turns` clamp from `24` to `256`. Refactored prompt assembly so preview/chat now builds the active set first, computes the system prompt, and then injects only as many recent turns as fit within the prompt-budget envelope. Budget reporting now records the actual injected history-turn count rather than only the requested count or available turn count. The TUI modal ratchets were updated to prove both the higher clamp (`999 -> 256`) and persistence of a larger requested value (`64`) across Tune Session reopen.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q tests/test_inference_profiles.py tests/test_tui_smoke.py` -> `24 passed in 53.21s`
+`./.venv/bin/pytest -q` -> `82 passed in 65.39s (0:01:05)`
+Status register changes:
+- Implemented:
+  - Requested `history_turns` now clamps to `1..256`.
+  - Actual injected recent history is budget-bounded at prompt assembly.
+  - Budget surfaces now reflect actual injected history-turn count.
+- Instrumented:
+  - Docs now explicitly distinguish model-native context from EDEN prompt-budget policy.
+- Conceptual:
+  - Widening EDEN's prompt-budget presets to exploit more of the model's native context remains a separate change.
+- Unknown:
+  - The practical upper limit for prompt-budget preset expansion on this M3/48GB local runtime under real heavy sessions is still unmeasured in this turn.
+Truth-table / limitations updates:
+Updated truth-table and limitations because operator-visible `history_turns` semantics changed materially: requested depth is now larger and actual injection is budget-bounded rather than assumed.
+Remaining uncertainties:
+- `.DS_Store` remains an unrelated modified file and was left untouched.
+- Current prompt-budget presets still top out far below the model's native advertised context window.
+Next shortest proof path:
+Manual long-session run on the real MLX backend: request `history_turns=128`, compose dense turns, and verify Deck/topbar history contribution rises and then trims naturally as the active set and feedback consume more of the current prompt-budget envelope.
+
+## [2026-03-16 17:45:51 EDT] PRE-FLIGHT
+Operator task:
+Replace the still-too-conservative `history_turns` ceiling with a much higher requested bound and make recent-history prompt assembly budget-aware so EDEN does not blindly overrun its own bounded prompt-budget profiles.
+Task checksum:
+`model-native-context-vs-eden-budget-aware-history`
+Repo situation:
+Worktree includes the just-completed `1..24` history-turn expansion plus unrelated `.DS_Store`. No merge conflict, but the current implementation still has a spec/code honesty gap: prompt budget is estimated and displayed, yet history assembly is not trimmed against it.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts in force:
+`history_turns` is bounded and operator-visible. Prompt-budget surfaces are EDEN-side estimates and must not be overclaimed as hard model limits. The local runtime uses `Qwen 3.5 35B A3B` on MLX, but EDEN's profile budgets remain separate repo policy from the model's native context length.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/inference.py`
+`/Users/brianray/Adam/tests/test_inference_profiles.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - The local model config under `models/qwen3.5-35b-a3b-mlx-mxfp4/config.json` advertises `max_position_embeddings=262144`.
+  - EDEN session profiles currently cap `history_turns` explicitly and build history without trimming to the displayed prompt-budget estimate.
+- Instrumented:
+  - The topbar/Deck budget surfaces report history contribution and remaining tokens, but they are not currently used to trim history assembly.
+- Conceptual:
+  - A higher requested `history_turns` ceiling that still respects prompt-budget envelopes by trimming the actual injected history window.
+- Unknown:
+  - The largest safe requested bound that remains practical on this machine once actual injected history is budget-bounded.
+Risks / invariants:
+Do not equate model-native context length with safe EDEN prompt assembly on a local 35B MLX runtime. Preserve bounded-local behavior and make the budget readout more truthful, not less. Avoid unbounded prompt growth or a mismatch where UI says one budget while runtime injects much more.
+Evidence plan:
+Raise the requested `history_turns` bound substantially, add budget-aware recent-history assembly, ensure budget reporting reflects actual injected history turns, update docs/limitations/truth table, and prove with targeted plus full pytest runs.
+Shortest proof path:
+Implement budget-aware `_recent_history_context(...)` selection in `eden/runtime.py`, raise the requested clamp in `eden/inference.py`, add tests for high requested values and budget-bounded actual inclusion, then run `./.venv/bin/pytest -q tests/test_inference_profiles.py tests/test_tui_smoke.py` and `./.venv/bin/pytest -q`.
