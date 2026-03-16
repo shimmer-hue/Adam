@@ -53,14 +53,14 @@ Session-start modal:
   - `wide`: larger prompt-budget envelope for deeper retrieval and longer replies within safe local bounds
 - manual bounded fields:
   - `temperature`: sampling randomness; lower is steadier, higher is more varied
-  - `max_output_tokens`: hard generation-token cap; lower is shorter, higher allows longer continuations
+  - `max_output_tokens`: hard generation-token cap; lower is shorter, higher allows longer continuations; current manual clamp is `128..4096`, and the balanced default is `1200`
   - `top_p`: nucleus-sampling cutoff; lower narrows token choice, higher widens it
   - `repetition_penalty`: discourages token reuse; higher suppresses loops more aggressively
   - `retrieval_depth`: number of recall candidates inspected before prompt assembly; lower is narrower/faster, higher searches deeper
   - `max_context_items`: number of retrieved items allowed into the active prompt; lower keeps the aperture tighter, higher spends more prompt budget
   - `history_turns`: number of recent Brian/Adam turns requested for prompt history; lower keeps conversation context tighter, higher preserves more continuity at added prompt-budget cost; current manual clamp is `1..256`
   - EDEN trims the actually injected recent-history block to the active prompt-budget envelope after active set, feedback, and operator text are accounted for, so requested history and injected history can differ on dense turns
-  - `response_char_cap`: post-generation operator-facing character cap; lower forces tighter replies, higher allows fuller answers
+  - `response_char_cap`: post-generation operator-facing character cap; lower forces tighter replies, higher allows fuller answers; current manual clamp is `600..12000`, and the balanced default is `5200`
   - `Profile Summary` reflects the clamped request values that will actually be persisted
   - `low_motion`: `On` reduces terminal animation only; it does not change retrieval or sampling
   - `debug`: persisted session/profile flag surfaced in runtime status; current MLX path does not alter sampler or retrieval behavior from this toggle yet
@@ -71,6 +71,7 @@ Primary split:
 
 - left primary dialogue bay:
   - longer scrolling dialogue tape with persisted Brian / Adam turn boxes for the active session
+  - Adam transcript cards reconstruct their readable text from raw stored turn output under a larger bounded display cap, so older turns clipped by a smaller generation-time `response_char_cap` remain readable in the tape without rewriting graph history
   - static alternating transcript cards for faster scanning: Brian cards sit on a true-black field and Adam cards on a slightly lifted rose-black shade; decorative interior glyph bands are no longer rendered inside the chat text surface
   - live Brian draft box when the composer is loaded
   - multiline `TextArea` composer for Brian the operator with strong focus styling

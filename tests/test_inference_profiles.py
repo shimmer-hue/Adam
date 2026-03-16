@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 
+from eden.models.base import ModelResult
+from eden.models.mock import MockModelAdapter
+
 
 def test_session_start_persists_manual_profile(runtime) -> None:
     experiment = runtime.initialize_experiment("blank")
@@ -91,6 +94,25 @@ def test_history_turns_clamps_to_two_hundred_fifty_six(runtime) -> None:
     assert profile["history_turns"] == 256
 
 
+def test_max_output_tokens_and_response_cap_clamp_to_long_form_bounds(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(
+        experiment["id"],
+        title="Long Form Bounds",
+        profile_request={
+            "mode": "manual",
+            "budget_mode": "wide",
+            "max_output_tokens": 99999,
+            "response_char_cap": 99999,
+        },
+    )
+
+    profile = runtime.session_profile_request(session["id"])
+
+    assert profile["max_output_tokens"] == 4096
+    assert profile["response_char_cap"] == 12000
+
+
 def test_recent_history_injection_respects_prompt_budget(runtime) -> None:
     experiment = runtime.initialize_experiment("blank")
     session = runtime.start_session(
@@ -119,3 +141,49 @@ def test_recent_history_injection_respects_prompt_budget(runtime) -> None:
     assert injected_turns >= 1
     assert "T5 Brian the operator: Turn 5" in history_context
     assert "T0 Brian the operator: Turn 0" not in history_context
+
+
+def test_session_snapshot_recovers_long_visible_response_from_raw_turn_text(runtime, monkeypatch) -> None:
+    class LongMockAdapter(MockModelAdapter):
+        def generate(
+            self,
+            *,
+            system_prompt: str,
+            conversation_prompt: str,
+            max_tokens: int = 420,
+            temperature: float = 0.0,
+            top_p: float = 0.0,
+            repetition_penalty: float = 0.0,
+            progress_callback=None,
+        ) -> ModelResult:
+            answer = "Long-form operator-facing answer. " * 260
+            return ModelResult(
+                backend=self.backend_name,
+                text=answer,
+                tokens_estimate=min(max_tokens, max(64, len(answer.split()))),
+                metadata={},
+                answer_text=answer,
+                reasoning_text="",
+                raw_text=answer,
+            )
+
+    monkeypatch.setattr(runtime, "_get_model_adapter", lambda: LongMockAdapter())
+
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(
+        experiment["id"],
+        title="Long Form Snapshot",
+        profile_request={
+            "mode": "manual",
+            "budget_mode": "balanced",
+            "max_output_tokens": 1800,
+            "response_char_cap": 1600,
+        },
+    )
+
+    outcome = runtime.chat(session_id=session["id"], user_text="Give me a long-form answer.")
+    snapshot = runtime.session_state_snapshot(session["id"])
+
+    assert len(outcome.turn["membrane_text"]) <= 1600
+    assert len(snapshot["last_response"]) > len(outcome.turn["membrane_text"])
+    assert len(snapshot["last_response"]) > 3000

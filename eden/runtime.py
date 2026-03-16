@@ -12,6 +12,7 @@ from .config import DEFAULT_MLX_MODEL_DIR, EXPORT_DIR, LOG_DIR, RUNTIME_LOG_PATH
 from .hum import HumService
 from .inference import (
     InferenceProfileRequest,
+    MAX_RESPONSE_CHAR_CAP,
     default_profile_request,
     request_from_dict,
     resolve_profile,
@@ -38,6 +39,7 @@ CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 ANSWER_LABEL_RE = re.compile(r"(?im)^\s*(final answer|answer|adam)\s*:\s*")
 SUPPORT_SECTION_RE = re.compile(r"(?im)^\s*(basis|next step)\s*:\s*")
 RUNTIME_LAUNCH_PROFILE_KEY = "runtime_launch_profile"
+DISPLAY_RESPONSE_CHAR_CAP = 24_000
 TUI_APPEARANCE_KEY = "tui_appearance"
 PRIMARY_EXPERIMENT_KEY = "primary_experiment"
 PRIMARY_EXPERIMENT_NAME = "Adam Graph"
@@ -651,10 +653,7 @@ class EdenRuntime:
             user_text = (turn.get("user_text") or "").strip()
             if user_text.lower().startswith(f"{OPERATOR_LABEL.lower()}:"):
                 user_text = user_text.split(":", 1)[1].strip()
-            visible_response, _ = self.sanitize_operator_response(
-                turn.get("membrane_text") or turn.get("response_text") or "",
-                response_char_cap=320,
-            )
+            visible_response, _ = self.render_turn_visible_response(turn)
             recent_turns.append(
                 {
                     "turn_index": turn["turn_index"],
@@ -707,10 +706,7 @@ class EdenRuntime:
             user_text = (turn.get("user_text") or "").strip()
             if user_text.lower().startswith(f"{OPERATOR_LABEL.lower()}:"):
                 user_text = user_text.split(":", 1)[1].strip()
-            visible_response, _ = self.sanitize_operator_response(
-                turn.get("membrane_text") or turn.get("response_text") or "",
-                response_char_cap=1600,
-            )
+            visible_response, _ = self.render_turn_visible_response(turn)
             lines.extend(
                 [
                     f"## Turn T{turn['turn_index']}",
@@ -800,10 +796,7 @@ class EdenRuntime:
             return snapshot
         turn = turns[0]
         metadata = json.loads(turn["metadata_json"] or "{}")
-        visible_response, _ = self.sanitize_operator_response(
-            turn["membrane_text"] or turn["response_text"] or "",
-            response_char_cap=1600,
-        )
+        visible_response, _ = self.render_turn_visible_response(turn, metadata=metadata)
         snapshot.update(
             {
                 "last_turn_id": turn["id"],
@@ -975,6 +968,52 @@ class EdenRuntime:
         if not events:
             events.append({"event_type": "PASSTHROUGH", "detail": "Response passed the membrane unchanged."})
         return cleaned, events
+
+    def response_char_cap_for_turn(
+        self,
+        turn: dict[str, Any],
+        *,
+        metadata: dict[str, Any] | None = None,
+        fallback: int = MAX_RESPONSE_CHAR_CAP,
+    ) -> int:
+        resolved_metadata = metadata
+        if resolved_metadata is None:
+            try:
+                resolved_metadata = json.loads(turn.get("metadata_json") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                resolved_metadata = {}
+        profile: dict[str, Any] = {}
+        if isinstance(resolved_metadata, dict):
+            candidate = resolved_metadata.get("inference_profile") or resolved_metadata.get("requested_inference_profile") or {}
+            if isinstance(candidate, dict):
+                profile = candidate
+        try:
+            cap = int(profile.get("response_char_cap", fallback) or fallback)
+        except (TypeError, ValueError):
+            cap = fallback
+        return max(400, cap)
+
+    def render_turn_visible_response(
+        self,
+        turn: dict[str, Any],
+        *,
+        metadata: dict[str, Any] | None = None,
+        display_char_cap: int = DISPLAY_RESPONSE_CHAR_CAP,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        resolved_metadata = metadata
+        if resolved_metadata is None:
+            try:
+                resolved_metadata = json.loads(turn.get("metadata_json") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                resolved_metadata = {}
+        model_result = resolved_metadata.get("model_result") or {} if isinstance(resolved_metadata, dict) else {}
+        answer_text = str(model_result.get("answer_text") or "").strip() if isinstance(model_result, dict) else ""
+        source_text = answer_text or turn.get("response_text") or turn.get("membrane_text") or ""
+        response_char_cap = max(
+            self.response_char_cap_for_turn(turn, metadata=resolved_metadata),
+            max(400, int(display_char_cap)),
+        )
+        return self.sanitize_operator_response(source_text, response_char_cap=response_char_cap)
 
     def _index_text_into_graph(
         self,

@@ -9,30 +9,34 @@ from .utils import now_utc
 
 INFERENCE_MODES = {"manual", "runtime_auto", "adam_auto"}
 MAX_HISTORY_TURNS = 256
+MIN_OUTPUT_TOKENS = 128
+MAX_OUTPUT_TOKENS = 4096
+MIN_RESPONSE_CHAR_CAP = 600
+MAX_RESPONSE_CHAR_CAP = 12_000
 PROFILE_PRESETS: dict[str, dict[str, float | int]] = {
     "tight": {
         "prompt_budget_tokens": 3072,
         "temperature": 0.25,
-        "max_output_tokens": 320,
+        "max_output_tokens": 512,
         "retrieval_depth": 8,
         "max_context_items": 6,
-        "response_char_cap": 1100,
+        "response_char_cap": 2200,
     },
     "balanced": {
         "prompt_budget_tokens": 5120,
         "temperature": 0.4,
-        "max_output_tokens": 480,
+        "max_output_tokens": 1200,
         "retrieval_depth": 12,
         "max_context_items": 8,
-        "response_char_cap": 1600,
+        "response_char_cap": 5200,
     },
     "wide": {
         "prompt_budget_tokens": 7168,
         "temperature": 0.55,
-        "max_output_tokens": 640,
+        "max_output_tokens": 1600,
         "retrieval_depth": 16,
         "max_context_items": 10,
-        "response_char_cap": 2200,
+        "response_char_cap": 6800,
     },
 }
 
@@ -41,13 +45,13 @@ PROFILE_PRESETS: dict[str, dict[str, float | int]] = {
 class InferenceProfileRequest:
     mode: str = "manual"
     temperature: float = 0.4
-    max_output_tokens: int = 480
+    max_output_tokens: int = 1200
     top_p: float = 0.9
     repetition_penalty: float = 1.05
     retrieval_depth: int = 12
     max_context_items: int = 8
     history_turns: int = 3
-    response_char_cap: int = 1600
+    response_char_cap: int = 5200
     low_motion: bool = False
     debug: bool = True
     budget_mode: str = "balanced"
@@ -84,16 +88,17 @@ class ResolvedInferenceProfile:
 
 
 def default_profile_request(settings: RuntimeSettings) -> InferenceProfileRequest:
+    balanced_preset = PROFILE_PRESETS["balanced"]
     return InferenceProfileRequest(
         mode="manual",
         temperature=0.4,
-        max_output_tokens=480,
+        max_output_tokens=int(balanced_preset["max_output_tokens"]),
         top_p=0.9,
         repetition_penalty=1.05,
         retrieval_depth=settings.retrieval_depth,
         max_context_items=settings.max_context_items,
         history_turns=settings.history_turns,
-        response_char_cap=1600,
+        response_char_cap=int(balanced_preset["response_char_cap"]),
         low_motion=settings.low_motion,
         debug=settings.debug,
         budget_mode="balanced",
@@ -134,13 +139,13 @@ def clamp_request(request: InferenceProfileRequest) -> InferenceProfileRequest:
         request,
         mode=mode,
         temperature=max(0.0, min(1.5, request.temperature)),
-        max_output_tokens=max(128, min(1200, request.max_output_tokens)),
+        max_output_tokens=max(MIN_OUTPUT_TOKENS, min(MAX_OUTPUT_TOKENS, request.max_output_tokens)),
         top_p=max(0.0, min(1.0, request.top_p)),
         repetition_penalty=max(0.0, min(2.5, request.repetition_penalty)),
         retrieval_depth=max(4, min(32, request.retrieval_depth)),
         max_context_items=max(4, min(16, request.max_context_items)),
         history_turns=max(1, min(MAX_HISTORY_TURNS, request.history_turns)),
-        response_char_cap=max(600, min(3200, request.response_char_cap)),
+        response_char_cap=max(MIN_RESPONSE_CHAR_CAP, min(MAX_RESPONSE_CHAR_CAP, request.response_char_cap)),
         budget_mode=budget_mode,
         title=request.title.strip() or "Operator Session",
     )

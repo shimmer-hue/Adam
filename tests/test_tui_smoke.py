@@ -10,6 +10,8 @@ import pytest
 from textual.widgets import Button, Input, Select, Static, TextArea
 
 from eden.browser import BrowserOpenResult
+from eden.models.base import ModelResult
+from eden.models.mock import MockModelAdapter
 from eden.tui.app import ActionStrip, ChatScreen, ConversationAtlasModal, DeckModal, EdenTuiApp, IngestModal, SessionConfigModal
 
 
@@ -288,6 +290,66 @@ async def test_tui_hum_live_pane_scrolls_when_focused(runtime) -> None:
         await pilot.press("home")
         await pilot.pause(0.1)
         assert thinking_scroller.scroll_y == 0
+
+
+@pytest.mark.asyncio
+async def test_dialogue_tape_recovers_long_answer_beyond_turn_membrane_cap(runtime, monkeypatch) -> None:
+    class LongMockAdapter(MockModelAdapter):
+        def generate(
+            self,
+            *,
+            system_prompt: str,
+            conversation_prompt: str,
+            max_tokens: int = 420,
+            temperature: float = 0.0,
+            top_p: float = 0.0,
+            repetition_penalty: float = 0.0,
+            progress_callback=None,
+        ) -> ModelResult:
+            answer = ("Long-form tape recovery paragraph. " * 120) + "TAIL MARKER 7319"
+            return ModelResult(
+                backend=self.backend_name,
+                text=answer,
+                tokens_estimate=min(max_tokens, max(64, len(answer.split()))),
+                metadata={},
+                answer_text=answer,
+                reasoning_text="",
+                raw_text=answer,
+            )
+
+    monkeypatch.setattr(runtime, "_get_model_adapter", lambda: LongMockAdapter())
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(
+        experiment["id"],
+        title="Tape Recovery",
+        profile_request={
+            "mode": "manual",
+            "budget_mode": "balanced",
+            "max_output_tokens": 2400,
+            "response_char_cap": 1600,
+        },
+    )
+
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(200, 60)) as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+        app.apply_session_snapshot(runtime.session_state_snapshot(session["id"]))
+        app.screen.refresh_panels()
+        await pilot.pause(0.2)
+        composer = app.screen.query_one("#composer_input", TextArea)
+        composer.load_text("Give me the long version.")
+        await pilot.pause(0.2)
+        await app.screen._send_turn()
+        await pilot.pause(0.4)
+
+        latest_turn = runtime.store.list_turns(session["id"], limit=1)[0]
+        assert len(latest_turn["membrane_text"]) <= 1600
+        assert "TAIL MARKER 7319" in app.ui_state.last_response
+
+        chat_group = app.screen.main_chat_exchange_panel()
+        adam_panel = chat_group.renderables[1]
+        assert "TAIL MARKER 7319" in getattr(adam_panel.renderable, "plain", "")
 
 
 @pytest.mark.asyncio
@@ -637,7 +699,16 @@ async def test_session_config_modal_labels_history_and_clamped_summary(runtime) 
         assert "max_context_items=4" in summary_text
         assert "history_turns=256" in summary_text
         assert "max_output_tokens=128" in summary_text
-        assert "response_char_cap=3200" in summary_text
+        assert "response_char_cap=5000" in summary_text
+
+        modal.query_one("#max_tokens_input", Input).value = "99999"
+        modal.query_one("#response_char_cap_input", Input).value = "99999"
+        await pilot.pause(0.3)
+
+        summary_panel = modal.query_one("#session_config_summary", Static).render()
+        summary_text = summary_panel._renderable.renderable.plain
+        assert "max_output_tokens=4096" in summary_text
+        assert "response_char_cap=12000" in summary_text
 
         modal.query_one("#session_confirm_btn", Button).press()
         await pilot.pause(0.5)
@@ -680,6 +751,8 @@ async def test_tune_session_modal_restores_title_edit_and_recent_titles(runtime)
 
         title_input.value = "June Session Revised"
         modal.query_one("#history_turns_input", Input).value = "64"
+        modal.query_one("#max_tokens_input", Input).value = "2400"
+        modal.query_one("#response_char_cap_input", Input).value = "7200"
         await pilot.pause(0.2)
         assert history_select.value == Select.NULL
 
@@ -691,14 +764,20 @@ async def test_tune_session_modal_restores_title_edit_and_recent_titles(runtime)
         assert runtime.store.get_session(current_session["id"])["title"] == "June Session Revised"
         assert runtime.session_profile_request(current_session["id"])["title"] == "June Session Revised"
         assert runtime.session_profile_request(current_session["id"])["history_turns"] == 64
+        assert runtime.session_profile_request(current_session["id"])["max_output_tokens"] == 2400
+        assert runtime.session_profile_request(current_session["id"])["response_char_cap"] == 7200
         assert "Updated session profile: June Session Revised" in app.ui_state.last_feedback
         assert "history_turns=64" in app.ui_state.last_feedback
+        assert "max_output_tokens=2400" in app.ui_state.last_feedback
+        assert "response_char_cap=7200" in app.ui_state.last_feedback
 
         app.screen.begin_edit_profile_flow()
         await pilot.pause(0.5)
         assert isinstance(app.screen, SessionConfigModal)
         reopened_modal = app.screen
         assert reopened_modal.query_one("#history_turns_input", Input).value == "64"
+        assert reopened_modal.query_one("#max_tokens_input", Input).value == "2400"
+        assert reopened_modal.query_one("#response_char_cap_input", Input).value == "7200"
 
 
 @pytest.mark.asyncio

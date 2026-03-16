@@ -82,6 +82,7 @@ Manual numeric fields:
 
 - `temperature`: lower values are steadier; higher values produce more randomness/variation
 - `max_output_tokens`: lower values force shorter outputs; higher values allow longer continuations
+- current manual clamp is `128..4096`; the balanced manual default is now `1200` for longer-form local replies
 - `top_p`: lower values narrow the candidate-token pool; higher values widen it
 - `repetition_penalty`: higher values suppress repeated phrasing more strongly; lower values allow more reuse
 - `retrieval_depth`: lower values inspect fewer recall candidates; higher values inspect more
@@ -89,6 +90,8 @@ Manual numeric fields:
 - `history_turns`: lower values keep the prompt history tighter; higher values preserve more recent Brian/Adam turns at added prompt-budget cost; current manual clamp is `1..256`
 - requested `history_turns` is not identical to injected history every turn: EDEN now trims the actual recent-history block against the active prompt-budget envelope after active set, feedback, and operator text are accounted for
 - `response_char_cap`: lower values enforce tighter post-generation operator-facing replies; higher values allow fuller replies
+- current manual clamp is `600..12000`; the balanced manual default is now `5200` so longer replies are not immediately re-trimmed on the visible surface
+- `response_char_cap` still governs the membrane-cleaned operator-facing answer stored at turn time, but readable archive/tape surfaces may reconstruct from raw stored `response_text` under a larger bounded display cap so older clipped turns remain legible
 
 ## MLX pass-through
 
@@ -98,6 +101,12 @@ On the real MLX path, v1.1 passes through:
 - `top_p`
 - `repetition_penalty`
 - `max_output_tokens`
+
+The visible Adam reply surface is related but separate:
+
+- `max_output_tokens` governs generation length
+- `response_char_cap` governs the post-generation operator-facing visible reply after membrane cleanup
+- longer Adam replies only appear in full when both are set high enough at generation time, although some readable transcript surfaces can recover more of the answer later from raw stored model text
 
 using the installed local `mlx-lm` sampler/logits processor utilities.
 

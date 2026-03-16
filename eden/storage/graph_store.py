@@ -465,6 +465,20 @@ class GraphStore:
             raise KeyError(f"Unknown document: {document_id}")
         return _row_to_dict(row) or {}
 
+    def get_document_by_sha(self, experiment_id: str, sha256: str) -> dict[str, Any] | None:
+        row = self._fetchone(
+            "SELECT * FROM documents WHERE experiment_id = ? AND sha256 = ?",
+            (experiment_id, sha256),
+        )
+        return _row_to_dict(row) if row is not None else None
+
+    def document_chunk_count(self, document_id: str) -> int:
+        row = self._fetchone(
+            "SELECT COUNT(*) AS count FROM document_chunks WHERE document_id = ?",
+            (document_id,),
+        )
+        return int(row["count"]) if row is not None else 0
+
     def add_document_chunk(
         self,
         *,

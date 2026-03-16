@@ -4516,3 +4516,231 @@ Evidence plan:
 Raise the requested `history_turns` bound substantially, add budget-aware recent-history assembly, ensure budget reporting reflects actual injected history turns, update docs/limitations/truth table, and prove with targeted plus full pytest runs.
 Shortest proof path:
 Implement budget-aware `_recent_history_context(...)` selection in `eden/runtime.py`, raise the requested clamp in `eden/inference.py`, add tests for high requested values and budget-bounded actual inclusion, then run `./.venv/bin/pytest -q tests/test_inference_profiles.py tests/test_tui_smoke.py` and `./.venv/bin/pytest -q`.
+
+## [2026-03-16 18:37:42 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/ingest/extractors.py`
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/eden/storage/graph_store.py`
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Revised the document-ingest contract so large PDFs are processed as streamed page-like units instead of requiring the full extraction payload to be materialized before chunk persistence begins. Preserved the contract that ingest is local and operator-initiated. Added explicit failure-state behavior for aborted ingest attempts and documented SHA-based reuse of already completed documents.
+Behavior implemented or modified:
+`CURRENT_ADAM_LOG.pdf` was verified not to have produced any chunks, memes, memodes, or edges. The stale `documents` row left behind in `status='processing'` was deleted from `data/eden.db` without re-uploading or re-ingesting the PDF. Ingest now streams extraction units into chunk/meme persistence, marks failed attempts as `status='failed'` with error metadata, and reuses an already completed identical document by SHA rather than duplicating graph artifacts. The TUI ingest action now surfaces ingest failures explicitly instead of appearing frozen/silent.
+Evidence produced (tests / traces / commands / exports):
+Database verification before cleanup:
+`./.venv/bin/python - <<'PY' ... select id, status from documents where path='/Users/brianray/Adam/assets/seed_canon/CURRENT_ADAM_LOG.pdf' ...` -> stale row found with `status='processing'`, `0` chunks, `0` graph artifacts.
+Cleanup verification:
+`./.venv/bin/python - <<'PY' ... delete from documents where id=? ...` -> `deleted_documents: 1`
+Post-cleanup verification:
+`./.venv/bin/python - <<'PY' ... select id, status, path from documents where path=? ...` -> `[]`
+Targeted tests:
+`./.venv/bin/pytest -q tests/test_ingest.py tests/test_tui_smoke.py` -> `21 passed in 52.71s`
+Full suite:
+`./.venv/bin/pytest -q` -> `84 passed in 65.61s (0:01:05)`
+Status register changes:
+- Implemented:
+  - PDF ingest now streams page-like units into persistence instead of waiting for whole-document extraction to finish.
+  - Failed ingest attempts now transition the document row to `failed` with error metadata.
+  - Completed identical documents can be reused by SHA instead of duplicating ingest artifacts.
+  - The stale `CURRENT_ADAM_LOG.pdf` processing row was removed from the live database.
+- Instrumented:
+  - TUI/operator feedback and ingest traces now expose ingest failure state more directly.
+- Conceptual:
+  - Pre-cleaning or structurally normalizing giant PDFs before optional future ingest remains an operator workflow, not an automated pipeline added in this turn.
+- Unknown:
+  - The practical throughput and stability limits for extremely large PDFs on this M3/48GB machine under repeated real ingest loads remain unmeasured beyond this failure case and tests.
+Truth-table / limitations updates:
+Updated the truth table and limitations because ingest behavior changed materially: large-PDF processing is now streamed and explicit failure states are part of the contract.
+Remaining uncertainties:
+- `.DS_Store` remains an unrelated modified file and was left untouched.
+- `CURRENT_ADAM_LOG.pdf` itself was not altered or re-uploaded in this turn.
+- Very large PDFs can still be slow; the refactor removes the silent-zombie failure mode, not the underlying size cost.
+Next shortest proof path:
+Run a manual ingest of a smaller cleaned PDF copy and verify progressive chunk creation, observatory delta, and explicit operator feedback end-to-end without reintroducing a silent `processing` row.
+
+## [2026-03-16 18:48:29 EDT] PRE-FLIGHT
+Operator task:
+Raise the operator-available `max_output_tokens` range and set a more long-form default so Adam can produce materially longer responses in normal sessions instead of being biased toward short continuations.
+Task checksum:
+`longer-adam-replies-output-cap-expansion`
+Repo situation:
+Worktree is already dirty from the just-completed ingest hardening plus unrelated `.DS_Store`. Current inference profile surfaces still cap `max_output_tokens` at `1200`, and the default manual/balanced request remains `480`, which is much shorter than the operator now wants.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts in force:
+Session tuning values are operator-visible, bounded, and persisted. Prompt-budget accounting must remain honest about reserved output tokens. If long-form output defaults are raised, the visible response surface must not silently truncate them through an unrelated low character cap.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/inference.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_inference_profiles.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - `max_output_tokens` is currently persisted and passed through to MLX generation.
+  - The current manual clamp is `128..1200`.
+  - Default manual/balanced sessions still start at `480` output tokens with a `1600` character cap.
+- Instrumented:
+  - Budget surfaces already reserve output tokens explicitly in prompt accounting.
+- Conceptual:
+  - A long-form default profile with a larger available output-token ceiling and a synchronized visible response cap.
+- Unknown:
+  - The practical sweet spot for "average long conversation" on this local runtime that feels longer without consuming too much prompt budget by default.
+Risks / invariants:
+Do not overclaim model-native output limits. Keep prompt-budget accounting honest. Avoid raising output-token defaults without also raising the operator-facing response cap enough for the longer text to remain visible.
+Evidence plan:
+Raise the `max_output_tokens` clamp and defaults in inference profiles, widen the visible response cap accordingly, update TUI/tests/docs, and prove via targeted plus full pytest runs.
+Shortest proof path:
+Edit `eden/inference.py` and relevant tests/docs, then run `./.venv/bin/pytest -q tests/test_inference_profiles.py tests/test_tui_smoke.py` followed by `./.venv/bin/pytest -q`.
+
+## [2026-03-16 18:56:18 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/inference.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/eden/app.py`
+`/Users/brianray/Adam/tests/test_inference_profiles.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Revised the session-tuning contract so output-length tuning is no longer implicitly short by default. `max_output_tokens` is now bounded but materially wider, `response_char_cap` is widened in parallel, and operator-facing Adam reply surfaces now honor the persisted turn-level response cap instead of a fixed 1600-character trim. Preserved the contract that EDEN prompt-budget accounting must continue to reserve output tokens honestly.
+Behavior implemented or modified:
+Raised `max_output_tokens` clamp from `128..1200` to `128..4096`. Raised the balanced manual default from `480` to `1200`, with preset output defaults now `tight=512`, `balanced=1200`, `wide=1600`. Raised `response_char_cap` clamp from `600..3200` to `600..12000`, with preset defaults now `tight=2200`, `balanced=5200`, `wide=6800`. Runtime/session snapshot, transcript cards, conversation logs, archive preview, and CLI feedback now resolve the visible response cap from the turn's persisted inference profile instead of assuming a fixed 1600/2200 trim.
+Evidence produced (tests / traces / commands / exports):
+Targeted tests:
+`./.venv/bin/pytest -q tests/test_inference_profiles.py tests/test_tui_smoke.py` -> `26 passed in 53.58s`
+Full suite:
+`./.venv/bin/pytest -q` -> `86 passed in 65.84s (0:01:05)`
+Status register changes:
+- Implemented:
+  - Session tuning now allows materially larger `max_output_tokens` values.
+  - Balanced manual sessions now default to a longer-form output budget.
+  - Visible Adam reply surfaces honor turn-specific `response_char_cap` values instead of a fixed short trim.
+- Instrumented:
+  - TUI feedback now echoes updated `max_output_tokens` and `response_char_cap` values after Tune Session apply.
+- Conceptual:
+  - Exploiting more of the model's full native context/output envelope than EDEN's bounded local runtime policy remains a separate change.
+- Unknown:
+  - The practical human-preference sweet spot for long-form defaults under sustained real MLX sessions on this machine remains only lightly measured beyond the new defaults and tests.
+Truth-table / limitations updates:
+Updated truth table and limitations because output-length tuning semantics and visible response behavior changed materially.
+Remaining uncertainties:
+- `.DS_Store` remains an unrelated modified file and was left untouched.
+- The prompt-budget presets still reserve output tokens conservatively relative to the model's larger native envelope.
+- Longer defaults increase visible answer size and may feel heavy on dense sessions if the operator does not tune them back down.
+Next shortest proof path:
+Run a real MLX session with `max_output_tokens=2400` and `response_char_cap=7200`, confirm that the transcript cards and latest-turn snapshot retain a materially longer Adam reply, and check whether the balanced default still feels right for ordinary conversations.
+
+## [2026-03-16 19:08:31 EDT] PRE-FLIGHT
+Operator task:
+Repair the dialogue tape so lengthy Adam replies are readable instead of appearing cut off, and determine whether the failure is UI clipping or earlier membrane trimming.
+Task checksum:
+`dialogue-tape-long-reply-recovery`
+Repo situation:
+Worktree remains dirty from the previous long-output and ingest changes plus unrelated `.DS_Store`. Live database inspection already shows the relevant failure mode: the current session's T12/T13 turns were generated with large `max_output_tokens` budgets, but their stored `membrane_text` was trimmed to `response_char_cap=1600`, so the tape is replaying a shortened operator-facing answer rather than clipping a full one in the widget.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+Natural-language contracts in force:
+The dialogue tape is the readable persisted transcript surface. `response_char_cap` is a membrane/output-tuning control, but the tape should not silently lose readability when raw turn output is still available. Any recovery path must preserve graph state and history truthfully rather than pretending the old membrane record was never trimmed.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - The dialogue tape currently renders sanitized turn text.
+  - Live DB evidence shows T12 used `max_output_tokens=4096` and `response_char_cap=1600`, with `response_text` much longer than `membrane_text`.
+- Instrumented:
+  - Runtime stores both raw `response_text` and membrane-cleaned `membrane_text` per turn.
+- Conceptual:
+  - Reconstructing readable tape/log/snapshot surfaces from raw stored response text under a generous display cap, while leaving graph-indexed membrane history intact.
+- Unknown:
+  - Which operator-facing surfaces besides the dialogue tape still replay the shortened membrane string and need the same repair for consistency.
+Risks / invariants:
+Do not mutate old graph-indexed membrane history unless necessary. Keep visible answer sanitation consistent with membrane rules (split reasoning, strip scaffolding), but recover readability from raw stored text when possible. Avoid creating a contract mismatch where one surface shows a short clipped answer and another shows a longer reconstructed one without documentation.
+Evidence plan:
+Add a shared runtime helper for reconstructed visible turn text, switch tape/snapshot/log/archive/live-response surfaces to it where appropriate, update docs, and prove with runtime plus TUI regression tests.
+Shortest proof path:
+Implement a runtime helper that sanitizes `response_text` with a generous display cap, route the dialogue tape and latest-response surfaces through it, add tests showing snapshot/tape recover text beyond the old `1600` limit, then run targeted and full pytest.
+
+## [2026-03-16 19:14:32 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/eden/storage/graph_store.py`
+`/Users/brianray/Adam/tests/test_inference_profiles.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Revised the readable transcript contract. The dialogue tape is not supposed to be limited to the old generation-time membrane trim when a cleaner, longer operator-facing answer is still recoverable from stored turn artifacts. Preserved the distinction that graph-indexed `membrane_text` remains the historical membrane record; readable surfaces can recover a longer bounded display answer without pretending the graph history itself changed.
+Behavior implemented or modified:
+Added `render_turn_visible_response(...)` in runtime. It now prefers `metadata.model_result.answer_text` when available, then falls back to stored turn text, and applies the membrane sanitizer under a generous bounded display cap. Dialogue tape cards, latest live/session response state, conversation logs, and archive preview/session snapshot surfaces now use that helper. This repairs older turns like the live T12 case where `membrane_text` was `1599` chars under `response_char_cap=1600` even though a longer clean answer was still available in the stored model result. The archive catalog SQL was deliberately left on `membrane_text` preference after confirming raw `response_text` can be reasoning-bearing on MLX/Qwen turns.
+Evidence produced (tests / traces / commands / exports):
+Live data proof from the current DB:
+`turn_index=12` latest row previously showed `membrane_len=1599`, `response_len=18572`, `response_char_cap=1600`.
+After the helper fix:
+`render_turn_visible_response(...)` on that same stored turn -> `visible_len=1800` with an answer-text tail, not leaked reasoning.
+Targeted tests:
+`./.venv/bin/pytest -q tests/test_inference_profiles.py tests/test_tui_smoke.py tests/test_runtime_e2e.py` -> `32 passed in 55.27s`
+Full suite:
+`./.venv/bin/pytest -q` -> `87 passed in 67.38s (0:01:07)`
+Status register changes:
+- Implemented:
+  - Dialogue tape and related readable transcript surfaces now recover longer visible answers from stored turn artifacts instead of replaying a too-short historical membrane trim.
+  - Live-session `last_response` now uses the same recovery helper, so fresh turns are immediately readable in the chat surface.
+- Instrumented:
+  - Live DB probe proved the specific clipped T12 turn now recovers from `1599` to `1800` visible answer characters.
+- Conceptual:
+  - A dedicated migration that rewrites historical `membrane_text` rows themselves remains unimplemented and was intentionally avoided.
+- Unknown:
+  - Whether the archive catalog's short one-line excerpt should also gain metadata-aware reconstruction rather than the current membrane-first excerpt path.
+Truth-table / limitations updates:
+Updated truth table and limitations because transcript/readability semantics changed materially.
+Remaining uncertainties:
+- `.DS_Store` remains an unrelated modified file and was left untouched.
+- Untracked `docs 3.zip` is present in the worktree and was left untouched.
+- Readable recovery is bounded and depends on stored answer artifacts existing; it is not infinite replay.
+Next shortest proof path:
+Open the current session in the TUI and confirm the previously clipped T12 card now renders the recovered ending in the dialogue tape without altering the underlying graph-indexed membrane record.

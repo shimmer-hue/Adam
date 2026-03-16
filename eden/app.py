@@ -82,7 +82,7 @@ def cmd_feedback(args) -> int:
 
     response_text, _ = runtime.sanitize_operator_response(
         turn.get("membrane_text") or turn.get("response_text") or "",
-        response_char_cap=2200,
+        response_char_cap=runtime.response_char_cap_for_turn(turn),
     )
     print("EDEN feedback popup")
     print("===================")

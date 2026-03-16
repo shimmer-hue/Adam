@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import subprocess
 from pathlib import Path
+from typing import Iterator
 
 import pdfplumber
 from pypdf import PdfReader
@@ -10,45 +11,47 @@ from pypdf import PdfReader
 from ..utils import sentence_chunks
 
 
-def extract_pdf(path: Path) -> list[dict[str, object]]:
-    pages: list[dict[str, object]] = []
+def iter_extract_pdf(path: Path) -> Iterator[dict[str, object]]:
     extraction_errors: list[str] = []
     try:
         with pdfplumber.open(path) as pdf:
             for idx, page in enumerate(pdf.pages):
                 text = page.extract_text() or ""
                 if text.strip():
-                    pages.append({"page_number": idx + 1, "text": text, "parser": "pdfplumber"})
+                    yield {"page_number": idx + 1, "text": text, "parser": "pdfplumber"}
+        return
     except Exception as exc:
         extraction_errors.append(f"pdfplumber:{exc}")
 
-    if not pages:
-        try:
-            reader = PdfReader(str(path))
-            for idx, page in enumerate(reader.pages):
-                text = page.extract_text() or ""
-                if text.strip():
-                    pages.append({"page_number": idx + 1, "text": text, "parser": "pypdf"})
-        except Exception as exc:
-            extraction_errors.append(f"pypdf:{exc}")
+    try:
+        reader = PdfReader(str(path))
+        for idx, page in enumerate(reader.pages):
+            text = page.extract_text() or ""
+            if text.strip():
+                yield {"page_number": idx + 1, "text": text, "parser": "pypdf"}
+        return
+    except Exception as exc:
+        extraction_errors.append(f"pypdf:{exc}")
 
-    if not pages:
-        try:
-            result = subprocess.run(
-                ["pdftotext", str(path), "-"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            text = result.stdout.strip()
-            if text:
-                pages.append({"page_number": None, "text": text, "parser": "pdftotext"})
-        except Exception as exc:
-            extraction_errors.append(f"pdftotext:{exc}")
+    try:
+        result = subprocess.run(
+            ["pdftotext", str(path), "-"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        text = result.stdout.strip()
+        if text:
+            yield {"page_number": None, "text": text, "parser": "pdftotext"}
+            return
+    except Exception as exc:
+        extraction_errors.append(f"pdftotext:{exc}")
 
-    if not pages:
-        raise RuntimeError("; ".join(extraction_errors) or "No extractable PDF text found.")
-    return pages
+    raise RuntimeError("; ".join(extraction_errors) or "No extractable PDF text found.")
+
+
+def extract_pdf(path: Path) -> list[dict[str, object]]:
+    return list(iter_extract_pdf(path))
 
 
 def extract_csv(path: Path) -> list[dict[str, object]]:
@@ -76,3 +79,12 @@ def extract_document(path: Path) -> list[dict[str, object]]:
     if suffix in {".txt", ".md", ".markdown"}:
         return extract_plaintext(path)
     raise ValueError(f"Unsupported ingest format: {path.suffix}")
+
+
+def iter_extract_document(path: Path) -> Iterator[dict[str, object]]:
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        yield from iter_extract_pdf(path)
+        return
+    for page in extract_document(path):
+        yield page

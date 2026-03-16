@@ -689,7 +689,11 @@ class SessionConfigModal(ModalScreen[dict[str, Any] | None]):
                     )
                 with Vertical(classes="field_stack", id="max_tokens_field"):
                     yield Static("Max Output Tokens", classes="field_label", id="max_tokens_label")
-                    yield Input(value=str(self.defaults.get("max_output_tokens", 480)), id="max_tokens_input", placeholder="max output tokens")
+                    yield Input(
+                        value=str(self.defaults.get("max_output_tokens", 1200)),
+                        id="max_tokens_input",
+                        placeholder="max output tokens",
+                    )
                     yield Static(
                         "Hard token cap for the generated answer. Lower values force shorter replies and can cut an answer off earlier; higher values allow longer continuations but spend more budget and time.",
                         classes="field_help",
@@ -750,7 +754,7 @@ class SessionConfigModal(ModalScreen[dict[str, Any] | None]):
                 with Vertical(classes="field_stack", id="response_char_cap_field"):
                     yield Static("Response Character Cap", classes="field_label", id="response_char_cap_label")
                     yield Input(
-                        value=str(self.defaults.get("response_char_cap", 1600)),
+                        value=str(self.defaults.get("response_char_cap", 5200)),
                         id="response_char_cap_input",
                         placeholder="response char cap",
                     )
@@ -815,13 +819,13 @@ class SessionConfigModal(ModalScreen[dict[str, Any] | None]):
             "low_motion": str(self.query_one("#low_motion_select", Select).value) == "true",
             "debug": str(self.query_one("#debug_select", Select).value) == "true",
             "temperature": self._float_value("#temperature_input", 0.4),
-            "max_output_tokens": self._int_value("#max_tokens_input", 480),
+            "max_output_tokens": self._int_value("#max_tokens_input", 1200),
             "top_p": self._float_value("#top_p_input", 0.9),
             "repetition_penalty": self._float_value("#repetition_penalty_input", 1.05),
             "retrieval_depth": self._int_value("#retrieval_depth_input", 12),
             "max_context_items": self._int_value("#max_context_items_input", 8),
             "history_turns": self._int_value("#history_turns_input", 3),
-            "response_char_cap": self._int_value("#response_char_cap_input", 1600),
+            "response_char_cap": self._int_value("#response_char_cap_input", 5200),
         }
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -1602,7 +1606,7 @@ class AdamSigil(Static):
         trace_items = list((app.ui_state.preview_trace or app.ui_state.last_trace or []))
         pressure = str((app.ui_state.current_budget or {}).get("pressure_level", "LOW")).upper()
         response_chars = len(app.ui_state.last_response or "")
-        response_cap = max(1, int((app.ui_state.current_profile or {}).get("response_char_cap", 1600) or 1600))
+        response_cap = max(1, int((app.ui_state.current_profile or {}).get("response_char_cap", 5200) or 5200))
         max_context_items = max(1, int((app.ui_state.current_profile or {}).get("max_context_items", 8) or 8))
         model_status = app.runtime.mlx_model_status()
         behavior_count = sum(1 for item in active_items if item.get("domain") == "behavior")
@@ -3821,10 +3825,7 @@ class ChatScreen(Screen):
                     adam_title = f"Adam / T{turn['turn_index']}"
                     adam_border = AMBER
                 brian_text = self._display_operator_text(turn.get("user_text") or "") or " "
-                adam_text, _ = app.runtime.sanitize_operator_response(
-                    turn.get("membrane_text") or turn.get("response_text") or "",
-                    response_char_cap=1600,
-                )
+                adam_text, _ = app.runtime.render_turn_visible_response(turn)
                 adam_text = adam_text or " "
                 transcript.append(
                     Panel(
@@ -4244,7 +4245,7 @@ class ChatScreen(Screen):
             )
             app.ui_state.last_turn_id = outcome.turn["id"]
             app.ui_state.last_user_text = text
-            app.ui_state.last_response = outcome.turn["membrane_text"]
+            app.ui_state.last_response, _ = app.runtime.render_turn_visible_response(outcome.turn)
             app.ui_state.last_reasoning = outcome.reasoning_text
             app.ui_state.last_active_set = outcome.active_set
             app.ui_state.last_trace = outcome.trace
@@ -4321,22 +4322,32 @@ class ChatScreen(Screen):
             return
         if not path:
             return
-        result = await asyncio.to_thread(
-            partial(
-                app.runtime.ingest_document,
-                experiment_id=app.ui_state.experiment_id,
-                path=path,
-                briefing=briefing,
-                session_id=app.ui_state.session_id,
+        try:
+            result = await asyncio.to_thread(
+                partial(
+                    app.runtime.ingest_document,
+                    experiment_id=app.ui_state.experiment_id,
+                    path=path,
+                    briefing=briefing,
+                    session_id=app.ui_state.session_id,
+                )
             )
-        )
+        except Exception as exc:
+            app.ui_state.last_feedback = f"Ingest failed for {Path(path).name}: {exc}"
+            self._write_forensic(f"[ERROR] Ingest failed :: {path} :: {exc}")
+            self.refresh_panels()
+            self._schedule_preview_refresh()
+            return
         app.ui_state.last_ingest_result = result
         self._mark_graph_dirty()
-        app.ui_state.last_feedback = (
-            f"Ingested {result['title']} into the memgraph with "
-            f"{result['meme_count']} memes / {result['memode_count']} memodes"
-            + (f" plus briefing lens {result['brief_meme_count']}/{result['brief_memode_count']}." if result["briefing"] else ".")
-        )
+        if "existing ingest reused" in (result.get("notes") or []):
+            app.ui_state.last_feedback = f"Reused existing ingest for {result['title']}."
+        else:
+            app.ui_state.last_feedback = (
+                f"Ingested {result['title']} into the memgraph with "
+                f"{result['meme_count']} memes / {result['memode_count']} memodes"
+                + (f" plus briefing lens {result['brief_meme_count']}/{result['brief_memode_count']}." if result["briefing"] else ".")
+            )
         self._write_forensic(
             f"[INFO] Ingested corpus root :: {result['title']} "
             f"(memes={result['meme_count']} memodes={result['memode_count']} brief={bool(result['briefing'])})"
@@ -4662,7 +4673,8 @@ class ChatScreen(Screen):
         app.ui_state.last_feedback = (
             "Updated session profile: "
             f"{updated['title']} / {updated['mode']} / {updated['budget_mode']} / "
-            f"history_turns={updated['history_turns']} / low_motion={updated['low_motion']}"
+            f"history_turns={updated['history_turns']} / max_output_tokens={updated['max_output_tokens']} / "
+            f"response_char_cap={updated['response_char_cap']} / low_motion={updated['low_motion']}"
         )
         self.refresh_panels()
         self._schedule_preview_refresh()
