@@ -4,6 +4,7 @@ import asyncio
 import json
 import math
 import re
+from collections import deque
 from time import monotonic
 from dataclasses import dataclass
 from functools import partial
@@ -172,6 +173,7 @@ ACTION_STRIP_OPTIONS = [
 ]
 ACTION_STRIP_INDEX = {value: index for index, (_, value) in enumerate(ACTION_STRIP_OPTIONS)}
 ACTION_STRIP_NUMBER = {value: index + 1 for index, (_, value) in enumerate(ACTION_STRIP_OPTIONS)}
+DOCUMENT_PROVENANCE_SUFFIXES = (".pdf", ".txt", ".md", ".markdown", ".csv")
 FOCUS_MARKER = ">>"
 FOCUSABLE_SURFACE_TITLES = {
     "runtime_action_menu": "Actions",
@@ -268,6 +270,12 @@ class ReviewTextArea(TextArea):
 
 
 class ComposerTextArea(TextArea):
+    _PASTE_BURST_WINDOW_S = 0.25
+    _PASTE_BURST_MIN_CHARS = 8
+    _PASTE_TRAILING_ENTER_WINDOW_S = 0.05
+    _PASTE_EVENT_ENTER_GUARD_S = 0.2
+    _PASTE_ECHO_TIMEOUT_S = 0.8
+
     @dataclass
     class Submitted(Message):
         textarea: "ComposerTextArea"
@@ -277,17 +285,111 @@ class ComposerTextArea(TextArea):
         def control(self) -> "ComposerTextArea":
             return self.textarea
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._recent_printable_events: deque[tuple[float, int]] = deque()
+        self._paste_enter_guard_until = 0.0
+        self._paste_echo_buffer = ""
+        self._paste_echo_started_at = 0.0
+
+    def _prune_recent_printable_events(self, now: float) -> None:
+        cutoff = now - self._PASTE_BURST_WINDOW_S
+        while self._recent_printable_events and self._recent_printable_events[0][0] < cutoff:
+            self._recent_printable_events.popleft()
+
+    def _record_printable_event(self, *, text: str, now: float) -> None:
+        if not text:
+            return
+        self._prune_recent_printable_events(now)
+        self._recent_printable_events.append((now, len(text)))
+
+    def _clear_paste_state(self) -> None:
+        self._recent_printable_events.clear()
+        self._paste_enter_guard_until = 0.0
+        self._paste_echo_buffer = ""
+        self._paste_echo_started_at = 0.0
+
+    @staticmethod
+    def _normalize_paste_text(text: str) -> str:
+        return text.replace("\r\n", "\n").replace("\r", "\n")
+
+    def _arm_paste_echo_buffer(self, text: str, *, now: float) -> None:
+        self._paste_echo_buffer = text
+        self._paste_echo_started_at = now
+
+    def _consume_paste_echo(self, event: events.Key, *, now: float) -> bool:
+        if not self._paste_echo_buffer:
+            return False
+        if (now - self._paste_echo_started_at) > self._PASTE_ECHO_TIMEOUT_S:
+            self._paste_echo_buffer = ""
+            self._paste_echo_started_at = 0.0
+            return False
+        echoed = "\n" if event.key == "enter" else event.character if event.is_printable and event.character is not None else None
+        if echoed is None:
+            return False
+        if not self._paste_echo_buffer.startswith(echoed):
+            self._paste_echo_buffer = ""
+            self._paste_echo_started_at = 0.0
+            return False
+        self._paste_echo_buffer = self._paste_echo_buffer[len(echoed) :]
+        if not self._paste_echo_buffer:
+            self._paste_echo_started_at = 0.0
+        event.stop()
+        event.prevent_default()
+        return True
+
+    def _should_treat_enter_as_paste_trailer(self, now: float) -> bool:
+        self._prune_recent_printable_events(now)
+        if now <= self._paste_enter_guard_until:
+            self._clear_paste_state()
+            return True
+        if not self._recent_printable_events:
+            return False
+        latest_printable_at = self._recent_printable_events[-1][0]
+        burst_chars = sum(length for _, length in self._recent_printable_events)
+        if burst_chars >= self._PASTE_BURST_MIN_CHARS and (now - latest_printable_at) <= self._PASTE_TRAILING_ENTER_WINDOW_S:
+            self._clear_paste_state()
+            return True
+        return False
+
+    async def _on_paste(self, event: events.Paste) -> None:
+        now = monotonic()
+        normalized = self._normalize_paste_text(event.text)
+        self._record_printable_event(text=normalized, now=now)
+        self._arm_paste_echo_buffer(normalized, now=now)
+        if normalized.endswith("\n"):
+            self._paste_enter_guard_until = now + self._PASTE_EVENT_ENTER_GUARD_S
+        if self.read_only:
+            return
+        event.stop()
+        if result := self._replace_via_keyboard(normalized, *self.selection):
+            self.move_cursor(result.end_location)
+
     async def _on_key(self, event: events.Key) -> None:
+        now = monotonic()
+        if self._consume_paste_echo(event, now=now):
+            return
         if event.key == "enter":
+            if self._should_treat_enter_as_paste_trailer(now):
+                event.stop()
+                event.prevent_default()
+                self._replace_via_keyboard("\n", *self.selection)
+                return
             event.stop()
             event.prevent_default()
+            self._clear_paste_state()
             self.post_message(self.Submitted(self, self.text))
             return
         if event.key == "shift+enter":
             event.stop()
             event.prevent_default()
+            self._clear_paste_state()
             self._replace_via_keyboard("\n", *self.selection)
             return
+        if event.is_printable and event.character is not None:
+            self._record_printable_event(text=event.character, now=now)
+        elif event.key not in {"left", "right", "up", "down"}:
+            self._prune_recent_printable_events(now)
         await super()._on_key(event)
 
 
@@ -2708,6 +2810,18 @@ class ChatScreen(Screen):
         assert isinstance(app, EdenTuiApp)
         return list((app.ui_state.preview_active_set if self._composer_text().strip() else app.ui_state.last_active_set) or [])
 
+    def _active_document_group_key(self, item: dict[str, Any]) -> str | None:
+        document_id = str(item.get("document_id") or "").strip()
+        if document_id:
+            return document_id
+        provenance = str(item.get("provenance") or "").strip()
+        if provenance.lower().endswith(DOCUMENT_PROVENANCE_SUFFIXES):
+            return provenance
+        return None
+
+    def _active_document_group_count(self, active_items: list[dict[str, Any]]) -> int:
+        return len({key for key in (self._active_document_group_key(item) for item in active_items) if key})
+
     def _trace_items(self) -> list[dict[str, Any]]:
         app = self.app
         assert isinstance(app, EdenTuiApp)
@@ -2994,7 +3108,7 @@ class ChatScreen(Screen):
         show_form = state == "pending"
         surface.display = True
         surface.styles.height = "auto"
-        surface.styles.min_height = 11 if show_form else 4
+        surface.styles.min_height = 11 if show_form else 8
         command_row.display = show_form
         explanation_input.display = show_form
         corrected_input.display = show_form
@@ -3029,6 +3143,25 @@ class ChatScreen(Screen):
             "needs_corrected": needs_corrected,
             "ready": ready,
         }
+
+    def _stored_feedback_payload_text(self, latest_entry: dict[str, Any]) -> Text:
+        verdict = str(latest_entry.get("verdict", "skip")).upper()
+        turn_index = latest_entry.get("turn_index", "?")
+        created_at = latest_entry.get("created_at", "n/a")
+        explanation = safe_excerpt(str(latest_entry.get("explanation") or "none"), limit=220)
+        corrected = str(latest_entry.get("corrected_text") or "").strip()
+        feedback_id = safe_excerpt(str(latest_entry.get("id") or "n/a"), limit=18)
+        turn_id = safe_excerpt(str(latest_entry.get("turn_id") or "n/a"), limit=18)
+        lines = [
+            f"T{turn_index} verdict={verdict}",
+            f"created={created_at}",
+            f"feedback_id={feedback_id} turn_id={turn_id}",
+            f"explanation={explanation}",
+        ]
+        if corrected:
+            lines.append(f"corrected={safe_excerpt(corrected, limit=220)}")
+        lines.append("Awaiting the next Adam reply.")
+        return Text("\n".join(lines), style=TEXT)
 
     def _conversation_stage(self) -> tuple[str, str]:
         app = self.app
@@ -3089,13 +3222,14 @@ class ChatScreen(Screen):
         focus_item = active_items[focus_index]
         pulse = "▶"
         ingest = app.ui_state.last_ingest_result or {}
+        document_count = self._active_document_group_count(active_items)
         knowledge_memes = [item for item in active_items if item.get("node_kind") != "memode" and item.get("domain") != "behavior"]
         behavior_memes = [item for item in active_items if item.get("node_kind") != "memode" and item.get("domain") == "behavior"]
         memodes = [item for item in active_items if item.get("node_kind") == "memode"]
         anchors = sorted(active_items, key=lambda item: float(item.get("regard", 0.0)), reverse=True)[:3]
         body = Text.from_markup(
             f"[bold {AMBER}]Bus-to-aperture read[/]\n"
-            f"{lead} turn | docs={1 if ingest else 0} knowledge={knowledge_count} behavior={behavior_count} memodes={memode_count} items={len(active_items)}\n"
+            f"{lead} turn | docs={document_count} knowledge={knowledge_count} behavior={behavior_count} memodes={memode_count} items={len(active_items)}\n"
             f"Focus {pulse} [bold {NEON}]{safe_excerpt(focus_item.get('label', 'untitled'), limit=28)}[/] "
             f"({self._active_item_role(focus_item)})\n"
             f"NOW={self._selection_phrase(float(focus_item.get('selection', 0.0)))} | "
@@ -3763,7 +3897,6 @@ class ChatScreen(Screen):
         recent_feedback = self._recent_feedback_entries(limit=1)
         latest_feedback = recent_feedback[0] if recent_feedback else None
         transcript_name = Path(app.ui_state.conversation_log_path).name if app.ui_state.conversation_log_path else "pending"
-        ingest = app.ui_state.last_ingest_result or {}
         phase_index = 0
         if app.ui_state.session_id:
             phase_index = 1
@@ -3779,6 +3912,7 @@ class ChatScreen(Screen):
         behavior_count = sum(1 for item in active_items if item.get("domain") == "behavior" and item.get("node_kind") != "memode")
         knowledge_count = sum(1 for item in active_items if item.get("domain") != "behavior" and item.get("node_kind") != "memode")
         memode_count = sum(1 for item in active_items if item.get("node_kind") == "memode")
+        document_count = self._active_document_group_count(active_items)
         feedback_state = (
             f"{str(latest_feedback.get('verdict', 'pending')).upper()} T{latest_feedback.get('turn_index', '?')}"
             if latest_feedback
@@ -3787,7 +3921,7 @@ class ChatScreen(Screen):
         event_summary = safe_excerpt(self._event_lines[-1] if self._event_lines else "No recent event flow.", limit=132)
         text = Text.from_markup(
             f"[bold {AMBER}]Runtime Loop[/] {rendered_steps}\n"
-            f"docs={1 if ingest else 0} knowledge={knowledge_count} behavior={behavior_count} memodes={memode_count} "
+            f"docs={document_count} knowledge={knowledge_count} behavior={behavior_count} memodes={memode_count} "
             f"active={len(active_items)}/{profile.get('max_context_items', 'n/a')} "
             f"pressure={budget.get('pressure_level', 'n/a')} reasoning={'present' if app.ui_state.last_reasoning else 'quiet'}\n"
             f"selection={selection_peak:.2f} regard={regard_peak:.2f} feedback={feedback_state} transcript={transcript_name}\n"
@@ -3892,12 +4026,8 @@ class ChatScreen(Screen):
             border = NEON if form["ready"] else ROSE
         elif state == "reviewed" and latest_entry is not None:
             verdict = str(latest_entry.get("verdict", "skip")).lower()
-            explanation = latest_entry.get("explanation") or ("lightweight no-op verdict" if verdict == "skip" else "no explanation")
-            text = Text.from_markup(
-                f"T{latest_entry.get('turn_index', '?')} {verdict.upper()} :: "
-                f"{safe_excerpt(str(explanation), limit=112)}. Awaiting the next Adam reply."
-            )
-            title = "Stored Feedback"
+            text = self._stored_feedback_payload_text(latest_entry)
+            title = "Stored Feedback Payload"
             if verdict == "accept":
                 border = NEON
             elif verdict == "edit":

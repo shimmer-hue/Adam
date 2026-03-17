@@ -4936,3 +4936,240 @@ Remaining uncertainties:
 - The current live markdown sidecar row is usable for retrieval, but because it was first ingested before the chunk-index fix, its `document_chunks` surface is thinner than a fresh post-fix ingest would be. The graph evidence itself is already present and prompt retrieval now surfaces the source.
 Next shortest proof path:
 If you want a pristine post-fix provenance surface for the memoir, ingest the normalized markdown sidecar into a fresh graph or under a fresh sidecar path so the corrected chunk-index logic is exercised end-to-end without reusing or layering on the earlier live row.
+
+## [2026-03-17T12:22:30Z] PRE-FLIGHT
+Operator task:
+Investigate chat-interface regressions in the TUI: pasted text auto-submits without explicit Enter, verdict payload is missing from the review surface, and the dialogue box appearance changed unexpectedly after the recent refactor.
+Task checksum:
+TUI input/review/style regression triage and repair.
+Repo situation:
+Working tree is already dirty from the PDF-ingest hardening and dirty-PDF fallback work. Do not touch unrelated `.DS_Store`. Current repo also contains earlier TUI refactors from prior turns; user is reporting regressions against expected chat behavior.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts in force:
+TUI is the primary runtime surface. Multiline composition is first-class. Explicit review remains graph-backed and inline. Transcript cards should preserve the dialogue-first shaded panel grammar. Do not overclaim a fix without runtime or test evidence.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/TUI_SPEC.md` if contract wording needs correction.
+Status register:
+- Implemented:
+  - Multiline composer and inline latest-turn reply review are part of the claimed TUI contract.
+- Instrumented:
+  - Existing TUI smoke coverage exercises the main surface but may not cover paste behavior or verdict payload rendering.
+- Conceptual:
+  - None for the reported regressions; these are expected implemented behaviors.
+- Unknown:
+  - Exact event path causing paste-to-send, exact surface where verdict payload disappeared, and whether the visual change is accidental drift or a deliberate earlier refactor that now conflicts with user expectation.
+Risks / invariants:
+Do not break keyboard-first submit flow. Preserve explicit review semantics. Keep the TUI dialogue-first layout intact. Minimize churn in the large TUI file and prove the repair with targeted tests.
+Evidence plan:
+Inspect TUI input handlers and review rendering, reproduce structurally via code/tests, patch only the affected paths, update/add smoke coverage, and rerun targeted plus relevant broader tests.
+Shortest proof path:
+Locate paste/submit event handling in `eden/tui/app.py`, inspect verdict/render methods and transcript card styling hooks, patch regressions, run `tests/test_tui_smoke.py` plus any directly affected runtime/UI tests, then summarize what was fixed and what still needs live visual confirmation.
+
+## [2026-03-17T16:39:40Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Live config updated:
+`config_store[tui_appearance]` switched from `typewriter_light` back to `amber_dark` in `/Users/brianray/Adam/data/eden.db`
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+Natural-language contracts added/revised/preserved:
+Preserved the dialogue-first TUI contract and explicit inline review contract. Revised the composer contract to state that pasted trailing-newline bursts stay in the draft instead of auto-submitting. Revised the stored-feedback contract to surface a payload block rather than a one-line gloss.
+Behavior implemented or modified:
+`ComposerTextArea` now guards against paste-style rapid printable bursts and bracketed-paste trailing newlines so raw trailing Enter events insert a newline instead of submitting the turn. The inline review surface now renders a stored-feedback payload block with verdict, timestamp, ids, explanation, and corrected text when present. The live persisted UI look was reset to `amber_dark`, which matched the prior dialogue-card appearance expected by Brian the operator.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py` -> `20 passed in 57.09s`
+`./.venv/bin/pytest -q` -> `94 passed in 84.20s (0:01:24)`
+`./.venv/bin/python - <<'PY' ... runtime.ui_appearance() ... runtime.update_ui_appearance(look='amber_dark') ...` ->
+`before {'look': 'typewriter_light'}`
+`update {'look': 'amber_dark'}`
+`after {'look': 'amber_dark'}`
+Status register changes:
+- Implemented:
+  - Paste-safe multiline composer behavior for trailing newline bursts.
+  - Stored-feedback payload block in the inline review surface.
+  - Amber-dark look restored in the live config store.
+- Instrumented:
+  - TUI smoke now proves the stored-feedback payload title/fields and the rapid-burst no-submit path.
+- Conceptual:
+  - None added.
+- Unknown:
+  - Live terminal-specific paste behavior outside Textual's test harness is still environment-dependent, though the current guard covers both bracketed-paste and raw rapid-burst paths.
+Truth-table / limitations updates:
+Truth table wording updated for multiline composer and latest-turn inline review. No limitations update was required because this turn repaired regressions against the existing TUI contract.
+Remaining uncertainties:
+- If Brian keeps the app open across the code/config change, he may need a relaunch to pick up both the restored look and the patched composer logic.
+Next shortest proof path:
+Relaunch the TUI, paste a multiline block with a trailing newline into the composer, verify it stays unsent, and submit one feedback item to confirm the stored-feedback payload block is visible inline above the composer.
+
+## [2026-03-17T17:04:35Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+No additional spec edits were required; the prior TUI contract wording still held.
+Natural-language contracts added/revised/preserved:
+Preserved the pasted-text contract added earlier. This follow-up patch tightened implementation so a terminal that emits both `Paste` and raw echoed key events still yields exactly one pasted draft and no implicit send.
+Behavior implemented or modified:
+`ComposerTextArea` now normalizes pasted newlines, inserts the `Paste` payload directly, and arms a short-lived echo buffer that swallows matching raw printable / Enter events from terminals that replay the same paste as keypresses. This removes the duplicate-draft failure shown in the live screenshot while preserving the earlier rapid-burst fallback for non-bracketed paste terminals.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py -k 'composer_rapid_paste_burst_enter_does_not_submit or composer_bracketed_paste_with_echoed_raw_keys_does_not_duplicate_or_submit'` -> `2 passed, 19 deselected in 3.07s`
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py` -> `21 passed in 58.23s`
+`./.venv/bin/pytest -q` -> `95 passed in 83.67s (0:01:23)`
+Status register changes:
+- Implemented:
+  - Composer now handles duplicate-delivery paste streams without double insertion or submission.
+- Instrumented:
+  - New TUI smoke regression explicitly simulates `Paste` plus echoed raw key events.
+- Conceptual:
+  - None added.
+- Unknown:
+  - None beyond live confirmation on Brian the operator's exact app surface after relaunch.
+Truth-table / limitations updates:
+No additional truth-table or limitations changes were required beyond the earlier TUI updates.
+Remaining uncertainties:
+- Live confirmation still requires a full app relaunch because the currently running Python/TUI process will not hot-reload this composer patch.
+Next shortest proof path:
+Relaunch the app, paste the same multiline greeting block once, verify the draft appears only once in the draft card, and then send a turn to confirm the inline stored-feedback payload remains visible after review.
+
+## [2026-03-17T13:39:26Z] PRE-FLIGHT
+Operator task:
+Patch the aperture docs counter so it reflects unique document-backed active-set groups rather than the last ingest UI flag.
+Task checksum:
+Aperture docs-count semantics repair.
+Repo situation:
+Working tree is already dirty from prior ingest and TUI regression fixes. Do not disturb unrelated files. Current TUI look/paste fixes are already in place and passing tests.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+Natural-language contracts in force:
+Active-set assembly mixes behavior and knowledge while keeping provenance visible. TUI aperture is an operator-facing readable trace of the active set and should not misstate document presence.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+Status register:
+- Implemented:
+  - Active-set items already carry document provenance metadata from retrieval.
+  - Aperture currently renders docs count, but the value is driven by `last_ingest_result`, not active-set document groups.
+- Instrumented:
+  - TUI smoke covers main chat structure and composer/review regressions.
+- Conceptual:
+  - None; this is a semantics fix to an existing implemented surface.
+- Unknown:
+  - Whether any other TUI panels should be updated in the same turn for docs-count consistency.
+Risks / invariants:
+Keep the patch bounded. Preserve active-set ontology: memes/memodes remain first-class; docs count is derived from provenance only. Do not regress chat layout or review behavior.
+Evidence plan:
+Patch the aperture summary to count unique document-backed active-set groups, add/adjust TUI smoke coverage if feasible, rerun targeted TUI tests and full pytest if the change is low-cost.
+Shortest proof path:
+Add a helper in `eden/tui/app.py` for unique document-group counting, wire it into the aperture summary, add a focused smoke assertion, run `tests/test_tui_smoke.py`, then run full `pytest -q`.
+
+## [2026-03-17T13:47:57Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+Natural-language contracts added/revised/preserved:
+Preserved the active-set ontology and provenance discipline. Revised the TUI aperture contract so `docs=` explicitly means unique document-backed active-set groups rather than the latest ingest action.
+Behavior implemented or modified:
+The compact aperture panel and runtime/event chyron now derive `docs=` from unique active-set document groups using `document_id` when present and document-like provenance paths as fallback. This makes the top-right count match document-backed retrieval evidence already present in the active set.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py` -> `22 passed in 59.99s`
+`./.venv/bin/pytest -q` -> `96 passed in 85.85s (0:01:25)`
+New smoke coverage proves two excerpts from one document plus one excerpt from a second document render as `docs=2` in both the aperture panel and runtime chyron.
+Status register changes:
+- Implemented:
+  - `docs=` in prime TUI active-set summaries now reflects unique document-backed active-set groups.
+- Instrumented:
+  - TUI smoke now ratchets the docs-count semantics against duplicate/split document provenance.
+- Conceptual:
+  - None added.
+- Unknown:
+  - None material for this bounded patch.
+Truth-table / limitations updates:
+No truth-table or limitations update was required because the feature remained implemented; this turn repaired misleading TUI semantics and updated the normative TUI spec text.
+Remaining uncertainties:
+- The live running app needs a relaunch to pick up the patched docs counter.
+Next shortest proof path:
+Relaunch the app, ask Adam another memoir-grounded question, and confirm the aperture/runtime `docs=` count is non-zero when document-backed evidence is in the active set.
+
+## [2026-03-17T13:52:02Z] PRE-FLIGHT
+Operator task:
+Determine whether the repo already provides an easy way to audit second-order memode computation and, if needed, add a bounded audit surface.
+Task checksum:
+Memode audit path discovery / possible implementation.
+Repo situation:
+Working tree is already dirty from prior ingest and TUI fixes. Do not disturb unrelated files. Need to inspect current observatory, ontology, and measurement surfaces before deciding whether this is analysis-only or requires a code patch.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/docs/MEASUREMENT_EVENT_MODEL.md`
+Natural-language contracts in force:
+Memes are first-class; memodes are derived second-order structures with an admissibility floor and operator-visible provenance. Any audit claim must be tied to existing evidence surfaces or implemented in this turn.
+Files/modules likely in scope:
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/eden/observatory/*`
+`/Users/brianray/Adam/eden/runtime.py`
+Status register:
+- Implemented:
+  - Memode computation and observatory measurement/edit surfaces exist in the repo.
+- Instrumented:
+  - Observatory payloads, runtime trace, and measurement ledger likely expose some memode evidence.
+- Conceptual:
+  - An easy dedicated memode-audit surface may or may not exist yet.
+- Unknown:
+  - Whether current surfaces are sufficient for Brian the operator to audit memode admissibility/computation without new work.
+Risks / invariants:
+Do not overclaim auditability. Keep ontology exact: not every connected relation is a memode. If a new audit surface is added, it must distinguish operator assertion from auto-derived memode facts.
+Evidence plan:
+Inspect docs and code for current memode evidence paths, summarize them against the operator need, and only implement if a short bounded audit addition is clearly justified.
+Shortest proof path:
+Read the observatory/ontology specs, inspect memode-related payloads and UI code, then either answer with exact existing audit paths or patch a minimal report/export and prove it with tests.
+
+## [2026-03-17T13:52:39Z] POST-FLIGHT
+Files changed:
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None.
+Natural-language contracts added/revised/preserved:
+Preserved the existing ontology and observatory contracts. No new audit surface was implemented in this turn because the immediate task was to determine whether an audit path already exists.
+Behavior implemented or modified:
+No code changes. This turn established the current memode-audit path from existing observatory, inspector, precision-drawer, and measurement-ledger surfaces.
+Evidence produced (tests / traces / commands / exports):
+Repo inspection only. Evidence anchors:
+- `/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md` lines covering memode admissibility floor and operator intervention semantics
+- `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md` lines covering known memode workflow, assemblies, active-set, compare, and measurement ledger
+- `/Users/brianray/Adam/docs/MEASUREMENT_EVENT_MODEL.md` lines naming `memode_assert` and `memode_update_membership`
+- `/Users/brianray/Adam/eden/observatory/exporters.py` payload generation for memode membership, supporting edges, and measurement history
+Status register changes:
+- Implemented:
+  - There is an existing memode audit path through the browser observatory: inspector cards, assemblies view, active-set view, precision drawer preview/commit/revert, and measurement ledger.
+- Instrumented:
+  - Measurement events and runtime trace provide attributable evidence for memode assertions and membership updates.
+- Conceptual:
+  - A single dedicated operator-friendly memode audit report or checklist surface remains unbuilt.
+- Unknown:
+  - Whether the current distributed observatory workflow is easy enough for Brian the operator without a purpose-built audit table/report.
+Truth-table / limitations updates:
+No updates required; no implementation status changed.
+Remaining uncertainties:
+- The gap is usability, not total absence of evidence surfaces.
+Next shortest proof path:
+If Brian wants this easier, implement a dedicated memode audit table/export that shows member set, qualifying support edges, connectedness/admissibility checks, assertion origin, evidence label, confidence, feedback channels, and measurement history in one place.

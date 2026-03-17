@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from textual import events
 from textual.widgets import Button, Input, Select, Static, TextArea
 
 from eden.browser import BrowserOpenResult
@@ -168,7 +169,11 @@ async def test_inline_feedback_skip_submits_from_verdict_enter(runtime) -> None:
         assert app.screen.query_one("#inline_feedback_command_row").display is False
         assert app.screen.query_one("#inline_feedback_explanation_input", TextArea).display is False
         assert app.screen.query_one("#inline_feedback_corrected_input", TextArea).display is False
-        assert "Awaiting the next Adam reply." in app.screen.main_inline_feedback_status_panel().renderable.plain
+        stored_feedback_panel = app.screen.main_inline_feedback_status_panel()
+        assert str(stored_feedback_panel.title) == "Stored Feedback Payload"
+        assert "verdict=SKIP" in stored_feedback_panel.renderable.plain
+        assert "created=" in stored_feedback_panel.renderable.plain
+        assert "Awaiting the next Adam reply." in stored_feedback_panel.renderable.plain
 
         composer.load_text("Second turn re-arms inline review.")
         await app.screen._send_turn()
@@ -217,6 +222,117 @@ async def test_inline_feedback_edit_walks_explanation_then_corrected_on_enter(ru
         assert "EDIT recorded" in app.ui_state.last_feedback
         assert getattr(app.focused, "id", None) == "composer_input"
         assert runtime.graph_health(app.ui_state.experiment_id)["feedback"] == 1
+
+
+@pytest.mark.asyncio
+async def test_composer_rapid_paste_burst_enter_does_not_submit(runtime, monkeypatch) -> None:
+    tick = 1_000.0
+
+    def fake_monotonic() -> float:
+        return tick
+
+    monkeypatch.setattr("eden.tui.app.monotonic", fake_monotonic)
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(200, 60)) as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        composer = app.screen.query_one("#composer_input", TextArea)
+        for character in "pastedmemoir":
+            await composer._on_key(events.Key(character, character))
+            tick += 0.005
+
+        await composer._on_key(events.Key("enter", None))
+        await pilot.pause(0.2)
+
+        assert app.ui_state.last_turn_id is None
+        assert composer.text == "pastedmemoir\n"
+
+
+@pytest.mark.asyncio
+async def test_composer_bracketed_paste_with_echoed_raw_keys_does_not_duplicate_or_submit(runtime, monkeypatch) -> None:
+    tick = 2_000.0
+
+    def fake_monotonic() -> float:
+        return tick
+
+    monkeypatch.setattr("eden.tui.app.monotonic", fake_monotonic)
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(200, 60)) as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        composer = app.screen.query_one("#composer_input", TextArea)
+        pasted = "All right, good morning, Big Sweet!\n"
+        await composer._on_paste(events.Paste(pasted))
+        tick += 0.01
+
+        for character in "All right, good morning, Big Sweet!":
+            await composer._on_key(events.Key(character, character))
+            tick += 0.005
+
+        await composer._on_key(events.Key("enter", None))
+        await pilot.pause(0.2)
+
+        assert app.ui_state.last_turn_id is None
+        assert composer.text == pasted
+
+
+@pytest.mark.asyncio
+async def test_active_set_document_group_count_drives_aperture_and_runtime_docs(runtime) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(200, 60)) as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        app.ui_state.last_active_set = [
+            {
+                "label": "memoir excerpt a",
+                "node_kind": "meme",
+                "domain": "knowledge",
+                "selection": 2.1,
+                "regard": 1.7,
+                "activation": 0.6,
+                "document_id": "doc-memoir",
+                "provenance": "/memoir.normalized.md",
+            },
+            {
+                "label": "memoir excerpt b",
+                "node_kind": "meme",
+                "domain": "knowledge",
+                "selection": 1.9,
+                "regard": 1.5,
+                "activation": 0.5,
+                "document_id": "doc-memoir",
+                "provenance": "/memoir.normalized.md",
+            },
+            {
+                "label": "whitepaper excerpt",
+                "node_kind": "meme",
+                "domain": "knowledge",
+                "selection": 1.4,
+                "regard": 1.3,
+                "activation": 0.4,
+                "document_id": "doc-whitepaper",
+                "provenance": "/eden_whitepaper_v14.pdf",
+            },
+            {
+                "label": "operator greeting norm",
+                "node_kind": "meme",
+                "domain": "behavior",
+                "selection": 0.8,
+                "regard": 1.1,
+                "activation": 0.3,
+                "provenance": "behavior_rule",
+            },
+        ]
+        app.ui_state.last_ingest_result = None
+
+        aperture_text = app.screen.main_aperture_panel().renderable.plain
+        runtime_text = app.screen.main_runtime_chyron_panel().renderable.plain
+
+        assert "docs=2 knowledge=3 behavior=1 memodes=0 items=4" in aperture_text
+        assert "docs=2 knowledge=3 behavior=1 memodes=0" in runtime_text
 
 
 @pytest.mark.asyncio

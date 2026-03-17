@@ -75,6 +75,7 @@ Primary split:
   - static alternating transcript cards for faster scanning: Brian cards sit on a true-black field and Adam cards on a slightly lifted rose-black shade; decorative interior glyph bands are no longer rendered inside the chat text surface
   - live Brian draft box when the composer is loaded
   - multiline `TextArea` composer for Brian the operator with strong focus styling
+  - pasted text must remain in the composer until Brian explicitly sends it; trailing newline bursts from paste are treated as composer newlines rather than auto-submitting the turn
   - keyboard-scrollable tape container so the operator can move up/down through the session history
 - right secondary telemetry bay:
   - top-row compact context-budget strip between the action shelf and live turn-status strip on wide terminals, so the operator can always read EDEN's current used/remaining prompt-budget estimate without opening Deck
@@ -159,13 +160,13 @@ Secondary surfaces:
 - MLX/Qwen model-emitted thinking is kept out of the main Adam response; the prime feed now combines response material, filtered visible reasoning/hum artifacts, runtime linguistic condition, membrane behavior, continuity, and active consideration telemetry, while suppressing prompt-mirror scaffolding and avoiding any claim about hidden reasoning
 - the signal field is explicitly explanatory: it renders a live orthographic memgraph slice using active-set nodes, recall anchors, recent trace events, and ingest roots while remaining separate from any claim about hidden activations
 - the memgraph bus keeps an always-visible legend for its glyph vocabulary so the operator can read it as a tool rather than decorative telemetry
-- the aperture is rendered as both a compact top-right bus-to-active-set read and a wider pull-down readable scan with natural-language summaries plus a ranked queue
+- the aperture is rendered as both a compact top-right bus-to-active-set read and a wider pull-down readable scan with natural-language summaries plus a ranked queue; `docs=` in these summaries refers to unique document-backed active-set groups, not merely the latest ingest action
 - the prime surface keeps transcript, composer, aperture, memgraph, and reasoning/feed lenses visible while the operator types; the standalone hum fact box is removed from the prime screen, while `Hum Live` now renders bounded hum entries, stats, metrics, and token-table carryover inside the feed lens
 - on compact terminals, the prime surface prioritizes transcript + composer + runtime chyron trigger and hides the right telemetry stack until the operator explicitly opens aperture/deeper surfaces
 - feedback is integrated inline inside the chat column through the explicit-feedback surface directly above the composer
 - when the local MLX/Qwen backend emits visible reasoning incrementally, the prime `Reasoning` lens updates during generation from streaming model output rather than waiting for the completed turn artifact
 - explicit review is collected there after each successful turn submission; `Review` / `F7` focuses the inline form only while Adam's latest reply is awaiting review
-- once feedback is stored for the latest reply, the inline form collapses to a compact stored-feedback line until Adam answers again
+- once feedback is stored for the latest reply, the inline form collapses to a stored-feedback payload block showing verdict, timestamp, ids, explanation, and any corrected text until Adam answers again
 - inline review reuses the graph-backed feedback path and therefore updates regard, reward, risk, and edit channels
 - `Review` only focuses the inline form when Adam has already replied and that reply is still pending review; otherwise the composer keeps focus and the status line explains whether there is nothing new to review or the latest reply is already settled
 - conversation logs are written as markdown artifacts under `exports/conversations/` for the active session and surfaced on-screen plus via `Open Conversation Log`
