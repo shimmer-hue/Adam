@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import networkx as nx
@@ -31,11 +31,58 @@ class CandidateScore:
     breakdown: dict[str, float]
     text: str
     provenance: str
+    document_id: str | None = None
+    document_title: str | None = None
+    page_number: int | None = None
+    evidence_excerpt: str = ""
+    quality_score: float | None = None
+    quality_flags: list[str] = field(default_factory=list)
 
 
 class RetrievalService:
     def __init__(self, store) -> None:
         self.store = store
+
+    def _document_group_key(self, item: CandidateScore) -> str | None:
+        if item.document_id:
+            return item.document_id
+        if item.provenance.lower().endswith((".pdf", ".txt", ".md", ".markdown", ".csv")):
+            return item.provenance
+        return None
+
+    def _format_candidate_block(self, item: CandidateScore) -> str:
+        lines = [
+            f"[{item.domain.upper()}:{item.node_kind}] {item.label}",
+            f"selection={item.selection:.3f} regard={item.regard:.3f} activation={item.activation:.3f}",
+            f"provenance={item.provenance}",
+        ]
+        if item.page_number is not None:
+            lines.append(f"page={item.page_number}")
+        if item.quality_score is not None:
+            lines.append(f"quality={item.quality_score:.3f}")
+        if item.quality_flags:
+            lines.append(f"quality_flags={','.join(item.quality_flags[:4])}")
+        lines.append(safe_excerpt(item.evidence_excerpt or item.text, limit=280))
+        return "\n".join(lines)
+
+    def _format_document_group(self, items: list[CandidateScore]) -> str:
+        lead = items[0]
+        lines = [
+            f"[{lead.domain.upper()}:document] {lead.document_title or lead.provenance}",
+            f"provenance={lead.provenance}",
+            f"evidence_items={len(items)}",
+        ]
+        for item in items:
+            summary = f"- [{item.node_kind}] {item.label} selection={item.selection:.3f}"
+            if item.page_number is not None:
+                summary += f" page={item.page_number}"
+            if item.quality_score is not None:
+                summary += f" quality={item.quality_score:.3f}"
+            lines.append(summary)
+            if item.quality_flags:
+                lines.append(f"  quality_flags={','.join(item.quality_flags[:4])}")
+            lines.append(f"  excerpt={safe_excerpt(item.evidence_excerpt or item.text, limit=180)}")
+        return "\n".join(lines)
 
     def build_graph_metrics(self, experiment_id: str) -> tuple[dict[str, dict[str, float]], dict[str, float]]:
         memes = self.store.list_memes(experiment_id)
@@ -161,7 +208,23 @@ class RetrievalService:
                 membrane_penalty=membrane_penalty,
                 weights=settings.selection_weights,
             )
-            provenance = metadata.get("title") or metadata.get("source_path") or metadata.get("origin") or node.get("source_kind", "unknown")
+            document_id = str(metadata["document_id"]) if metadata.get("document_id") else None
+            document_title = str(metadata["title"]) if metadata.get("title") else None
+            if document_id and metadata.get("source_path"):
+                provenance = metadata.get("source_path")
+            else:
+                provenance = metadata.get("title") or metadata.get("source_path") or metadata.get("origin") or node.get("source_kind", "unknown")
+            page_number_raw = metadata.get("page_number")
+            try:
+                page_number = int(page_number_raw) if page_number_raw is not None else None
+            except (TypeError, ValueError):
+                page_number = None
+            quality_score_raw = metadata.get("quality_score")
+            try:
+                quality_score = float(quality_score_raw) if quality_score_raw is not None else None
+            except (TypeError, ValueError):
+                quality_score = None
+            quality_flags = [str(flag) for flag in metadata.get("quality_flags", []) if str(flag).strip()]
             scored.append(
                 CandidateScore(
                     node_kind=node_kind,
@@ -190,6 +253,12 @@ class RetrievalService:
                     },
                     text=content,
                     provenance=str(provenance),
+                    document_id=document_id,
+                    document_title=document_title,
+                    page_number=page_number,
+                    evidence_excerpt=safe_excerpt(content, limit=220),
+                    quality_score=quality_score,
+                    quality_flags=quality_flags,
                 )
             )
 
@@ -212,14 +281,26 @@ class RetrievalService:
             deduped.append(item)
 
         items = [asdict(item) for item in deduped]
-        prompt_context_parts = []
+        prompt_context_parts: list[str] = []
+        document_groups: dict[str, list[CandidateScore]] = {}
+        prompt_entries: list[tuple[str, CandidateScore | str]] = []
+        seen_document_groups: set[str] = set()
         for item in deduped:
-            prompt_context_parts.append(
-                f"[{item.domain.upper()}:{item.node_kind}] {item.label}\n"
-                f"selection={item.selection:.3f} regard={item.regard:.3f} activation={item.activation:.3f}\n"
-                f"provenance={item.provenance}\n"
-                f"{safe_excerpt(item.text, limit=280)}"
-            )
+            document_group_key = self._document_group_key(item)
+            if document_group_key is None:
+                prompt_entries.append(("item", item))
+                continue
+            document_groups.setdefault(document_group_key, []).append(item)
+            if document_group_key in seen_document_groups:
+                continue
+            seen_document_groups.add(document_group_key)
+            prompt_entries.append(("document", document_group_key))
+
+        for kind, value in prompt_entries:
+            if kind == "item":
+                prompt_context_parts.append(self._format_candidate_block(value))  # type: ignore[arg-type]
+                continue
+            prompt_context_parts.append(self._format_document_group(document_groups[str(value)]))
 
         trace = []
         for candidate in scored[: min(10, len(scored))]:

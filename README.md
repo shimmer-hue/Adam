@@ -80,6 +80,7 @@ Ingest a document into an existing experiment:
 
 ```bash
 .venv/bin/python -m eden ingest <experiment_id> /absolute/path/to/file.pdf
+# also accepts: .md, .txt, .csv
 ```
 
 Export observability artifacts for an experiment:

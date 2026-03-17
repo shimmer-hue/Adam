@@ -41,6 +41,21 @@ EDEN v1 uses SQLite for local reliability, with graph semantics implemented in d
 - `metadata_json.archive.folder`
 - `metadata_json.archive.tags`
 
+### `documents`
+
+- `path`, `kind`, `title`, `sha256`, `status`
+- canonical identity now enforced at `(experiment_id, sha256)`
+- `metadata_json.source_kind`, `metadata_json.source_path`
+- `metadata_json.parser_strategy`
+- `metadata_json.quality_score`, `metadata_json.quality_state`, `metadata_json.quality_flags`
+- `metadata_json.selected_parser_counts`
+
+### `document_chunks`
+
+- `chunk_index`, `page_number`, `text`
+- `metadata_json.parser`, `metadata_json.page_number`
+- `metadata_json.quality_score`, `metadata_json.quality_flags`
+
 ### `memes`
 
 - `label`, `canonical_label`, `text`, `domain`, `source_kind`, `scope`

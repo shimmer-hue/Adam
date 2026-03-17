@@ -28,7 +28,7 @@
 ## Prompt assembly inputs
 
 - constitutional seed
-- retrieved active-set items
+- retrieved active-set items, including document-backed evidence blocks with explicit provenance and page/excerpt context when available
 - recent feedback summaries
 - bounded recent turn history
 

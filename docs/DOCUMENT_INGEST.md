@@ -11,11 +11,13 @@
 
 ### PDF
 
+EDEN now evaluates page candidates from:
+
 1. `pdfplumber`
 2. `pypdf`
-3. `pdftotext` CLI fallback
+3. `pdftotext -layout` when available
 
-Failure is explicit if all three fail.
+The extractor normalizes ligatures and line-wrap artifacts, scores each parser candidate per page, then selects the best page-level text before chunking. Failure is explicit if no parser yields usable text or if the scored document quality falls below the minimum usable threshold.
 
 ### CSV
 
@@ -30,14 +32,14 @@ Failure is explicit if all three fail.
 ## Pipeline
 
 1. Create or update a `documents` record.
-2. If the same document SHA is already fully ingested for the current graph, reuse that document record instead of duplicating chunks and graph artifacts.
+2. Canonicalize document identity by `(experiment_id, sha256)` so repeated ingest attempts update one persistent document row instead of accumulating duplicate `documents` rows.
 3. Stream page-like text units from the extractor instead of materializing the full document payload before storage.
 4. Chunk text into manageable blocks.
-5. Store `document_chunks` with parser and page provenance as extraction progresses.
+5. Store `document_chunks` with parser, page provenance, and extraction-quality metadata as chunk materialization progresses.
 6. Extract top phrases heuristically into memes.
 7. Add co-occurrence edges inside each chunk.
 8. Materialize a memode when a chunk yields at least two memes.
-9. Mark the document `ingested` on success or `failed` with error metadata if extraction/ingest aborts.
+9. Mark the document `ingested` on success or `failed` with error and extraction-quality metadata if extraction/ingest aborts.
 
 ## Provenance kept
 
@@ -46,6 +48,8 @@ Failure is explicit if all three fail.
 - chunk id
 - page number where available
 - parser used
+- extraction quality score / flags
+- selected parser counts
 
 ## Observed validation
 
@@ -56,12 +60,15 @@ This build validated a real PDF ingest on:
 Observed result:
 
 - `24` page-like units
-- parser: `pdfplumber`
+- parser strategy: `page_scored_pdf_extract_v1`
+- selected parser counts favored `pdfplumber` on the validated whitepaper sample
 
 ## Current ingest status semantics
 
 - `processing`: active ingest run in progress
-- `ingested`: ingest completed and chunk/materialization work is persisted
-- `failed`: ingest aborted; error and partial progress metadata are stored on the document row
+- `ingested`: ingest completed and chunk/materialization work is persisted; `metadata_json` records parser strategy, quality score, quality state, quality flags, and selected parser counts
+- `failed`: ingest aborted; error and partial progress metadata are stored on the document row, including extraction diagnostics when available
 
-Large PDFs can still take real time to process, but the pipeline now streams extraction/storage work instead of waiting for the full PDF to be read before any `document_chunks` are written.
+Legacy document rows that predate scored extraction are backfilled as `quality_state = "legacy_unscored"` with explicit `legacy_unscored_*` flags rather than being silently promoted to `clean`.
+
+Large PDFs can still take real time to process, but the pipeline still streams extraction/storage work into chunk persistence after parser selection rather than waiting for graph artifact materialization to finish before any `document_chunks` are written.

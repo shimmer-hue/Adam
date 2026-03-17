@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -35,6 +36,12 @@ class GraphStore:
 
     def _apply_additive_migrations(self) -> None:
         self._ensure_column("turns", "metadata_json", "TEXT NOT NULL DEFAULT '{}'")
+        self._dedupe_documents_by_sha()
+        self._cleanup_orphan_chunk_fts()
+        self._backfill_document_quality_metadata()
+        self._conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_experiment_sha ON documents(experiment_id, sha256)"
+        )
 
     def _ensure_column(self, table: str, column: str, definition: str) -> None:
         row = self._conn.execute(f"PRAGMA table_info({table})").fetchall()
@@ -42,6 +49,143 @@ class GraphStore:
         if column in existing:
             return
         self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+    def _dedupe_documents_by_sha(self) -> None:
+        duplicate_groups = self._conn.execute(
+            """
+            SELECT experiment_id, sha256
+            FROM documents
+            GROUP BY experiment_id, sha256
+            HAVING COUNT(*) > 1
+            """
+        ).fetchall()
+        for group in duplicate_groups:
+            experiment_id = str(group["experiment_id"])
+            sha256 = str(group["sha256"])
+            documents = self._conn.execute(
+                """
+                SELECT d.*, COALESCE(ch.chunk_count, 0) AS chunk_count
+                FROM documents d
+                LEFT JOIN (
+                    SELECT document_id, COUNT(*) AS chunk_count
+                    FROM document_chunks
+                    GROUP BY document_id
+                ) ch ON ch.document_id = d.id
+                WHERE d.experiment_id = ? AND d.sha256 = ?
+                ORDER BY
+                    CASE d.status
+                        WHEN 'ingested' THEN 2
+                        WHEN 'processing' THEN 1
+                        ELSE 0
+                    END DESC,
+                    COALESCE(ch.chunk_count, 0) DESC,
+                    d.created_at DESC,
+                    d.id DESC
+                """,
+                (experiment_id, sha256),
+            ).fetchall()
+            if len(documents) < 2:
+                continue
+            survivor = documents[0]
+            survivor_id = str(survivor["id"])
+            survivor_title = str(survivor["title"])
+
+            for duplicate in documents[1:]:
+                duplicate_id = str(duplicate["id"])
+                duplicate_chunks = self._conn.execute(
+                    "SELECT * FROM document_chunks WHERE document_id = ? ORDER BY chunk_index ASC, created_at ASC",
+                    (duplicate_id,),
+                ).fetchall()
+                for chunk in duplicate_chunks:
+                    transferred_chunk_id = str(uuid4())
+                    inserted = self._conn.execute(
+                        """
+                        INSERT OR IGNORE INTO document_chunks(
+                            id, experiment_id, document_id, chunk_index, page_number, text, metadata_json, created_at
+                        )
+                        VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            transferred_chunk_id,
+                            str(chunk["experiment_id"]),
+                            survivor_id,
+                            int(chunk["chunk_index"]),
+                            chunk["page_number"],
+                            str(chunk["text"]),
+                            str(chunk["metadata_json"]),
+                            str(chunk["created_at"]),
+                        ),
+                    )
+                    if inserted.rowcount:
+                        self._conn.execute(
+                            "INSERT INTO chunk_fts(chunk_id, title, text) VALUES(?, ?, ?)",
+                            (transferred_chunk_id, survivor_title, str(chunk["text"])),
+                        )
+                if duplicate_chunks:
+                    self._conn.executemany(
+                        "DELETE FROM chunk_fts WHERE chunk_id = ?",
+                        [(str(chunk["id"]),) for chunk in duplicate_chunks],
+                    )
+                self._conn.execute("DELETE FROM documents WHERE id = ?", (duplicate_id,))
+
+    def _cleanup_orphan_chunk_fts(self) -> None:
+        self._conn.execute(
+            "DELETE FROM chunk_fts WHERE chunk_id NOT IN (SELECT id FROM document_chunks)"
+        )
+
+    def _backfill_document_quality_metadata(self) -> None:
+        rows = self._conn.execute("SELECT * FROM documents").fetchall()
+        for row in rows:
+            metadata = json.loads(row["metadata_json"] or "{}")
+            missing_quality = any(
+                key not in metadata
+                for key in ("parser_strategy", "quality_score", "quality_state", "quality_flags", "selected_parser_counts")
+            )
+            if not missing_quality:
+                continue
+
+            parser_counts: dict[str, int] = {}
+            chunk_rows = self._conn.execute(
+                "SELECT metadata_json FROM document_chunks WHERE document_id = ?",
+                (str(row["id"]),),
+            ).fetchall()
+            for chunk in chunk_rows:
+                try:
+                    chunk_metadata = json.loads(chunk["metadata_json"] or "{}")
+                except json.JSONDecodeError:
+                    continue
+                parser = chunk_metadata.get("parser")
+                if parser:
+                    parser_key = str(parser)
+                    parser_counts[parser_key] = parser_counts.get(parser_key, 0) + 1
+            if not parser_counts:
+                for note in metadata.get("notes", []):
+                    if not isinstance(note, str):
+                        continue
+                    match = re.search(r"parser=([A-Za-z0-9_:-]+)", note)
+                    if not match:
+                        continue
+                    parser_key = match.group(1)
+                    parser_counts[parser_key] = parser_counts.get(parser_key, 0) + 1
+
+            if "parser_strategy" not in metadata:
+                metadata["parser_strategy"] = "legacy_ingest_unscored"
+            if "quality_score" not in metadata:
+                metadata["quality_score"] = 0.0
+            if "quality_state" not in metadata or metadata.get("quality_state") in {"clean", "degraded", "failed"}:
+                metadata["quality_state"] = "legacy_unscored"
+            flags = {str(flag) for flag in metadata.get("quality_flags", []) if str(flag).strip()}
+            if str(row["kind"]).lower() == "pdf":
+                flags.add("legacy_unscored_pdf")
+            else:
+                flags.add("legacy_unscored_document")
+            metadata["quality_flags"] = sorted(flags)
+            metadata.setdefault("selected_parser_counts", dict(sorted(parser_counts.items())))
+
+            self._conn.execute(
+                "UPDATE documents SET metadata_json = ? WHERE id = ?",
+                (compact_json(metadata), str(row["id"])),
+            )
 
     @contextmanager
     def transaction(self) -> Iterable[sqlite3.Connection]:
@@ -467,7 +611,26 @@ class GraphStore:
 
     def get_document_by_sha(self, experiment_id: str, sha256: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT * FROM documents WHERE experiment_id = ? AND sha256 = ?",
+            """
+            SELECT d.*
+            FROM documents d
+            LEFT JOIN (
+                SELECT document_id, COUNT(*) AS chunk_count
+                FROM document_chunks
+                GROUP BY document_id
+            ) ch ON ch.document_id = d.id
+            WHERE d.experiment_id = ? AND d.sha256 = ?
+            ORDER BY
+                CASE d.status
+                    WHEN 'ingested' THEN 2
+                    WHEN 'processing' THEN 1
+                    ELSE 0
+                END DESC,
+                COALESCE(ch.chunk_count, 0) DESC,
+                d.created_at DESC,
+                d.id DESC
+            LIMIT 1
+            """,
             (experiment_id, sha256),
         )
         return _row_to_dict(row) if row is not None else None
@@ -478,6 +641,16 @@ class GraphStore:
             (document_id,),
         )
         return int(row["count"]) if row is not None else 0
+
+    def reset_document_chunks(self, document_id: str) -> None:
+        chunk_rows = self._fetchall("SELECT id FROM document_chunks WHERE document_id = ?", (document_id,))
+        with self.transaction() as conn:
+            if chunk_rows:
+                conn.executemany(
+                    "DELETE FROM chunk_fts WHERE chunk_id = ?",
+                    [(str(row["id"]),) for row in chunk_rows],
+                )
+            conn.execute("DELETE FROM document_chunks WHERE document_id = ?", (document_id,))
 
     def add_document_chunk(
         self,

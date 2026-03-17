@@ -4744,3 +4744,195 @@ Remaining uncertainties:
 - Readable recovery is bounded and depends on stored answer artifacts existing; it is not infinite replay.
 Next shortest proof path:
 Open the current session in the TUI and confirm the previously clipped T12 card now renders the recovered ending in the dialogue tape without altering the underlying graph-indexed membrane record.
+
+## [2026-03-17T10:42:46Z] PRE-FLIGHT
+Operator task:
+Determine why memoir ingest/retrieval behaved unreliably, then harden PDF ingest and evidence surfaces so document access claims are grounded.
+Task checksum:
+Implement parser scoring + PDF text normalization, persist ingest-quality metadata, canonicalize document identity by SHA, strengthen retrieval provenance formatting, add regression coverage, update ingest/schema/turn-loop contract docs.
+Repo situation:
+Worktree is dirty only on `.DS_Store`. Live SQLite DB already contains duplicate `documents` rows for repeated whitepaper/Austin ingest and stale `processing` rows for Austin. Current Adam session `1d8a96a4-7f63-4487-9dcb-25f473785e3d` shows memoir provenance only after `2026-03-17T02:16:57+00:00`.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts in force:
+Document ingest must fail explicitly when extraction is unusable, provenance must remain inspectable, prompt assembly may only rely on bounded retrieved active-set material, and implementation claims must be backed by tests or direct runtime evidence from this turn.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/ingest/extractors.py`
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/eden/storage/graph_store.py`
+`/Users/brianray/Adam/eden/storage/schema.py`
+`/Users/brianray/Adam/eden/retrieval.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+Related test fixtures / runtime helpers as needed.
+Status register:
+- Implemented:
+  - PDF ingest persists `documents` / `document_chunks` and emits ingest trace events.
+  - Prompt assembly persists `turns.prompt_context` and `active_set_json`, so document provenance in prompt context is a real conditioning surface.
+- Instrumented:
+  - Live DB forensics prove whitepaper and Austin prompt-context provenance and memoir ingest timing.
+- Conceptual:
+  - Parser-quality scoring, PDF text cleaning, canonical SHA dedupe, and stronger document evidence formatting are only specified, not yet built.
+- Unknown:
+  - Whether memoir extraction quality alone explains the observed confabulation, versus a separate response-grounding weakness after retrieval succeeds.
+Risks / invariants:
+Do not mutate source PDFs. Preserve ontology and prompt-assembly boundaries. Additive migration only; do not destroy historical evidence surfaces. Keep document identity canonical by SHA within an experiment. Avoid overclaiming ingest success when extracted text is badly degraded.
+Evidence plan:
+Patch extractor/pipeline/storage/retrieval, add regression tests for normalization, degraded extraction, SHA dedupe, and document-evidence prompt formatting, then run targeted tests and full pytest. Re-check DB-facing behavior through tests rather than mutating the live Adam graph.
+Shortest proof path:
+Implement page-level parser evaluation and normalization, add additive dedupe migration + unique index, persist quality metadata into documents/chunks/traces, expose page/excerpt evidence in retrieval prompt context, update docs/truth-table/limitations, then run `./.venv/bin/pytest -q`.
+
+## [2026-03-17T11:00:59Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/ingest/extractors.py`
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/eden/storage/graph_store.py`
+`/Users/brianray/Adam/eden/retrieval.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Revised the PDF ingest contract from fixed parser order to scored parser selection with text normalization and explicit quality metadata. Revised graph schema prose to treat `(experiment_id, sha256)` as canonical document identity. Revised prompt-assembly prose so document-backed active-set items can surface page/excerpt evidence. Preserved the v1 loop order and no-hidden-planner membrane constraints.
+Behavior implemented or modified:
+`extractors.py` now evaluates `pdfplumber`, `pypdf`, and optional `pdftotext -layout` per PDF page, normalizes ligatures / orphan artifact lines / hyphenated linebreaks, scores page candidates deterministically, and fails explicit ingest when scored extraction is unusable. `pipeline.py` now persists parser strategy, quality score/state/flags, and selected parser counts on documents, chunks, and ingest traces. `graph_store.py` now deduplicates historical duplicate document rows by SHA on startup, cleans orphan chunk FTS rows, enforces a unique index on `(experiment_id, sha256)`, and exposes `reset_document_chunks(...)` for canonical-row retries. `retrieval.py` now groups document-backed active-set items into readable provenance blocks with page references and excerpts so prompt context carries concrete evidence rather than bare title repetition.
+Evidence produced (tests / traces / commands / exports):
+Targeted verification:
+`./.venv/bin/pytest -q tests/test_ingest.py tests/test_graph_store.py tests/test_runtime_e2e.py tests/test_tui_smoke.py` -> `33 passed in 68.45s`
+Full suite:
+`./.venv/bin/pytest -q` -> `92 passed in 80.15s (0:01:20)`
+Focused ingest regression:
+`./.venv/bin/pytest -q tests/test_ingest.py` -> `8 passed in 12.64s`
+Direct extractor inspection against `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` showed the memoir is extractable but layout-odd: `pdfplumber` cleaned ligatures but scrambled some first-page ordering, `pypdf` preserved ordering but leaked ligature glyphs, and `pdftotext -layout` kept column geometry with visible missing-ligature scars. The implemented scorer/normalizer now handles that class explicitly instead of trusting first non-empty output.
+Status register changes:
+- Implemented:
+  - Page-scored PDF extraction with deterministic cleanup and explicit quality-state persistence.
+  - Canonical same-SHA document row enforcement with additive dedupe migration and unique index.
+  - Document-backed prompt-context evidence blocks with page/excerpt provenance.
+- Instrumented:
+  - Ingest traces now carry parser strategy, quality score/state, quality flags, and selected parser counts.
+- Conceptual:
+  - A deeper answer-grounding subsystem that guarantees Adam will always report retrieval state correctly under conversational pressure is still unimplemented.
+- Unknown:
+  - How much already-accrued historical meme/memode evidence from prior duplicate ingest attempts should be normalized in a future cleanup pass.
+Truth-table / limitations updates:
+Updated truth table and limitations because PDF ingest semantics, startup dedupe behavior, and prompt-context evidence formatting changed materially.
+Remaining uncertainties:
+- Canonical SHA reuse still preserves historical document-derived graph evidence. The startup migration deduplicates document rows and chunks, but it does not retroactively normalize every meme evidence count or edge weight accumulated by earlier duplicate ingests.
+- `.DS_Store` remains an unrelated modified file and was left untouched.
+Next shortest proof path:
+Restart the live Adam runtime against the existing repo DB, inspect the startup dedupe on `documents`, then ingest a fresh odd-layout PDF and verify the resulting `turns.prompt_context` shows grouped document evidence with page/excerpt provenance during chat.
+
+## [2026-03-17T11:05:16Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/storage/graph_store.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None after the prior POST-FLIGHT; contract docs already matched the implemented behavior.
+Natural-language contracts added/revised/preserved:
+Preserved the prior contract updates. The additional change only corrected legacy quality metadata backfill so old ingest rows are labeled truthfully as `legacy_unscored` when no scored extraction evidence exists.
+Behavior implemented or modified:
+`graph_store.py` now backfills missing legacy document quality metadata with `parser_strategy=legacy_ingest_unscored`, `quality_state=legacy_unscored`, zero score, inferred parser counts when available, and a legacy quality flag instead of overclaiming `clean`/`degraded`/`failed` for documents that predate the scored extractor. The dedupe migration test was updated to assert that truth-preserving behavior.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q tests/test_ingest.py` -> `8 passed in 12.28s`
+`./.venv/bin/pytest -q` -> `92 passed in 80.37s (0:01:20)`
+Status register changes:
+- Implemented:
+  - Legacy documents without scored extraction evidence are now marked `legacy_unscored` instead of being backfilled with misleading quality states.
+- Instrumented:
+  - No new telemetry surfaces beyond the earlier turn; this was a truth-preserving metadata correction.
+- Conceptual:
+  - Automatic re-extraction of already-ingested same-SHA legacy PDFs remains unimplemented.
+- Unknown:
+  - Whether any operator workflows require a dedicated command to force re-score/re-extract a canonical document row rather than reusing it.
+Truth-table / limitations updates:
+No further doc edits were required because `docs/KNOWN_LIMITATIONS.md` already records the `legacy_unscored` caveat and the lack of automatic re-extraction for old same-SHA ingests.
+Remaining uncertainties:
+- Existing canonical same-SHA reuse still returns early for already-ingested rows; old PDFs become truthfully labeled but are not rescored unless a future force-refresh path is added.
+Next shortest proof path:
+Start the live runtime, inspect a legacy ingested PDF row in `documents.metadata_json`, then force a fresh ingest on a new odd-layout PDF and compare the new scored metadata against the legacy-unscored backfill.
+
+## [2026-03-17T12:15:30Z] PRE-FLIGHT
+Operator task:
+Operator wants a practical fallback for dirty PDFs: convert memoir PDF to a simpler format Adam can ingest directly, and verify or improve universal ingest across PDF/Markdown/TXT/CSV.
+Task checksum:
+Dirty PDF fallback plus non-PDF ingest correctness after markdown sidecar creation.
+Repo situation:
+Working tree already contains the earlier PDF-ingest hardening edits plus docs and notes. Live DB now has a newly ingested markdown sidecar for the memoir. During that ingest I observed a non-PDF persistence bug: only two document_chunks survived despite 640 text units materializing.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts in force:
+EDEN already claims support for PDF, CSV, TXT, and Markdown. Chunk provenance must be truthful and inspectable. Do not overclaim ingest success when persistence surfaces are wrong.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+Potentially docs if the operator-facing universal-acceptor path needs clearer wording.
+Status register:
+- Implemented:
+  - PDF/CSV/TXT/Markdown are accepted by the extractor layer.
+  - Memoir PDF was converted to `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.normalized.md` and ingested into the live graph as a clean markdown sidecar.
+- Instrumented:
+  - Live DB evidence shows the markdown sidecar ingest completed with `quality_state=clean`, but `document_chunks` persistence is inconsistent with the number of extracted text units.
+- Conceptual:
+  - A clean “dirty PDF -> normalized markdown sidecar -> ingest” operator workflow is not yet formalized in code/docs.
+- Unknown:
+  - Exact scope of the non-PDF chunk-index collision across TXT/Markdown/CSV in existing historical ingests.
+Risks / invariants:
+Do not mutate source PDFs. Preserve the already-created markdown sidecar. Avoid silent duplicate evidence claims. Keep the fix bounded to persistence correctness unless a doc clarification is needed.
+Evidence plan:
+Patch non-PDF chunk indexing so every extracted unit gets a stable unique chunk index, add regression coverage for markdown/text-family ingest chunk persistence, rerun targeted ingest tests, and only then summarize what the live sidecar ingest already accomplished.
+Shortest proof path:
+Fix chunk_index computation in `pipeline.py`, add a markdown ingest regression in `tests/test_ingest.py`, run targeted pytest, and report that the live sidecar exists plus the code fix for future ingests.
+
+## [2026-03-17T12:18:30Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+`/Users/brianray/Adam/README.md`
+Operational artifact created: `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.normalized.md`
+Append-only `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+No normative spec changes were required. `docs/DOCUMENT_INGEST.md` already claimed PDF/CSV/TXT/Markdown support; the code was brought back into alignment with that existing contract. README ingest example was clarified so operator-facing docs no longer imply PDF-only intake.
+Natural-language contracts added/revised/preserved:
+Preserved the existing universal ingest contract. Clarified the public CLI example to say `.md`, `.txt`, and `.csv` are accepted alongside `.pdf`.
+Behavior implemented or modified:
+`pipeline.py` now assigns stable unique `chunk_index` values for non-PDF extracted units where `page_number` is `None`, so Markdown/TXT/CSV ingests no longer collapse persisted `document_chunks` through repeated `(document_id, chunk_index)` collisions. This fixes the persistence bug observed while ingesting the memoir markdown sidecar.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_ingest.py` -> `9 passed in 12.88s`
+`./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_runtime_e2e.py /Users/brianray/Adam/tests/test_tui_smoke.py` -> `24 passed in 55.66s`
+`./.venv/bin/pytest -q` -> `93 passed in 81.25s (0:01:21)`
+Live operator artifact:
+`/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.normalized.md` generated from the memoir PDF via the scored/normalized extractor.
+Live graph evidence:
+document `82151535-869a-44b3-ac59-e2056417abff` ingested from the normalized markdown sidecar with `quality_state=clean`, `parser_strategy=direct_extract_v1`, `selected_parser_counts={"text": 640}`, and trace event `Completed ingest for bad_trip_with_jesus_theory_memoir.normalized.md` at `2026-03-17T12:12:43+00:00`. Retrieval probe for `Bad Trip with Jesus Set and Setting madness memes memory` surfaced `[KNOWLEDGE:document] bad_trip_with_jesus_theory_memoir.normalized.md` in prompt context.
+Status register changes:
+- Implemented:
+  - Dirty-PDF fallback path via normalized markdown sidecar is now demonstrated on the live memoir document.
+  - Markdown/TXT/CSV chunk persistence bug is fixed and regression-covered.
+- Instrumented:
+  - Live retrieval probe confirms the normalized markdown source is now available as a document-backed prompt-context source.
+- Conceptual:
+  - A dedicated first-class “convert dirty PDF to sidecar markdown and ingest” UI action is still unbuilt; today this remains an operator/CLI workflow.
+- Unknown:
+  - The pre-fix live sidecar ingest row persisted only two `document_chunks`; the graph evidence from that run remains historical even though future ingests now persist chunks correctly.
+Truth-table / limitations updates:
+No truth-table or limitations update was required because the repo already claimed universal ingest support; this turn repaired code to match that claim and clarified the README example.
+Remaining uncertainties:
+- The current live markdown sidecar row is usable for retrieval, but because it was first ingested before the chunk-index fix, its `document_chunks` surface is thinner than a fresh post-fix ingest would be. The graph evidence itself is already present and prompt retrieval now surfaces the source.
+Next shortest proof path:
+If you want a pristine post-fix provenance surface for the memoir, ingest the normalized markdown sidecar into a fresh graph or under a fresh sidecar path so the corrected chunk-index logic is exercised end-to-end without reusing or layering on the earlier live row.
