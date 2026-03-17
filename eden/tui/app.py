@@ -4,6 +4,7 @@ import asyncio
 import json
 import math
 import re
+import urllib.parse
 from collections import deque
 from time import monotonic
 from dataclasses import dataclass
@@ -205,10 +206,24 @@ ARCHIVE_GROUP_OPTIONS = [
 ]
 
 
-def _observatory_target_url(runtime: EdenRuntime, status: dict[str, Any], experiment_id: str | None) -> str:
+def _observatory_export_index_path(runtime: EdenRuntime, experiment_id: str | None) -> Path | None:
+    if not experiment_id:
+        return None
+    return runtime.export_dir_for_experiment(experiment_id) / "observatory_index.html"
+
+
+def _observatory_target_url(
+    runtime: EdenRuntime,
+    status: dict[str, Any],
+    experiment_id: str | None,
+    session_id: str | None = None,
+) -> str:
     if not experiment_id:
         return status["url"]
-    return status["url"] + f"{experiment_id}/observatory_index.html"
+    target = status["url"] + f"{experiment_id}/observatory_index.html"
+    if session_id:
+        target += "?" + urllib.parse.urlencode({"session_id": session_id})
+    return target
 
 
 @dataclass(slots=True)
@@ -1294,7 +1309,7 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
         return {
             "state": "ready",
             "export_path": export_path,
-            "gui_url": _observatory_target_url(app.runtime, status, experiment_id),
+            "gui_url": _observatory_target_url(app.runtime, status, experiment_id, app.ui_state.session_id),
             "overview_url": f"{base_url}api/experiments/{experiment_id}/overview?session_id={session_id}",
             "turns_url": f"{base_url}api/sessions/{session_id}/turns",
             "active_set_url": f"{base_url}api/sessions/{session_id}/active-set",
@@ -1430,7 +1445,7 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
         app.ui_state.observatory_status = status
         if target == "gui":
             await asyncio.to_thread(partial(app.runtime.export_observability, experiment_id=experiment_id, session_id=session_id))
-            target_url = _observatory_target_url(app.runtime, status, experiment_id)
+            target_url = _observatory_target_url(app.runtime, status, experiment_id, session_id)
             label = "session observatory"
         elif target == "turns":
             target_url = f"{status['url']}api/sessions/{session_id}/turns"
@@ -4503,6 +4518,7 @@ class ChatScreen(Screen):
         app = self.app
         assert isinstance(app, EdenTuiApp)
         summary = "Observatory action cancelled before completion."
+        launch = None
         try:
             self._set_runtime_action_progress(
                 action="observatory",
@@ -4522,6 +4538,32 @@ class ChatScreen(Screen):
                 experiment_id = app.runtime.primary_experiment()["id"]
                 session_id = None
 
+            target_url = _observatory_target_url(app.runtime, status, experiment_id, session_id)
+            existing_export = _observatory_export_index_path(app.runtime, experiment_id)
+            export_exists = bool(existing_export and existing_export.exists())
+
+            if export_exists:
+                self._set_runtime_action_progress(
+                    action="observatory",
+                    label="Open Browser Observatory",
+                    phase="Opening browser",
+                    step=2,
+                    total=4,
+                    detail=f"Launching the system browser for {safe_excerpt(target_url, limit=88)} from the latest export shell.",
+                    feedback="Observatory: opening browser from the latest export shell.",
+                )
+                launch = await asyncio.to_thread(partial(open_browser_url, target_url))
+                if launch.ok:
+                    summary = f"Observatory opened at {target_url}; refreshing payloads in background."
+                    app.ui_state.last_feedback = summary
+                    self._write_forensic(f"[INFO] Observatory opened early :: {target_url} via {launch.method}")
+                else:
+                    summary = f"Observatory ready at {target_url}, but browser launch failed: {launch.detail}"
+                    app.ui_state.last_feedback = summary
+                    self._write_forensic(
+                        f"[WARN] Observatory early launch failed :: {target_url} :: {launch.detail}"
+                    )
+
             export_detail = (
                 f"Refreshing observability artifacts for graph {safe_excerpt(experiment_id, limit=20)}."
                 if experiment_id is not None
@@ -4531,31 +4573,30 @@ class ChatScreen(Screen):
                 action="observatory",
                 label="Open Browser Observatory",
                 phase="Exporting observatory payloads",
-                step=2,
-                total=3,
+                step=3 if export_exists else 2,
+                total=4 if export_exists else 3,
                 detail=export_detail,
                 feedback=(
-                    f"Observatory: exporting payloads for graph {safe_excerpt(experiment_id, limit=20)}."
+                    f"Observatory: refreshing payloads for graph {safe_excerpt(experiment_id, limit=20)}."
                     if experiment_id is not None
                     else "Observatory: no active graph, opening the server root."
                 ),
             )
             if experiment_id is not None:
-                await asyncio.to_thread(
-                    partial(app.runtime.export_observability, experiment_id=experiment_id, session_id=session_id)
-                )
+                await asyncio.to_thread(partial(app.runtime.export_observability, experiment_id=experiment_id, session_id=session_id))
 
-            target_url = _observatory_target_url(app.runtime, status, experiment_id)
-            self._set_runtime_action_progress(
-                action="observatory",
-                label="Open Browser Observatory",
-                phase="Opening browser",
-                step=3,
-                total=3,
-                detail=f"Launching the system browser for {safe_excerpt(target_url, limit=88)}.",
-                feedback="Observatory: launching the browser.",
-            )
-            launch = await asyncio.to_thread(partial(open_browser_url, target_url))
+            if not launch or not launch.ok:
+                self._set_runtime_action_progress(
+                    action="observatory",
+                    label="Open Browser Observatory",
+                    phase="Opening browser",
+                    step=4 if export_exists else 3,
+                    total=4 if export_exists else 3,
+                    detail=f"Launching the system browser for {safe_excerpt(target_url, limit=88)}.",
+                    feedback="Observatory: launching the browser.",
+                )
+                launch = await asyncio.to_thread(partial(open_browser_url, target_url))
+
             if launch.ok:
                 summary = f"Observatory {'reused' if status['reused_existing'] else 'started'} at {target_url}"
                 app.ui_state.last_feedback = summary

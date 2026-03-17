@@ -7,6 +7,7 @@ from typing import Any
 
 import networkx as nx
 
+from ..semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 from ..utils import now_utc, safe_excerpt
 from .contracts import MEMODE_SUPPORT_EDGE_ALLOWLIST, MEMODE_SUPPORT_EDGE_DENYLIST
 from .geometry import compute_geometry_metrics, compute_selection_geometry, metric_deltas
@@ -574,8 +575,8 @@ class ObservatoryService:
             )
             directed.add_node(temp_id, **graph.nodes[temp_id])
             for member_id in member_ids:
-                graph.add_edge(temp_id, member_id, weight=1.0, edge_type="MATERIALIZES_AS_MEMODE", provenance={})
-                directed.add_edge(temp_id, member_id, weight=1.0, edge_type="MATERIALIZES_AS_MEMODE", provenance={})
+                graph.add_edge(temp_id, member_id, weight=1.0, edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE, provenance={})
+                directed.add_edge(temp_id, member_id, weight=1.0, edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE, provenance={})
             change["before_state"] = {"memode": None}
             change["graph_changed"] = True
             change["supporting_edge_ids"] = subgraph["supporting_edge_ids"]
@@ -589,14 +590,14 @@ class ObservatoryService:
             member_ids = subgraph["member_ids"]
             existing_edges = []
             for _, target, attrs in list(directed.out_edges(memode_id, data=True)):
-                if attrs.get("edge_type") == "MATERIALIZES_AS_MEMODE":
+                if attrs.get("edge_type") == MEMODE_MEMBERSHIP_EDGE_TYPE:
                     existing_edges.append(target)
                     if graph.has_edge(memode_id, target):
                         graph.remove_edge(memode_id, target)
                     directed.remove_edge(memode_id, target)
             for member_id in member_ids:
-                graph.add_edge(memode_id, member_id, weight=1.0, edge_type="MATERIALIZES_AS_MEMODE", provenance={})
-                directed.add_edge(memode_id, member_id, weight=1.0, edge_type="MATERIALIZES_AS_MEMODE", provenance={})
+                graph.add_edge(memode_id, member_id, weight=1.0, edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE, provenance={})
+                directed.add_edge(memode_id, member_id, weight=1.0, edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE, provenance={})
             change["before_state"] = {"memode": {"memode_id": memode_id, "member_ids": existing_edges}}
             change["graph_changed"] = True
             change["supporting_edge_ids"] = subgraph["supporting_edge_ids"]
@@ -1062,7 +1063,7 @@ class ObservatoryService:
         member_ids: list[str],
         action: dict[str, Any],
     ) -> None:
-        existing = self.store.list_edges_for_node(experiment_id, node_kind="memode", node_id=memode_id, edge_type="MATERIALIZES_AS_MEMODE")
+        existing = self.store.list_edges_for_node(experiment_id, node_kind="memode", node_id=memode_id, edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE)
         for edge in existing:
             target_id = edge["dst_id"] if edge["src_id"] == memode_id else edge["src_id"]
             if target_id not in member_ids:
@@ -1081,7 +1082,7 @@ class ObservatoryService:
                 src_id=memode_id,
                 dst_kind="meme",
                 dst_id=member_id,
-                edge_type="MATERIALIZES_AS_MEMODE",
+                edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE,
                 weight=1.0,
                 provenance={
                     "assertion_origin": "operator_asserted",

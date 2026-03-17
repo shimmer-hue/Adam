@@ -70,7 +70,7 @@ export default function GraphPanel({
     let renderer: Sigma | null = null;
 
     try {
-      const graph = new Graph();
+      const graph = new Graph({ multi: true });
 
       for (const node of nodes) {
         const coords = coordinateMap[node.id] ?? node.render_coords?.force ?? node.derived_coords?.spectral ?? { x: 0, y: 0 };

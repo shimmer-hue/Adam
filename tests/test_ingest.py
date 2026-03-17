@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from eden.ingest.extractors import extract_pdf, iter_extract_document, normalize_pdf_text, score_pdf_text_quality
+from eden.semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 from eden.storage.graph_store import GraphStore
 from eden.storage.schema import SCHEMA_SQL
 from eden.utils import now_utc, sha256_file
@@ -79,6 +80,27 @@ def test_markdown_ingest_persists_all_extracted_units(runtime, tmp_path: Path) -
     )
     assert len(chunk_indexes) >= len(extracted_units)
     assert len({int(row["chunk_index"]) for row in chunk_indexes}) == len(chunk_indexes)
+
+
+def test_ingest_derives_typed_relations_and_memode_membership_edges(runtime, tmp_path: Path) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    source = tmp_path / "relation_seed.md"
+    source.write_text(
+        (
+            '# Relation Seed\n\n'
+            'Michel Foucault wrote "The Archaeology of Knowledge". '
+            "J. L. Austin authored How to Do Things with Words."
+        ),
+        encoding="utf-8",
+    )
+
+    runtime.ingest_document(experiment_id=experiment["id"], path=str(source))
+
+    edges = runtime.store.list_edges(experiment["id"])
+    edge_types = {edge["edge_type"] for edge in edges}
+
+    assert "AUTHOR_OF" in edge_types
+    assert MEMODE_MEMBERSHIP_EDGE_TYPE in edge_types
 
 
 def test_ingest_failure_marks_document_failed(runtime, sample_files, monkeypatch) -> None:

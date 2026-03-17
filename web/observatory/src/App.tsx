@@ -79,6 +79,8 @@ type GraphPayload = {
   edges: GraphEdge[];
   semantic_nodes: GraphNode[];
   semantic_edges: GraphEdge[];
+  assembly_nodes?: GraphNode[];
+  assembly_edges?: GraphEdge[];
   runtime_nodes: GraphNode[];
   runtime_edges: GraphEdge[];
   assemblies: any[];
@@ -259,6 +261,21 @@ type ResolvedSources = Partial<Record<PayloadKey, string>> & {
   liveEnabled: boolean;
   staleBuildWarning: string | null;
 };
+
+function applyBootstrapUrlOverrides(bootstrap: Bootstrap): Bootstrap {
+  if (typeof window === "undefined") return bootstrap;
+  const sessionOverride = new URL(window.location.href).searchParams.get("session_id");
+  if (!sessionOverride || sessionOverride === bootstrap.session_id) return bootstrap;
+  const liveApi = { ...(bootstrap.live_api ?? {}) };
+  liveApi.session_turns = `/api/sessions/${sessionOverride}/turns`;
+  liveApi.session_active_set = `/api/sessions/${sessionOverride}/active-set`;
+  liveApi.session_trace = `/api/sessions/${sessionOverride}/trace`;
+  return {
+    ...bootstrap,
+    session_id: sessionOverride,
+    live_api: liveApi,
+  };
+}
 
 type PayloadStatus = {
   label: string;
@@ -524,7 +541,8 @@ function nowStamp(): string {
   return new Date().toISOString();
 }
 
-export default function App({ bootstrap }: { bootstrap: Bootstrap }) {
+export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap }) {
+  const bootstrap = useMemo(() => applyBootstrapUrlOverrides(rawBootstrap), [rawBootstrap]);
   const initialSurface = SURFACES.includes((bootstrap.initial_surface as Surface) ?? "overview")
     ? (bootstrap.initial_surface as Surface)
     : "overview";
@@ -646,6 +664,14 @@ export default function App({ bootstrap }: { bootstrap: Bootstrap }) {
   const interactionModes = (data.graph?.interaction_modes ?? ["INSPECT", "MEASURE", "EDIT", "ABLATE", "COMPARE"]) as InteractionMode[];
   const graphModes = (data.graph?.graph_modes ?? [DEFAULT_GRAPH_MODE]) as GraphMode[];
   const renderModes = (data.graph?.assembly_render_modes ?? [DEFAULT_ASSEMBLY_RENDER_MODE]) as AssemblyRenderMode[];
+  const ablationRelationOptions = useMemo(() => {
+    const ordered = ["CO_OCCURS_WITH", "MATERIALIZES_AS_MEMODE", "MEMODE_HAS_MEMBER", "FED_BACK_BY"];
+    const values = new Set<string>(ordered);
+    for (const edge of data.graph?.edges ?? []) {
+      if (edge?.type) values.add(String(edge.type));
+    }
+    return [...values];
+  }, [data.graph?.edges]);
 
   useEffect(() => {
     layoutSettingsRef.current = layoutSettings;
@@ -2669,7 +2695,7 @@ export default function App({ bootstrap }: { bootstrap: Bootstrap }) {
               <label>
                 <span>Ablation relation</span>
                 <select aria-label="Ablation relation" value={actionForm.ablationRelation} onChange={(event) => updateAction("ablationRelation", event.target.value)}>
-                  {["CO_OCCURS_WITH", "MATERIALIZES_AS_MEMODE", "FED_BACK_BY"].map((value) => (
+                  {ablationRelationOptions.map((value) => (
                     <option key={value} value={value}>
                       {value}
                     </option>

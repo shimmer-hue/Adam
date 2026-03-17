@@ -152,6 +152,8 @@ Secondary surfaces:
 - the strip renders fully spelled-out numbered actions as brighter button-like chips and carries the runtime/session/progress lines directly beneath them
 - the topbar also carries a dedicated live turn-status strip so the operator can see Adam move through preflight, prompt-ready, generating, finalizing, and review phases without losing the aperture surface
 - `Open Browser Observatory` stays repeatable from the strip without forcing a reset back to review focus
+- when the current graph already has an `observatory_index.html` shell, `Open Browser Observatory` should launch the browser immediately from that shell and continue refreshing payloads in the background rather than blocking browser open on a full export rebuild
+- immediate observatory launches must preserve the current session scope by appending a session override in the browser URL instead of silently falling back to the stale session baked into the previous export shell
 - multiline composition is first-class
 - `Esc` returns focus to the composer, and printable keys pressed outside editable widgets are routed back into the composer automatically
 - the dialogue tape is scrollable and can be navigated by focusing it, then using `Up`, `Down`, `PageUp`, `PageDown`, `Home`, or `End`
@@ -179,6 +181,7 @@ Secondary surfaces:
 - corpus ingest supports a framing prompt whose phrases are graph-indexed as persistent document-conditioning material
 - export actions report the artifact directory path in the status surface so the operator can find the generated files without guesswork
 - observatory launch status is explicitly phased in the top action shelf (`queued`, `ensuring server`, `exporting payloads`, `opening browser`); elapsed time is real elapsed time, not an ETA claim
+- when an existing shell is available, `opening browser` can truthfully occur before `exporting payloads` completes; the status line must make that background refresh explicit rather than implying the browser is still idle
 
 ## Budget panel contents
 

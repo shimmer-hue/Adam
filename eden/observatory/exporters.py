@@ -324,6 +324,8 @@ class ObservatoryExporter:
             "edges": graph_model["edges"],
             "semantic_nodes": graph_model["semantic_nodes"],
             "semantic_edges": graph_model["semantic_edges"],
+            "assembly_nodes": graph_model["assembly_nodes"],
+            "assembly_edges": graph_model["assembly_edges"],
             "runtime_nodes": graph_model["runtime_nodes"],
             "runtime_edges": graph_model["runtime_edges"],
             "assemblies": graph_model["assemblies"],
@@ -1201,9 +1203,11 @@ class ObservatoryExporter:
         for feedback in snapshot["feedback"]:
             feedback_by_turn[feedback["turn_id"]].append(feedback)
 
-        def add_node(node_id: str, label: str, kind: str, **extra: Any) -> None:
-            export_label = str(extra.pop("export_label", "") or "").strip() or label
-            node = {"id": node_id, "label": label, "export_label": export_label, "kind": kind, **extra}
+        def add_node(node_id: str, label: str | None, kind: str, **extra: Any) -> None:
+            export_label = str(extra.pop("export_label", "") or "").strip()
+            label_text = str(label or "").strip() or export_label or str(node_id)
+            export_label = export_label or label_text
+            node = {"id": node_id, "label": label_text, "export_label": export_label, "kind": kind, **extra}
             nodes.append(node)
             graph.add_node(node_id, **node)
             directed.add_node(node_id, **node)
@@ -1393,19 +1397,21 @@ class ObservatoryExporter:
             edges.append(edge_payload)
             edge_types[(edge["src_id"], edge["dst_id"])] = edge["edge_type"]
 
-        node_order = [
-            node["id"]
-            for node in sorted(
-                nodes,
-                key=lambda item: (
-                    0 if item["kind"] == "turn" else 1 if item["kind"] == "feedback" else 2,
-                    item.get("session_id", ""),
-                    item.get("time_order", 999999),
-                    item.get("created_at", ""),
-                    item["label"],
-                ),
+        def _node_sort_key(item: dict[str, Any]) -> tuple[int, str, int, str, str]:
+            kind_rank = 0 if item["kind"] == "turn" else 1 if item["kind"] == "feedback" else 2
+            try:
+                time_order = int(item.get("time_order", 999999) or 999999)
+            except (TypeError, ValueError):
+                time_order = 999999
+            return (
+                kind_rank,
+                str(item.get("session_id") or ""),
+                time_order,
+                str(item.get("created_at") or ""),
+                str(item.get("label") or item.get("export_label") or item["id"]),
             )
-        ]
+
+        node_order = [node["id"] for node in sorted(nodes, key=_node_sort_key)]
         coords = compute_coordinate_sets(graph, node_order=node_order)
         geometry = compute_geometry_metrics(graph, directed, coords=coords, node_order=node_order)
         community_lookup: dict[str, int] = {}
@@ -1538,6 +1544,8 @@ class ObservatoryExporter:
             "measurement_events": measurement_events,
             "semantic_nodes": planes["semantic_nodes"],
             "semantic_edges": planes["semantic_edges"],
+            "assembly_nodes": planes["assembly_nodes"],
+            "assembly_edges": planes["assembly_edges"],
             "runtime_nodes": planes["runtime_nodes"],
             "runtime_edges": planes["runtime_edges"],
             "assemblies": planes["assemblies"],

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ..semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 from ..utils import sha256_text
 
 OBSERVATORY_GRAPH_SCHEMA_VERSION = 4
@@ -56,6 +57,7 @@ MEMODE_SUPPORT_EDGE_DENYLIST = {
     "BELONGS_TO_SESSION",
     "FED_BACK_BY",
     "MATERIALIZES_AS_MEMODE",
+    MEMODE_MEMBERSHIP_EDGE_TYPE,
     "DERIVED_FROM",
 }
 

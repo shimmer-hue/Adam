@@ -39,6 +39,7 @@ describe("EDEN Observatory App", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
   });
 
   it("renders graph controls, structured inspector cards, and hardened graph preset keys", async () => {
@@ -93,6 +94,17 @@ describe("EDEN Observatory App", () => {
               { id: "meme-3", label: "Reference Note", kind: "meme", domain: "knowledge", render_coords: { force: { x: 2, y: 2 } } },
             ],
             semantic_edges: [{ id: "edge-1", source: "meme-1", target: "meme-2", type: "SUPPORTS", weight: 1, evidence_label: "AUTO_DERIVED" }],
+            assembly_nodes: [
+              { id: "meme-1", label: "Persistence", kind: "meme", domain: "knowledge", render_coords: { force: { x: 0, y: 0 } } },
+              { id: "meme-2", label: "Retrieval", kind: "meme", domain: "knowledge", render_coords: { force: { x: 1, y: 1 } } },
+              { id: "meme-3", label: "Reference Note", kind: "meme", domain: "knowledge", render_coords: { force: { x: 2, y: 2 } } },
+              { id: "memode-1", label: "Persistence memode", kind: "memode", domain: "behavior" },
+            ],
+            assembly_edges: [
+              { id: "edge-1", source: "meme-1", target: "meme-2", type: "SUPPORTS", weight: 1, evidence_label: "AUTO_DERIVED" },
+              { id: "edge-2", source: "meme-2", target: "meme-3", type: "REFERENCES", weight: 0.4, evidence_label: "AUTO_DERIVED" },
+              { id: "edge-3", source: "memode-1", target: "meme-1", type: "MEMODE_HAS_MEMBER", weight: 1, evidence_label: "AUTO_DERIVED" },
+            ],
             runtime_nodes: [],
             runtime_edges: [],
             assemblies: [
@@ -265,6 +277,7 @@ describe("EDEN Observatory App", () => {
     expect(screen.getByRole("heading", { name: "1. Force-Directed Layout Algorithms" })).toBeTruthy();
     expect(screen.getByText(/Nodes repel while edges pull related nodes together/)).toBeTruthy();
     expect(screen.getByText("Runnable in browser worker")).toBeTruthy();
+    expect(screen.getByTestId("graph-panel").textContent).toContain(":3");
     expect((screen.getByLabelText(/ForceAtlas2.*Iterations/i) as HTMLInputElement).value).toBe("160");
     expect(screen.getByText("Identity")).toBeTruthy();
     expect(screen.getByText("Ontology")).toBeTruthy();
@@ -284,6 +297,9 @@ describe("EDEN Observatory App", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Kamada-Kawai / }));
     expect((screen.getByRole("button", { name: "Run Layout" }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByText(/distance fidelity matters more than raw scale/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Assemblies" }));
+    expect(screen.getByTestId("graph-panel").textContent).toContain(":4");
 
     fireEvent.click(screen.getByRole("radio", { name: "Compare" }));
     expect(screen.getByText("Baseline")).toBeTruthy();
@@ -571,5 +587,97 @@ describe("EDEN Observatory App", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: "Hum Live" }));
     expect(await screen.findByText("1. seed-state: 1 persisted turn; cross-turn recurrence not available yet.")).toBeTruthy();
+  });
+
+  it("honors session_id query overrides when reopening an existing observatory shell", async () => {
+    window.history.replaceState({}, "", "/observatory_index.html?session_id=session-override");
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/status") {
+        return response({
+          status: {
+            frontend_build: {
+              warning: false,
+            },
+          },
+        });
+      }
+      if (url === "/api/graph?session_id=session-override") {
+        return response({
+          source_graph_hash: "graph-hash-session",
+          semantic_nodes: [],
+          semantic_edges: [],
+          runtime_nodes: [],
+          runtime_edges: [],
+          assemblies: [],
+          cluster_summaries: [],
+          active_set_slices: [],
+        });
+      }
+      if (url === "/api/basin?session_id=session-override") {
+        return response({
+          projection_method: "svd_on_turn_features",
+          turns: [],
+          attractors: [],
+          filtered_turn_count: 0,
+          source_turn_count: 0,
+          diagnostics: { empty_state: true },
+        });
+      }
+      if (url === "/api/overview?session_id=session-override") {
+        return response({
+          graph_counts: {},
+          basin: { filtered_turn_count: 0 },
+          measurements: {},
+          hum: { present: false },
+        });
+      }
+      if (url === "/api/measurements?session_id=session-override") {
+        return response({ counts: { events: 0 }, events: [] });
+      }
+      if (url === "/api/sessions/session-override/turns") {
+        return response({ turns: [], hum: { present: false } });
+      }
+      if (url === "/api/sessions/session-override/trace") {
+        return response({ trace_events: [], membrane_events: [] });
+      }
+      if (url === "/api/runtime/status") {
+        return response({ available: true });
+      }
+      if (url === "/api/runtime/model") {
+        return response({ available: true, backend: "mock" });
+      }
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "overview",
+          experiment_id: "exp-session",
+          session_id: "session-stale",
+          live_api: {
+            status: "/api/status",
+            graph: "/api/graph",
+            basin: "/api/basin",
+            overview: "/api/overview",
+            measurements: "/api/measurements",
+            session_turns: "/api/sessions/session-stale/turns",
+            session_trace: "/api/sessions/session-stale/trace",
+            runtime_status: "/api/runtime/status",
+            runtime_model: "/api/runtime/model",
+            events: "/api/events",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByText(/EDEN Observatory/)).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith("/api/overview?session_id=session-override", { credentials: "same-origin" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/graph?session_id=session-override", { credentials: "same-origin" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/basin?session_id=session-override", { credentials: "same-origin" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/measurements?session_id=session-override", { credentials: "same-origin" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/sessions/session-override/turns", { credentials: "same-origin" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/sessions/session-override/trace", { credentials: "same-origin" });
   });
 });

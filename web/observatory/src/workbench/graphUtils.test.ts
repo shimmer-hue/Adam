@@ -13,6 +13,7 @@ import {
   tgfForGraph,
   tulipTlpForGraph,
   ucinetDlForGraph,
+  visibleGraphForMode,
 } from "./graphUtils";
 
 const nodes = [
@@ -103,5 +104,51 @@ describe("graph export serializers", () => {
     expect(tulip).toContain('(tlp "2.0"');
     expect(tgf).toContain("#");
     expect(tgf).toContain("meme-1 Persistent meme semantic content");
+  });
+
+  it("uses the assemblies slice for memode-visible graph modes", () => {
+    const payload = {
+      semantic_nodes: [...nodes],
+      semantic_edges: [...edges],
+      assembly_nodes: [
+        ...nodes,
+        {
+          id: "memode-1",
+          label: "Persistence Memode",
+          kind: "memode",
+          domain: "behavior",
+          source_kind: "memode",
+        },
+      ],
+      assembly_edges: [
+        ...edges,
+        {
+          id: "edge-2",
+          source: "memode-1",
+          target: "meme-1",
+          type: "MEMODE_HAS_MEMBER",
+          weight: 1,
+          evidence_label: "AUTO_DERIVED",
+          assertion_origin: "auto_derived",
+          confidence: 1,
+        },
+      ],
+      assemblies: [
+        {
+          id: "memode-1",
+          label: "Persistence Memode",
+          kind: "memode",
+          domain: "behavior",
+          source_kind: "memode",
+        },
+      ],
+      runtime_nodes: [],
+      runtime_edges: [],
+    };
+
+    const assemblyGraph = visibleGraphForMode(payload, "Assemblies");
+
+    expect(assemblyGraph.nodes.map((node) => node.id)).toContain("memode-1");
+    expect(assemblyGraph.edges.map((edge) => edge.type)).toContain("MEMODE_HAS_MEMBER");
   });
 });

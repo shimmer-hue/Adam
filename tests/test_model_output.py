@@ -16,6 +16,28 @@ def test_split_model_output_with_reasoning_only_fallback_shape() -> None:
     assert answer == text
 
 
+def test_split_model_output_handles_thinking_process_without_colon() -> None:
+    text = "Thinking Process\n\n1. Analyze the request.\n2. Plan the answer."
+    reasoning, answer = split_model_output(text)
+    assert reasoning == text
+    assert answer == text
+
+
+def test_split_model_output_recovers_final_version_from_thinking_process_block() -> None:
+    text = (
+        "Thinking Process\n\n"
+        "1. Analyze the request.\n"
+        "2. Draft the reply.\n\n"
+        "*Final Version:*\n"
+        "Brian, I have a clear sense of this schema.\n"
+        "Let us begin refining the codebase.\n\n"
+        "*Wait, I need to make sure I do not violate the rule.*"
+    )
+    reasoning, answer = split_model_output(text)
+    assert reasoning.startswith("Thinking Process")
+    assert answer == "Brian, I have a clear sense of this schema.\nLet us begin refining the codebase."
+
+
 def test_model_result_defaults_answer_and_raw_to_text() -> None:
     result = ModelResult(
         backend="mock",
@@ -37,3 +59,15 @@ def test_split_model_output_progressive_handles_closed_think_block_with_answer()
     reasoning, answer = split_model_output_progressive("<think>\n1. Inspect.\n</think>\nAnswer:\nReady.")
     assert reasoning == "1. Inspect."
     assert answer == "Answer:\nReady."
+
+
+def test_split_model_output_progressive_recovers_final_version_from_thinking_process_block() -> None:
+    text = (
+        "Thinking Process\n\n"
+        "1. Analyze.\n\n"
+        "*Final Version:*\n"
+        "Brian, I can answer directly."
+    )
+    reasoning, answer = split_model_output_progressive(text)
+    assert reasoning.startswith("Thinking Process")
+    assert answer == "Brian, I can answer directly."

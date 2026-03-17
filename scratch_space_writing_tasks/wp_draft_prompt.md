@@ -9,7 +9,11 @@ This is Step 3 of 3:
 2. Codex pre-writing memo
 3. Whitepaper generation
 
-There is no Claude memo step.
+Only two upstream artifact classes are expected for this run:
+- intelligence brief
+- Codex pre-writing memo
+
+If either is missing, record the missingness and continue under current repo truth.
 
 ROLE
 Your job is not to produce marketing prose or a vibes-based conceptual essay. Your job is to compile the current Adam repository, its current evidence surfaces, and its current drift-controlled artifact lineage into a coherent whitepaper that remains scientifically legible without laundering speculative or historical claims into present-tense implementation.
@@ -51,10 +55,56 @@ Hard rules:
 Fallback rule:
 - Legacy root-level directories such as `./intelligence_briefs/`, `./whitepaper_prewriting_memo/`, and `./whitepaper_drafts/` may still be searched as archaeology or fallback inputs if present, but they are no longer the canonical output targets.
 
-GOVERNANCE
-- If `./AGENTS.md` exists, follow it.
-- Do not depend on `AGENTS_CODEX-WRITER.md` or any writer-specialized agent file.
-- If `./codex_notes_garden.md` exists and is writable, you may append concise PRE/POST notes for continuity. This is recommended, not mandatory.
+FAIL-CLOSED GOVERNANCE RESOLUTION
+Resolve governance before inventory, drafting, or canonization.
+
+Attempt governance paths in this order:
+1. `./AGENTS.md`
+2. `<REPO_ROOT>/AGENTS.md`
+3. repo-root matches for `AGENTS*.md`, excluding stale writer-specialized aliases unless current repo evidence explicitly points to them
+
+For every attempted path, record:
+- absolute path
+- exists / missing
+- opened / not opened
+- accepted / rejected
+- reason
+
+Hard rules:
+- If `./AGENTS.md` exists, it governs.
+- Do not depend on `AGENTS_CODEX-WRITER.md` or any writer-specialized agent file unless current repo evidence explicitly reactivates it.
+- If governance cannot be established from current repo evidence, record `GOVERNANCE_UNRESOLVED` and fail closed.
+- The only allowed degraded mode is a short inventory report explaining unresolved governance. Do not draft or canonize the whitepaper in degraded mode.
+
+If governance remains unresolved after admissible current-repo resolution attempts, classify the run as `FAIL`.
+
+In this degraded mode, emit only:
+- the governance resolution log
+- a short inventory / degraded-mode report explaining why drafting and canonization were not allowed
+
+Do not produce draft, figure, bibliography, or canonization outputs in degraded mode.
+
+GOVERNANCE GATE PRECEDENCE
+If governance is unresolved, the governance failure state supersedes the generic run pipeline.
+
+Hard rules:
+- Do not proceed to baseline selection, empirical extraction, figure generation, rewrite/refactor, citation verification, LaTeX build, or canonization.
+- Generic full-run output requirements apply only when governance is resolved and drafting is allowed.
+- In governance-unresolved degraded mode, only the explicitly allowed degraded-mode artifacts may be written.
+
+MANDATORY PRE / POST RUN-NOTE DISCIPLINE
+Resolve the canonical run-note surface from the governing file. In the current Adam repo, prefer `./codex_notes_garden.md` when governance names it.
+
+Governance dependency:
+- Do not independently guess or resolve a canonical notes surface if governance is unresolved.
+- In governance-unresolved degraded mode, PRE and POST note actions are `SKIPPED`, and the reason must be recorded in the execution/build status log.
+
+Hard rules:
+- Write PRE notes before final execution or drafting.
+- Write POST notes before finalization.
+- If the notes file is not writable, record `WRITE_BLOCKED` with attempted absolute path(s) and reasons.
+- Do not silently skip PRE or POST.
+- Record the resolved notes file path or `MISSING`.
 
 UNIVERSALIZATION RULE
 This prompt is designed for repeated use across the remaining Adam project lifecycle.
@@ -103,6 +153,27 @@ Resolve the baseline in this order:
 Record which case fired.
 Record file hash for any baseline artifact actually used.
 
+BASELINE CANDIDATE FILTER
+Eligible baseline artifacts are manuscript-bearing files only:
+- `*.tex`
+- `*.md`
+- `*.pdf`
+- canonical pointer pairs such as `LATEST_ADAM_WHITEPAPER.pdf` plus its provenance manifest may be used to resolve the real manuscript artifact
+
+Exclude from baseline selection:
+- `audit/`
+- `figure_bundle/`
+- `data/`
+- LaTeX auxiliary files
+- build logs
+- manifests that are not canonical provenance pointers
+- per-run support files that are not themselves draft manuscripts
+
+Hard rule:
+- provenance manifests are metadata for manuscript resolution only and are not themselves eligible baseline manuscripts
+
+If selecting from a run directory, prefer the manuscript artifact named by the run’s provenance file when present.
+
 RUN VERSION
 Set:
 - `THIS_RUN_VERSION = YYYYMMDD_HHMMSS` in `America/New_York`
@@ -117,8 +188,61 @@ Required subpaths:
 - `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/<THIS_RUN_VERSION>/figure_bundle/`
 - `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/<THIS_RUN_VERSION>/data/`
 
+These full output subpaths are required only when governance is resolved and the run proceeds beyond degraded mode.
+In governance-unresolved degraded mode, only the audit output family is permitted.
+
+The `pdf/` output directory is always created when writing is permitted and governance is resolved.
+It must contain either:
+- the compiled PDF artifact
+- or an explicit build-status note when PDF generation was skipped or blocked
+
+RUN CONFIG / CONTROL-FLOW GUARD
+Resolve a deterministic `RUN_CONFIG` before writing.
+
+Audit these operator fields whether present or not:
+- `BASELINE_DRAFT_PATH`
+- `WHY_NOW`
+- `AUDIENCE`
+- `RED_LINES`
+- `COMPARATORS_ENABLED`
+- `PDF_BUILD_REQUIRED`
+- operator-supplied attachments or external artifacts
+
+Hard rules:
+- Record each field as `PROVIDED`, `UNSET`, or `PLACEHOLDER`.
+- If a field is missing, continue with a bounded default. Do not invent facts and do not halt when a safe continuation path exists.
+- If `WHY_NOW` is missing, frame urgency only as current-repo drift control and evidence refresh.
+- If `AUDIENCE` is missing, default to technically literate readers who need scientific legibility plus repo-grounded evidence.
+- If `RED_LINES` is missing, default to: no fabricated implementation claims, no browser overclaim, no Eden-only path regression, no silent omission.
+- If `COMPARATORS_ENABLED` is missing, treat comparative claims as disabled.
+- If `PDF_BUILD_REQUIRED` is missing, continue the drafting/audit path and record whether PDF build was attempted, skipped, or blocked.
+- Record what was provided, what was missing, and what defaults were used.
+- Do not ask the operator for clarification when a safe documented continuation path exists.
+
+EXECUTION STATUS DISCIPLINE
+Use these statuses where relevant:
+- `EXECUTED`
+- `SKIPPED`
+- `EXECUTION_BLOCKED`
+- `DEPENDENCY_BLOCKED`
+- `WRITE_BLOCKED`
+
+If a test, script, build, or launch attempt fails because of missing dependencies, permissions, environment limits, or unavailable services, record:
+- exact attempted command
+- failure reason
+- affected output family
+- downstream consequence for run classification
+
+Use `SKIPPED` when an action is intentionally not run because operator configuration, phase gating, missing applicability, or explicit degraded-mode rules make execution unnecessary.
+
+Do not collapse an intentional skip into `EXECUTION_BLOCKED` or `DEPENDENCY_BLOCKED`.
+
+Record these statuses in the execution/build status log.
+
+Do not convert environment inability into fabricated implementation success or failure.
+
 CANONIZATION
-After successful compilation, copy the compiled PDF to:
+If a compiled PDF exists and passed the required verification steps, copy it to:
 - `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/LATEST_ADAM_WHITEPAPER.pdf`
 
 Also write a small provenance file:
@@ -129,6 +253,9 @@ with:
 - timestamp
 - hash
 - baseline artifact used
+
+If PDF build is skipped, blocked, or fails, do not overwrite `LATEST_ADAM_WHITEPAPER.pdf` or its provenance manifest.
+Record PDF build status, failure or skip reason, and downstream consequence in the audit artifacts.
 
 SURFACE RESOLUTION RULE
 Treat explicitly listed files as preferred high-value entry points, not as a permanent exhaustive file contract.
@@ -151,14 +278,41 @@ Hard rule:
 - do not hallucinate equivalence
 - record the resolved substitute path explicitly
 
-SOURCE OF TRUTH
-1) Current implementation truth comes from:
-- opened code under `./eden/`
+AUTHORITY STACK / SOURCE OF TRUTH
+Use this precedence order when surfaces disagree:
+1. opened current code, direct tests, and audited runtime/export evidence from the current repo
+2. opened current normative docs in `./docs/` plus current `README.md`
+3. audit artifacts produced in this run
+4. current pipeline briefs, memos, and drafts under `/Users/brianray/Adam/assets/white_paper_pipeline/` if they exist
+5. historical notes, manifests, prompts, and public-facing discourse surfaces as archaeology only
+6. research literature / canonical secondary sources as framing only
+
+Explicit conflict rules:
+- direct repo evidence outranks drifted prompt prose
+- current implementation evidence outranks historical aspiration
+- audited runtime evidence outranks speculative summaries
+- historical prompt/discourse artifacts can inform archaeology, but they do not prove implementation
+
+OPERATIONAL INSTRUCTION PRECEDENCE
+When operational instructions conflict, follow this order:
+1. governing file resolved from current repo governance
+2. explicit operator-supplied run config and attached artifacts
+3. this prompt
+4. current intelligence brief and current Codex pre-writing memo
+5. prior drafts and archaeology artifacts
+
+Hard rule:
+- no lower-precedence artifact may force behavior that violates higher-precedence governance
+- no prose artifact at any level may override current opened repo evidence for implementation-strength claims
+
+Current implementation-truth surfaces come from:
+- opened runtime code under `./eden/`, or the current equivalent runtime package/directory when the repo has been renamed or restructured
 - tests under `./tests/`
 - current docs truth surfaces under `./docs/`
+- `./README.md`
 - runtime-visible artifacts under `./logs/` and `./exports/`
 
-2) Historical conceptual context comes from:
+Historical conceptual / archaeology context comes from:
 - prior briefs in `/Users/brianray/Adam/assets/white_paper_pipeline/intel_briefs/`
 - prior memos in `/Users/brianray/Adam/assets/white_paper_pipeline/writing_memos/`
 - prior drafts in `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/`
@@ -166,44 +320,105 @@ SOURCE OF TRUTH
   - `./intelligence_briefs/`
   - `./whitepaper_prewriting_memo/`
   - `./whitepaper_drafts/`
+- `./codex_notes_garden.md`
 - patch manifests and migration notes
 - `./assets/seed_canon/eden_whitepaper_v14.pdf`
 
 Hard rule:
 - pipeline artifact directories are lineage / staging / drift surfaces
-- they do not outrank opened current code, tests, logs, or exports as implementation truth
+- they do not outrank opened current code, tests, logs, exports, or current docs as implementation truth
 
-3) Canonical secondary definition/method surfaces come from:
-- `./assets/seed_canon/cannonical_secondary_sources/`
-- or `./assets/seed_canon/canonical_secondary_sources/`
-whichever exists
-
-4) Missingness rule:
+Missingness rule:
 - record `MISSING` or `EMPTY`
 - proceed without fabrication
 
-CANONICAL SECONDARY DISCIPLINE
-Canonical secondary sources are allowed only as discipline surfaces. They may stabilize:
-- definition boundaries
-- admissibility rules
-- evidence obligations
-- non-collapse distinctions
+RESEARCH LIBRARY / CANONICAL SECONDARY DISCIPLINE
+Resolve the current research library or literature cache in this order:
+1. `./assets/cannonical_secondary_sources/`
+2. `./assets/canonical_secondary_sources/`
+3. `./assets/seed_canon/cannonical_secondary_sources/`
+4. `./assets/seed_canon/canonical_secondary_sources/`
 
-They may not prove implementation.
+Record the resolved path or `MISSING`.
 
-Use them in this constrained way:
+Research literature is allowed only for bounded roles:
+- comparative baseline
+- formalization aid
+- gap exposure
+- evaluation scaffold
+- definition boundary / admissibility discipline
+
+Hard rules:
+- Research literature may not prove that Adam implements a mechanism.
+- Repo-evidenced claims and literature-evidenced framing must remain explicitly distinguished in the paper and in the audit artifacts.
+- If a theoretical reference cannot be compiled into a definition boundary, admissibility rule, or concrete evidence obligation, omit it.
+
+Use current literature in this constrained way:
 - Foucault: archaeology / archive / discontinuity discipline
-- Blackmore and Dennett: replication, selection pressure, persistence, but not metaphor-as-proof
+- Blackmore and Dennett: replication, fidelity/fecundity/longevity framing, but not metaphor-as-proof
 - Austin and Butler: governance phrases require felicity conditions and observed enforcement paths
 - Barad: apparatus matters; traces, measurements, and boundary-making practices determine accountability
 
-Compile-or-omit rule:
-If a theoretical reference cannot be compiled into:
-- a definition boundary
-- an admissibility rule
-- or a concrete evidence obligation
+TRAVERSAL AND CONTEXT-CRAWL PROTOCOL
+Perform exhaustive review within admissible high-signal corpus surfaces before writing implementation-strength claims.
 
-omit it.
+Authority classes to log explicitly:
+- `normative_doc`
+- `status_doc`
+- `code`
+- `test`
+- `runtime_log`
+- `conversation_transcript`
+- `export_manifest`
+- `output_registry`
+- `notes_archaeology`
+- `prompt_archaeology`
+- `literature`
+- `public_discourse`
+
+When a surface has versions or families, enumerate the ladder and read it in order:
+- patch manifests
+- migration notes
+- prior briefs, memos, and drafts
+- conversation-export families
+- export run directories
+- prompt variants
+
+Maintain a traversal log with, at minimum:
+- file path
+- type
+- version or date
+- authority class
+- anchors found
+- key claims
+- evidence hooks
+- search / extraction method
+- status `{opened | resolved_alias | missing | empty | skipped}`
+
+LARGE-CORPUS BOUNDING RULE
+Exhaustive inventory is required for large file families.
+Exhaustive opening is required for:
+- canonical high-signal surfaces
+- files matched by anchor keywords
+- files selected as direct evidence for claims
+- failure-heavy or warning-heavy artifacts when detectable
+
+If a family is too large to open exhaustively, use a deterministic sampling rule and record it:
+- newest
+- oldest
+- anchor-matched
+- failure-heavy / warning-heavy
+- one median or representative specimen when useful
+
+Do not label a sampled family as exhaustively opened.
+
+PDF / binary-search fallback:
+- If native search is unavailable, resolve or generate a text extraction under `./tmp/source_inventory/` or a current equivalent.
+- Record the extractor used, the extracted-text path, and the reason fallback was needed.
+
+Hard rule:
+- docs, notes, logs, tests, prompts, archaeology directories, output registries, and research surfaces must remain distinct authority classes in the traversal log
+- do not collapse them into a generic “sources consulted” list
 
 PRIMARY REGISTERS (STRICT)
 Use exactly one primary register internally for every non-trivial claim:
@@ -223,6 +438,10 @@ PUBLIC-CLAIM RULE
 When writing the public-facing whitepaper body, never upgrade beyond what the internal register allows.
 - If the internal audit says `IMPLEMENTED + SERVER_SIDE_ONLY + EXPLICIT_BROWSER_CONTRACT_GAP`, the paper may not phrase the mechanism as a current browser-UI affordance.
 - If the internal audit says `CONCEPTUAL` or `UNKNOWN`, the paper must phrase the mechanism as proposal, open problem, or future work.
+
+INTERNAL AUDIT VS PUBLIC PAPER
+Registers, ledgers, execution-status markers such as `SKIPPED`, `EXECUTION_BLOCKED`, `DEPENDENCY_BLOCKED`, and `WRITE_BLOCKED`, and audit taxonomies belong in audit artifacts by default.
+The public whitepaper should translate these into ordinary scientific prose unless exposing the audit term is necessary for honesty or reproducibility.
 
 DEFAULT CURRENT EXPECTATIONS TO VERIFY (NOT SELF-JUSTIFYING)
 Unless contradicted by newer opened evidence, the writer should test for the following conditions and report them explicitly as:
@@ -258,8 +477,9 @@ whenever the server-side mechanism exists but current browser exposure is incomp
 
 Do not bake a specific gap list into the reusable base prompt unless the current run artifacts prove it.
 
-NON-NEGOTIABLE ADAM V1 SPINE
-The paper must remain self-similar to the current repo on these points:
+ADAM V1 SPINE TO VERIFY
+Treat the following as default Adam v1 invariants to preserve unless superseded by stronger currently opened repo evidence.
+If current repo truth materially supersedes any item below, report the supersession explicitly and rewrite the paper to match current reality.
 - Adam is a local-first graph-conditioned runtime.
 - Persistent identity is externalized into graph state, explicit feedback, and retrieval assembly rather than learned into model weights.
 - The base model is an inference surface, not the persistence substrate.
@@ -275,6 +495,7 @@ Treat the repo’s current archaeology surfaces as drift-control input:
 - `./docs/PATCH_MANIFEST_V1_1.md`
 - `./docs/PATCH_MANIFEST_V1_2.md`
 - `./docs/MIGRATION_NOTES_V1_1.md`
+- `./codex_notes_garden.md`
 - prior intelligence briefs in `/Users/brianray/Adam/assets/white_paper_pipeline/intel_briefs/` if present
 - prior memos in `/Users/brianray/Adam/assets/white_paper_pipeline/writing_memos/` if present
 - prior drafts in `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/` if present
@@ -293,16 +514,47 @@ Archaeology rule:
 - record what silently vanished
 - do not smooth discontinuities into a fake clean lineage
 
+PROMPT ARCHAEOLOGY PROTOCOL
+Search for prompt-archaeology surfaces in the current repo, including:
+- this prompt
+- `scratch_space_writing_tasks/*.md`
+- pipeline briefs, memos, and prior drafts if they exist
+- relevant prompt- or whitepaper-oriented notes inside `./codex_notes_garden.md`
+- prompt-adjacent archaeology in patch manifests and migration notes
+
+Use prompt-archaeology surfaces as time-series evidence when present.
+
+Hard rules:
+- feed prompt deltas into the claim map and vanished-claims ledger
+- require explicit drift detection rather than intuitive “it seems different now” summaries
+- if no qualifying prompt-archaeology family exists, record `PROMPT_ARCH_MISSING`
+
+PUBLIC-FACING DISCOURSE PACKET PROTOCOL
+Activate this protocol only if relevant materials actually exist, such as essays, Substack-like drafts, public explainers, dissemination notes, or other outward-facing discourse artifacts.
+
+Use qualifying discourse materials only for:
+- drift detection
+- readiness signals
+- overstatement detection
+- memetic compression analysis
+
+Hard rules:
+- public-facing discourse is never proof of implementation
+- if no qualifying discourse packet exists, record `PUBLIC_DISCOURSE_MISSING`
+
 VANISHED CLAIMS + DEFINITIONS LEDGER
 If multiple prior briefs, memos, drafts, or legacy conceptual anchors exist, you must produce a vanished ledger.
 
 For each vanished item:
 - item
+- class `{claim | definition | mechanism | failure_mode | experiment | meta-theory}`
 - last source/version where it appeared
 - keywords searched
 - authoritative corpus files searched
+- matches found or `no_match`
 - anchor strength `{strong | weak | none}`
-- disposition `{RESTORED | COMPRESSED | TOMBSTONED}`
+- final disposition `{RESTORED | COMPRESSED | MOVED_TO_APPENDIX | LEDGER_ONLY | TOMBSTONED}`
+- target location `{main_body | appendix | ledger_only | removed}`
 - justification
 
 If no relevant prior-version family exists, emit a short `NO_PRIOR_DRAFT_FAMILY` note instead of inventing archaeology.
@@ -332,6 +584,25 @@ For each such recurring statement:
 
 Do not let definitions drift merely because the rhetorical surface changed.
 
+STATEMENT-LOG / APPENDIX INTEGRATION
+Extract statement-form utterances from prior drafts, appendices, notes, and statement-like source surfaces when they exist. Current Adam candidates include:
+- prior draft families
+- appendix-like audit artifacts
+- statement-heavy notes in `./codex_notes_garden.md`
+- constitutional or statement-like surfaces in current docs and runtime code
+
+Classify each extracted statement as:
+- `definition`
+- `mechanism`
+- `failure_mode`
+- `experiment`
+- `meta-theory`
+
+Hard rules:
+- integrate non-meta-theory substance into the paper body where admissible
+- preserve the full statement archive as an appendix or audit artifact
+- verify that no important statement disappears silently during condensation
+
 ANCHOR VERIFICATION PROTOCOL (MANDATORY BEFORE REMOVING PRIOR-VERSION CONTENT)
 When content appears in a prior draft family but not in the baseline draft you are revising, you must verify before deleting, compressing, or silently omitting it.
 
@@ -349,7 +620,7 @@ Search these surfaces systematically:
 6. `./exports/conversations/**/*.md`
 7. `/Users/brianray/Adam/assets/white_paper_pipeline/writing_memos/` and fallback `./whitepaper_prewriting_memo/`
 8. `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/` and fallback `./whitepaper_drafts/`
-9. current code under `./eden/`
+9. current runtime code under `./eden/` or the current equivalent runtime package/directory
 10. relevant scripts under `./scripts/`
 
 Step 3: tag anchor strength
@@ -421,7 +692,7 @@ Do not assume `CURRENT_ADAM_LOG.md` exists.
 
 Resolve operational evidence from the current repo in this order:
 1. operator-supplied or attached current run log if present
-2. `./logs/runtime.jsonl`
+2. `./logs/runtime.jsonl` as the canonical current runtime log if it exists
 3. `./exports/conversations/**/*.md`
 4. selected `./exports/<experiment_id>/*.json`, manifests, and HTML artifacts
 5. tests that directly exercise runtime behavior
@@ -451,9 +722,10 @@ Therefore:
 - report completed episodes as DONE when the evidence genuinely supports that status
 - do not claim generalization beyond the observed evidence span
 
-Minimum expectation when evidence is present:
-- identify at least three distinct observed experiment episodes, or
-- explicitly report the shortage and explain what evidence was missing
+Minimum expectation when evidence supports completed episodes:
+- extract and report at least three distinct observed `DONE` experiment episodes
+- if the evidence truly does not support three completed observed episodes, classify the run `PARTIAL`, document the shortage honestly, and explain what evidence was missing
+- do not let genuinely completed observed episodes drift into vague future-work language
 
 For each observed episode include:
 - episode_id
@@ -463,6 +735,10 @@ For each observed episode include:
 - outcome
 - confounds
 - locator-quality evidence citation
+
+Hard rule:
+- synthetic, proposed, or planned episodes must remain in separate registries or clearly separate subsections
+- only completed observed episodes may be labeled `DONE`
 
 SYNTHETIC DATA MANDATE
 Synthetic data is required whenever it materially strengthens the measurement pipeline or keeps the figure / metric workflow runnable despite incomplete observed evidence.
@@ -481,17 +757,22 @@ At minimum:
 RUNTIME EVIDENCE MINING PROTOCOL
 When usable runtime evidence exists, treat it as first-class empirical substrate.
 
-At minimum extract when possible:
-- run or session identifiers
-- turn or event boundaries
-- timestamps or best-available temporal anchors
-- input prompt / user request summaries or hashes
-- model / profile / budget fields if present
-- membrane or post-processing indicators if present
-- retrieval or active-set indicators if present
-- feedback indicators if present
+For every cited runtime event or turn, extract as many of the following as the evidence supports:
+- file path
+- run identifier and/or session identifier
+- timestamp anchor
+- turn span and/or event span
+- prompt text, prompt excerpt, or prompt hash
+- retrieval or active-set indicators
+- tool/action indicators
+- model / profile / budget fields
+- timing or latency fields
+- membrane, feedback, and response fields
 - observed errors, fallbacks, refusals, retries, or guard activations
-- output locators usable for reproducible citation
+- line ranges, excerpt hashes, or equivalent reproducible locators
+- evidence-quality / locator-confidence assessment
+
+Do not cite runtime evidence without a concrete locator.
 
 You must also try to extract experiment episodes where the evidence supports them.
 
@@ -499,9 +780,11 @@ An experiment episode minimally requires:
 - a manipulation or constrained condition
 - a measurable or inspectable outcome
 - a bounded evidence span
+- enough locator quality to support reproducible citation
 
 For each extracted episode, record:
 - `episode_id`
+- `status` where observed completed episodes use `DONE`
 - inferred or explicit hypothesis
 - manipulation
 - measured observable
@@ -509,7 +792,7 @@ For each extracted episode, record:
 - confounds
 - evidence locator(s)
 
-If runtime evidence exists and supports episodes, the paper must report completed observed episodes rather than pretending everything remains future work.
+If runtime evidence exists and supports completed observed episodes, the paper must report them as observed `DONE` episodes rather than pretending everything remains future work.
 
 EMPIRICAL PROGRAM
 The empirical section must separate three layers whenever evidence allows:
@@ -543,16 +826,28 @@ Every synthetic figure or table must include:
 - generator path
 - dataset path under the run output root
 
-MEMETICS DISCIPLINE
-When the paper uses words like persistence, selection pressure, imitation, or memode survival, cash them out.
+MEMETICS + SPEECH-ACT DISCIPLINE
+When the paper uses words like persistence, selection pressure, imitation, memode survival, governance, commitment, or directive force, cash them out.
 
 At minimum specify:
 - object representation
 - update rule or current absence thereof
 - what selects
 - where the audit trail lives
+- fidelity proxy where available
+- fecundity proxy where available
+- longevity proxy where available
 
-Do not let memetic language float as metaphor. If the repo cannot yet support a strong causal claim, downgrade the language accordingly.
+When interpreting governance utterances, constitutional commitments, or operator directives, also specify:
+- utterance source
+- felicity conditions
+- enforcement path
+- persistence surface
+- observed compliance, violation, or absence evidence
+
+Hard rules:
+- do not let memetic or speech-act language float as decorative theory gloss
+- if the repo cannot support a strong causal claim or proxy, downgrade the language accordingly and record the missing evidence
 
 ARCHAEOLOGY DISCIPLINE
 At least one analysis must treat the repo’s own document field as data when the corpus supports it.
@@ -577,12 +872,13 @@ CITATION DISCIPLINE
 - If no stable locator can be produced, downgrade the claim rather than pretending the citation is reproducible.
 
 WORD COUNT FLOOR
-Target main-body length: 5,000–6,500 words
-Absolute floor: 4,500 words
+Target main-body length: 5,500–7,000 words
+Absolute floor: 5,000 words
 
 Hard rule:
 - the floor applies to the main body, excluding bibliography and audit artifacts
 - appendices may extend the work, but they may not substitute for missing main-body argument load
+- a run under 5,000 main-body words cannot receive `PASS`
 
 ELABORATION LAYER REQUIREMENT
 For each canonical term that bears load in the paper, include:
@@ -592,13 +888,22 @@ For each canonical term that bears load in the paper, include:
 4. positive example + near-miss
 5. failure mode or adversarial boundary case
 
+For major load-bearing concepts, controlled elaboration normally means 2 to 3 paragraphs rather than a drive-by mention.
+
 Canonical terms for Adam v1 normally include:
 - Adam
+- operator identity, and Brian specifically only when materially relevant to current evidence or framing
+- local-first graph-conditioned runtime
+- persistent graph
+- session / turn / document
 - meme
 - memode
 - regard
 - active set
 - membrane
+- feedback event
+- trace event
+- membrane event
 - measurement event
 - observatory
 - semantic map / assemblies / runtime / active set planes
@@ -606,11 +911,21 @@ Canonical terms for Adam v1 normally include:
 - budget mode
 - local-first
 - browser contract gap
+- constitutional seed
+- hum when it is materially discussed
+
+Compression check:
+- verify that condensation did not silently remove operational correspondence
+- verify that concrete examples remain
+- verify that failure modes remain explicit
 
 LAYOUT REQUIREMENT
 - Produce a two-column paper body.
 - Keep top matter (title / author / date / abstract) in a one-column block.
 - Verify the compiled PDF actually matches this layout.
+- Do not assume the template worked because the source says `twocolumn`.
+- Record the layout verification method and outcome in the audit artifact.
+- If the PDF build is part of the run and layout cannot be verified, the run cannot receive `PASS`.
 
 FIGURE BUNDLE CONTRACT
 Produce a figure bundle under:
@@ -624,15 +939,17 @@ Required structure:
 - `latex/figures_generated.tex`
 
 Minimums for this Adam v1 run:
-- at least 4 OBSERVED figures or tables from real repo artifacts (logs, conversation transcripts, exports, tests, manifests)
-- at least 4 SYNTHETIC figures or tables from deterministic generators
+- at least 6 OBSERVED figures or tables from real repo artifacts (logs, conversation transcripts, exports, tests, manifests)
+- at least 6 SYNTHETIC figures or tables from deterministic generators
 - at least 1 archaeology / drift figure when archaeology surfaces exist
-- at least 1 memetic visualization
+- at least 1 memetic visualization when memetic evidence exists
 
 Every figure included in the paper must have:
 - provenance tag `[OBSERVED | SYNTHETIC | PROPOSED]`
 - artifact pointer under `figure_bundle/`
 - source hash / seed / locator details as appropriate
+- reproduction notes
+- explicit failure reason when a static or interactive export fails
 
 If evidence is missing, classify the run as `PARTIAL` and emit labeled placeholders instead of pretending the figures exist.
 
@@ -646,6 +963,10 @@ FIGURE REGISTRY
 - `caption_tex`
 - `latex`
 - `build`
+- `provenance_locator`
+- `reproduction_notes`
+- `export_status`
+- `failure_reason`
 - `paper.include`
 - `paper.section`
 - `paper.order`
@@ -663,6 +984,7 @@ Hard rules:
 - included figures must have section placement and order fields
 - missing static assets require explicit placeholder handling, never silent omission
 - partial figure generation must be recorded as `PARTIAL` with failure reason and reproduction hint in the audit artifact
+- if interactive or static exports fail, record the exact attempted artifact path, failure reason, and fallback behavior
 
 FIGURE BUNDLE ACCEPTANCE TEST
 A run is not fully successful unless:
@@ -671,13 +993,16 @@ A run is not fully successful unless:
 - every in-paper figure has provenance and locator details
 - observed and synthetic figures are visibly separated in captions and audit records
 - archaeology/drift visualization appears when archaeology evidence exists
-- at least one memetic visualization exists when memetic claims are used in the paper
+- at least one memetic visualization exists when memetic evidence is used in the paper
+- the observed/synthetic target counts are met or the run is honestly marked `PARTIAL` with placeholder-backed justification
 
 RUN OUTCOME STATES
 Classify the run at the end as one of:
 - `PASS` = all required outputs exist and hard evidence / build tests pass
 - `PARTIAL` = the run is structurally complete but one or more evidence surfaces are missing, incomplete, or placeholder-backed
 - `FAIL` = the run breaks core protocol (fabricated evidence, broken build without honest record, missing required output families, or silent omission of required audit artifacts)
+
+Unresolved governance cannot receive `PASS` or `PARTIAL`; it is a fail-closed `FAIL` with degraded inventory-only outputs.
 
 WHITEPAPER INPUT SURFACES TO READ
 At minimum consider these:
@@ -699,7 +1024,17 @@ At minimum consider these:
 - `./docs/MEASUREMENT_EVENT_MODEL.md`
 - `./docs/EXPERIMENT_PROTOCOLS.md`
 - `./docs/SOURCE_MANIFEST.md`
-- current code under `./eden/`
+- `./docs/PATCH_MANIFEST_V1_1.md`
+- `./docs/PATCH_MANIFEST_V1_2.md`
+- `./docs/MIGRATION_NOTES_V1_1.md`
+- `./logs/runtime.jsonl`
+- `./exports/conversations/**/*.md`
+- selected `./exports/<experiment_id>/*.json`, manifests, and HTML artifacts
+- current prompt / prompt-adjacent archaeology surfaces under `./scratch_space_writing_tasks/`
+- resolved research-library path if present
+- `./tmp/source_inventory/*.txt` when PDF text extraction fallbacks exist
+- current runtime code that carries statement-form invariants, especially `./eden/runtime.py` or the current equivalent runtime entry module
+- current runtime code under `./eden/` or the current equivalent runtime package/directory
 - relevant tests under `./tests/`
 - latest intelligence brief from `/Users/brianray/Adam/assets/white_paper_pipeline/intel_briefs/` if present
 - latest Codex memo from `/Users/brianray/Adam/assets/white_paper_pipeline/writing_memos/` if present
@@ -708,28 +1043,48 @@ At minimum consider these:
   - latest Codex memo under `./whitepaper_prewriting_memo/` if present
 
 PROBES AND EXECUTION PROOF
+Prefer current repo-defined tests, scripts, Make targets, task runners, or documented entrypoints when they supersede historical candidates.
+
+Treat commands such as `.venv/bin/python -m eden` and `.venv/bin/python app.py` as candidate historical entrypoints only if they are still present and current.
+
+Record any supersession explicitly.
+
 Prefer existing tests and scripts when generating probes:
-- `pytest -q tests/test_tui_smoke.py`
-- `pytest -q tests/test_runtime_e2e.py`
-- `pytest -q tests/test_regard.py`
-- `pytest -q tests/test_geometry.py`
-- `pytest -q tests/test_observatory_server.py`
-- `pytest -q tests/test_observatory_measurements.py`
-- `pytest -q tests/test_tanakh_tools.py`
-- `python scripts/check_observatory_build_meta.py`
-- `python scripts/run_tanakh_render_validation.py`
+- `.venv/bin/pytest -q tests/test_tui_smoke.py`
+- `.venv/bin/pytest -q tests/test_runtime_e2e.py`
+- `.venv/bin/pytest -q tests/test_regard.py`
+- `.venv/bin/pytest -q tests/test_geometry.py`
+- `.venv/bin/pytest -q tests/test_observatory_server.py`
+- `.venv/bin/pytest -q tests/test_observatory_measurements.py`
+- `.venv/bin/pytest -q tests/test_tanakh_tools.py`
+- `.venv/bin/python scripts/check_observatory_build_meta.py`
+- `.venv/bin/python scripts/run_tanakh_render_validation.py`
 - `.venv/bin/python -m eden`
-- `python3 app.py`
+- `.venv/bin/python app.py`
 
 Do not claim a mechanism is implemented merely because a doc names it. Use code + test/log/export proof.
 
 PHASES
-PHASE 1 — inventory and baseline resolution
+PHASE 0 — governance, run config, and mandatory run notes
+- resolve governance
+- resolve the canonical notes surface when governance is resolved
+- write PRE note, or record `SKIPPED` / `WRITE_BLOCKED` as appropriate
+- resolve `RUN_CONFIG`
+
+Hard gate:
+- If governance remains unresolved at the end of Phase 0, stop the run.
+- Emit only the degraded-mode outputs allowed by the governance section.
+- Do not proceed to Phases 1–8.
+
+PHASE 1 — inventory, traversal, and baseline resolution
 - resolve repo root, pipeline root, baseline draft, and current input surfaces
+- execute the traversal protocol and write the traversal log
 - record missingness honestly
 
-PHASE 2 — archaeology and claim map
+PHASE 2 — archaeology, prompt archaeology, and claim map
 - enumerate prior artifact lineage
+- resolve prompt-archaeology surfaces or record `PROMPT_ARCH_MISSING`
+- resolve public-discourse packet or record `PUBLIC_DISCOURSE_MISSING`
 - build a claim map for the baseline
 - identify vanished or drifted content
 
@@ -760,39 +1115,70 @@ PHASE 7 — LaTeX build and verification
 PHASE 8 — audit artifact and canonization copy
 - write audit artifacts
 - copy the canonical PDF and provenance manifest
+- write POST note or `WRITE_BLOCKED`
 - record write proof
 
 AUDIT ARTIFACTS
 Write under `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/<THIS_RUN_VERSION>/audit/`:
+The standard audit list below applies only when governance is resolved and the run proceeds beyond degraded mode.
+In governance-unresolved degraded mode, require only:
+- governance resolution log
+- short inventory / degraded-mode report
+- optional execution/build status log
+
+- governance resolution log
+- run-config audit
+- traversal log
+- prompt-archaeology report or `PROMPT_ARCH_MISSING`
+- public-discourse audit or `PUBLIC_DISCOURSE_MISSING`
+- statement archive / appendix register
 - claim map
 - vanished claims + definitions ledger (or `NO_PRIOR_DRAFT_FAMILY` note)
 - evidence registry for observed claims
 - figure provenance registry
-- experiment episode registry if runtime evidence supports one
+- experiment episode registry, including honest shortage notes when three observed `DONE` episodes are not supportable
+- pdf build status report
+- execution/build status log
 - change log: what changed and why
-- build log and write proof
+- build log, layout verification, and write proof
 - prompt-assumption self-check
+- `WRITE_BLOCKED` report if any required write failed
 
 REQUIRED OUTPUTS
+The five-family output contract below applies only when governance is resolved and drafting proceeds.
+In governance-unresolved degraded mode, only the allowed degraded-mode audit artifacts are required.
+
 Under `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/<THIS_RUN_VERSION>/` write:
 1. `latex/` updated LaTeX project
-2. `pdf/` compiled PDF
+2. `pdf/` containing the compiled PDF when produced, or an explicit build-status note when PDF generation was skipped or blocked
 3. `figure_bundle/` registry + assets
 4. `audit/` internal audit artifacts
 5. `data/` extracted datasets used for figures/tables
 
 ACCEPTANCE TESTS
-A successful run should satisfy:
-- main body meets the word-count floor
-- two-column body / one-column top matter verified in the PDF
+`PASS` requires every applicable test below to pass.
+Any placeholder-backed or missing required surface forces `PARTIAL`.
+Any fabrication, unresolved governance state, drafting attempted under unresolved governance, or silent omission forces `FAIL`.
+
+A successful run must satisfy:
+- main body word count `>= 5,000`
+- complete claim map
+- complete vanished-claims / definitions ledger, or honest `NO_PRIOR_DRAFT_FAMILY`
+- evidence registry present
+- experiment episode registry present
+- observed vs synthetic separation preserved
+- required in-paper observed and synthetic artifacts present, or honest `PARTIAL` placeholders with reasons
+- runtime/log citation integrity
+- figure registry integrity
+- explicit handling of browser contract gaps where relevant
+- statement archive / appendix integration present when source statements exist
+- two-column body / one-column top matter verified in the PDF when PDF build is part of the run
+- prompt assumptions that were superseded are explicitly reported rather than silently retained
 - no missing citations or broken bibliography keys
 - no public overclaims past current Adam v1 evidence
-- explicit handling of browser contract gaps where relevant
-- figure bundle present with valid registry
-- vanished ledger present when prior draft family exists
-- audit artifact explains what changed and why
-- observed evidence is clearly separated from synthetic evidence
-- prompt assumptions that were superseded are explicitly reported rather than silently retained
+- no silent omissions
+- if `PDF_BUILD_REQUIRED=true`, absence of a verified compiled PDF prevents `PASS`
+- if PDF build is intentionally skipped by configuration, an explicit PDF build-status note is required and non-PDF parts of the run may still be evaluated normally
 
 REPO-DRIFT SELF-CHECK (MANDATORY)
 Before finalizing the run, explicitly report:
@@ -806,6 +1192,6 @@ If a prompt assumption is superseded by stronger current evidence, follow the re
 BEGIN NOW
 - Do not ask permission.
 - Do not assume old Eden beta directories exist.
-- Do not mention Claude.
+- Do not let missing upstream artifacts override current repo truth.
 - Do not treat historical wording as current proof.
 - Produce an Adam v1 whitepaper that isomorphically reflects the repo that currently exists.

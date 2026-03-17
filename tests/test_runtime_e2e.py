@@ -4,6 +4,7 @@ import json
 
 import eden.runtime as runtime_module
 from eden.config import DEFAULT_MLX_MODEL_DIR
+from eden.semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 
 
 def test_single_graph_bootstrap_chat_feedback_and_exports(runtime, tmp_path) -> None:
@@ -160,8 +161,15 @@ def test_conversation_archive_records_and_taxonomy(runtime) -> None:
 def test_index_text_into_graph_builds_memode_label_without_refetching_memes(runtime, monkeypatch) -> None:
     monkeypatch.setattr(
         runtime_module,
-        "top_phrases",
-        lambda text, limit=6: [("alpha", 1.0), ("beta", 0.8), ("gamma", 0.6)],
+        "extract_semantic_candidates",
+        lambda text, limit=6: {
+            "meme_candidates": [
+                {"label": "alpha", "score": 1.0, "kind": "phrase"},
+                {"label": "beta", "score": 0.8, "kind": "phrase"},
+                {"label": "gamma", "score": 0.6, "kind": "phrase"},
+            ],
+            "relation_candidates": [],
+        },
     )
 
     class FakeStore:
@@ -201,3 +209,34 @@ def test_index_text_into_graph_builds_memode_label_without_refetching_memes(runt
     assert fake_store.memode_payload is not None
     assert fake_store.memode_payload["label"] == "alpha / beta / gamma"
     assert fake_store.memode_payload["member_ids"] == ["meme-1", "meme-2", "meme-3"]
+
+
+def test_index_text_into_graph_derives_authorship_and_memode_membership(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(experiment["id"], title="Typed relations")
+    turn = runtime.store.record_turn(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        user_text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        prompt_context="",
+        response_text="",
+        membrane_text="",
+        active_set=[],
+        trace=[],
+    )
+
+    indexed = runtime._index_text_into_graph(
+        experiment_id=experiment["id"],
+        turn_id=turn["id"],
+        session_id=session["id"],
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="turn_user",
+        actor="brian_operator",
+    )
+
+    edge_types = {edge["edge_type"] for edge in runtime.store.list_edges(experiment["id"])}
+
+    assert indexed["memode_ids"]
+    assert "AUTHOR_OF" in edge_types
+    assert MEMODE_MEMBERSHIP_EDGE_TYPE in edge_types

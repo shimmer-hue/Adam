@@ -21,14 +21,19 @@
 - `Basin summary`: trajectory and attractor summary derived from turns and active sets.
 - `Cluster / motif summary`: derived semantic neighborhood label or graph-health summary. Clusters are not memodes.
 
-## Edge semantics used in v1
+## Edge semantics used in v1.2
 
 - `BELONGS_TO_AGENT`
 - `BELONGS_TO_SESSION`
 - `DERIVED_FROM`
 - `OCCURS_IN`
 - `CO_OCCURS_WITH`
+- `CONTEXTUALIZES_DOCUMENT`
+- `AUTHOR_OF`
+- `INFLUENCES`
+- `REFERENCES`
 - `MATERIALIZES_AS_MEMODE`
+- `MEMODE_HAS_MEMBER`
 - `FED_BACK_BY`
 
 ## Domain split
@@ -41,6 +46,7 @@
 - Memes are the persistent base primitive.
 - Memodes are semantically derived, though they may be materialized and cached in the store.
 - The memode admissibility floor is graph-theoretic, not conceptual completeness: every selected meme must participate in at least one qualifying support edge and the support subgraph must be connected.
+- Knowledge relations and memode relations are not interchangeable. Informational edges such as `AUTHOR_OF`, `INFLUENCES`, and `REFERENCES` may be auto-derived and persisted, but they do not silently become memode support unless they are admitted by the qualifying support-edge rules.
 - Semantic clusters are derived summaries over meme-only semantic neighborhoods. They may carry manual labels, but they are never auto-promoted into memodes.
 - Regard acts over memes and memodes, not over tokens.
 - `The hum`, when referenced, names a low-bandwidth continuity artifact rather than a first-class runtime object. It is not identical to the active set, turn history, full graph, basin summary, cluster summary, or observatory payload.

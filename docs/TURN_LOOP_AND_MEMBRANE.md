@@ -14,6 +14,8 @@
 ## What the membrane does
 
 - strips control characters
+- strips recognized visible planning spills such as `<think>` blocks and `Thinking Process` scaffolds before persisting operator-facing text
+- fails closed when a response is reasoning-only and does not contain a recoverable operator-facing answer
 - enforces a sectioned `Answer / Basis / Next Step` response contract when needed
 - clamps excessive response length
 - records visible membrane events into persistent storage

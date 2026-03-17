@@ -37,8 +37,8 @@ The extractor normalizes ligatures and line-wrap artifacts, scores each parser c
 4. Chunk text into manageable blocks.
 5. Store `document_chunks` with parser, page provenance, and extraction-quality metadata as chunk materialization progresses.
 6. Extract top phrases heuristically into memes.
-7. Add co-occurrence edges inside each chunk.
-8. Materialize a memode when a chunk yields at least two memes.
+7. Add bounded auto-derived relation edges inside each chunk when explicit surface rules fire (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES` today), then add `CO_OCCURS_WITH` fallback edges across the chunk-local meme set.
+8. Materialize a memode when a chunk yields at least two memes and persist explicit `MEMODE_HAS_MEMBER` membership edges from the memode to its member memes.
 9. Mark the document `ingested` on success or `failed` with error and extraction-quality metadata if extraction/ingest aborts.
 
 ## Provenance kept

@@ -4,7 +4,10 @@ import json
 import socket
 import threading
 import time
+import urllib.error
 import urllib.request
+
+import pytest
 
 from eden.observatory.server import ObservatoryServer
 
@@ -99,6 +102,8 @@ def test_observatory_server_exposes_live_api(runtime, tmp_path) -> None:
         with urllib.request.urlopen(f"{status['url']}api/experiments/{experiment['id']}/graph?session_id={session['id']}") as response:
             graph_payload = json.loads(response.read().decode("utf-8"))
         assert graph_payload["semantic_nodes"]
+        assert "assembly_nodes" in graph_payload
+        assert "assembly_edges" in graph_payload
         assert any(node.get("export_label") and node["export_label"] != node["id"] for node in graph_payload["semantic_nodes"])
         assert any(edge.get("export_label") for edge in graph_payload["semantic_edges"])
         assert "memode_audit" in graph_payload
@@ -217,6 +222,24 @@ def test_observatory_server_exposes_live_api(runtime, tmp_path) -> None:
         assert ledger["counts"]["events"] >= 1
     finally:
         runtime.stop_observatory()
+
+
+def test_observatory_server_returns_json_500_when_get_handler_raises(tmp_path) -> None:
+    class _BoomService:
+        def experiment_overview(self, *, experiment_id: str, session_id: str | None):
+            raise RuntimeError("boom")
+
+    root = tmp_path / "exports"
+    server = ObservatoryServer(root, 8893, service=_BoomService())
+    status = server.start(reuse_existing=False)
+    try:
+        with pytest.raises(urllib.error.HTTPError) as excinfo:
+            urllib.request.urlopen(f"{status.url}api/experiments/test/overview")
+        assert excinfo.value.code == 500
+        payload = json.loads(excinfo.value.read().decode("utf-8"))
+        assert payload["error"] == "Unhandled observatory API failure: RuntimeError: boom"
+    finally:
+        server.stop()
 
 
 def test_observatory_server_sse_emits_small_invalidation_events(runtime, tmp_path) -> None:

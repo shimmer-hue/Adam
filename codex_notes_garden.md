@@ -5264,3 +5264,568 @@ Remaining uncertainties:
 - Worktree still contains unrelated dirty items outside this patch (`.DS_Store`, `scratch_space_writing_tasks/`). They were left untouched.
 Next shortest proof path:
 Open the browser observatory on the live graph, select a memode in `Memode Audit`, and verify the detail panel shows member memes, materialized support edges, and knowledge/informational relations for the same neighborhood.
+
+## [2026-03-17T14:42:44Z] PRE-FLIGHT
+Operator task:
+Diagnose why launching the browser observatory does not appear to be working after the recent observatory patch cycle.
+Task checksum:
+Observatory launch-path debug.
+Repo situation:
+Recent observatory source and static-bundle changes are in place and previously verified by test. Need runtime reproduction against the live repo path before deciding whether this is a code defect, stale server state, browser-open failure, or export problem.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+Natural-language contracts in force:
+Observatory launch should ensure the local server is running, reuse or choose a free port truthfully, print the actual URL as JSON, and serve static exports over HTTP rather than `file://`.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/observatory/server.py`
+`/Users/brianray/Adam/eden/observatory/service.py`
+`/Users/brianray/Adam/eden/observatory/frontend_assets.py`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+Status register:
+- Implemented:
+  - Local observatory server lifecycle, live API, and checked-in frontend bundle.
+- Instrumented:
+  - `exports/.eden_observatory.json` should expose the active server info.
+- Conceptual:
+  - None needed for diagnosis.
+- Unknown:
+  - Whether the current failure is startup, port reuse, browser-open, or stale export.
+Risks / invariants:
+Do not overclaim a launch bug until the live path is reproduced. Prefer bounded runtime checks before any code changes.
+Evidence plan:
+Start or inspect the observatory server directly, query `/api/status`, inspect `exports/.eden_observatory.json`, and only patch code if the live failure reproduces.
+Shortest proof path:
+Run the observatory CLI/server path locally, confirm the actual URL/status response, and inspect persisted server metadata.
+
+## [2026-03-17T15:06:13Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/eden/observatory/server.py`
+`/Users/brianray/Adam/tests/test_observatory_measurements.py`
+`/Users/brianray/Adam/tests/test_observatory_server.py`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. Existing observatory contract was preserved; this turn repaired implementation and hardened failure reporting.
+Natural-language contracts added/revised/preserved:
+Preserved `docs/OBSERVATORY_SPEC.md` local-server contract: HTTP-served observatory with live API should launch and remain operator-visible rather than silently failing.
+Behavior implemented or modified:
+- Normalized observatory node labels at graph-export assembly so `None` labels no longer crash `_build_graph_model` sorting.
+- Hardened observatory GET handlers so service exceptions return JSON 500 payloads instead of empty-response browser failures.
+- Added regressions for null-label export and GET error surfacing.
+Evidence produced (tests / traces / commands / exports):
+- Direct browser probe of `http://127.0.0.1:8741/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/observatory_index.html` reproduced frontend load with live API empty responses.
+- Direct live service reproduction against experiment `bb298723-5fbf-4554-bf6b-ec5f4d336fbd` / session `1d8a96a4-7f63-4487-9dcb-25f473785e3d` captured `TypeError: '<' not supported between instances of 'NoneType' and 'str'` in `eden/observatory/exporters.py::_build_graph_model`.
+- `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_observatory_measurements.py /Users/brianray/Adam/tests/test_observatory_server.py` -> `19 passed in 7.72s`
+- Direct live proof after patch: `service.experiment_overview(...)` for the same experiment/session completed successfully in `81.22s`.
+- `./.venv/bin/pytest -q` -> `99 passed in 86.36s`
+Status register changes:
+- Implemented:
+  - Observatory export no longer crashes on null node labels during graph-model sort.
+  - Observatory GET API now surfaces internal failures as JSON 500 payloads.
+- Instrumented:
+  - Live observatory browser failure mode was reproduced and traced through HTTP/API probes plus direct service invocation.
+- Conceptual:
+  - None added.
+- Unknown:
+  - The currently running TUI/app process still holds pre-patch observatory code until restart.
+Truth-table / limitations updates:
+No truth-table or limitations update. Capability status did not change; this turn fixed a regression in an already implemented surface.
+Remaining uncertainties:
+- Fresh observatory launch from the currently running app instance will still use old in-memory code until the app process is restarted.
+- Live overview rebuild on the current graph is slow (`~81s`) even after the crash is fixed.
+Next shortest proof path:
+Restart the running app process, relaunch the browser observatory from the TUI, and confirm `overview`, `graph`, `basin`, and `measurement-events` populate instead of stalling in `loading`.
+
+## [2026-03-17T14:53:25Z] PRE-FLIGHT
+Operator task:
+Repair `/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md` so the Adam-specific whitepaper-generation prompt keeps current repo naming/pathing but regains fail-closed governance, run-note, traversal, evidence-mining, archaeology, and acceptance-test hardness.
+Task checksum:
+`988d691764c56c38810156f822f3054e676f6cb4b6b37f82db9119530e248e1a`
+Repo situation:
+Working tree was already dirty before this turn: `.DS_Store`, `.playwright-cli/`, and prior `codex_notes_garden.md` edits are present. `assets/white_paper_pipeline/` exists but its `intel_briefs/`, `writing_memos/`, and `white_paper_drafts/` subdirectories are currently missing. `logs/runtime.jsonl`, `exports/conversations/`, `exports/<experiment_id>/...`, and `assets/cannonical_secondary_sources/` exist.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+`/Users/brianray/Adam/README.md`
+`/Users/brianray/Adam/docs/PROJECT_CHARTER.md`
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/MEASUREMENT_EVENT_MODEL.md`
+`/Users/brianray/Adam/docs/EXPERIMENT_PROTOCOLS.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/docs/SOURCE_MANIFEST.md`
+Natural-language contracts in force:
+Repo truth outranks drifted prompt prose. TUI remains primary, observatory remains secondary measurement instrument, memes remain first-class, memodes remain derived, regard remains durable selection, membrane remains operator-visible, and claims need file/test/log/export anchors. `AGENTS.md` is the governing file and `codex_notes_garden.md` is the append-only run-note surface.
+Files/modules likely in scope:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt_changelog.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - Current prompt already preserves Adam naming discipline, repo-root/output-root distinction, primary claim registers, browser-contract-gap language, repo-drift self-check, non-negotiable Adam spine, and baseline output structure.
+- Instrumented:
+  - Repo already exposes runtime evidence surfaces via `logs/runtime.jsonl`, `exports/conversations/`, export manifests, and long-form archaeology in `codex_notes_garden.md`.
+- Conceptual:
+  - The current prompt still treats governance resolution, PRE/POST notes, run-config handling, prompt archaeology, public-discourse gating, statement-log integration, and figure/acceptance thresholds too softly or incompletely.
+- Unknown:
+  - Whether any hidden whitepaper briefs/memos/drafts outside the currently visible repo tree materially change the strongest current-path assumptions.
+Risks / invariants:
+Do not roll back to Eden-only file loyalties or stale writer-agent files. Preserve Adam-specific pathing and truth surfaces. Fail closed on unresolved governance instead of inventing continuity. Keep missing pipeline subdirectories, literature caches, and discourse surfaces honest as `MISSING`, `EMPTY`, `PROMPT_ARCH_MISSING`, `PUBLIC_DISCOURSE_MISSING`, or `WRITE_BLOCKED` where applicable.
+Evidence plan:
+Patch the prompt with explicit governance-resolution, run-config, traversal-log, authority-stack, research-library, prompt-archaeology, runtime-mining, episode-extraction, memetics/speech-act, figure-registry, and acceptance-test sections; create the requested changelog file; then verify the resulting text by re-reading key sections and diffing the edited files.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch the prompt in place, add the grouped changelog in `scratch_space_writing_tasks/`, and verify the new file contains the required hard sections and Adam-compatible current paths without reintroducing obsolete Eden scaffolding.
+
+## [2026-03-17T15:08:30Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt_changelog.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. No canonical `docs/` contract surface was edited in this turn; the bounded change was to the whitepaper-generation prompt plus required run notes.
+Natural-language contracts added/revised/preserved:
+Revised the whitepaper prompt to add fail-closed governance resolution, mandatory PRE/POST note discipline, deterministic run-config auditing, explicit authority precedence, traversal logging, current Adam research-library resolution, prompt/public-discourse archaeology protocols, statement-log appendix integration, stronger runtime-event extraction, stronger observed-episode requirements, memetics/speech-act hardening, higher figure thresholds, the 5,000-word floor, and harder PASS/PARTIAL/FAIL acceptance gates. Preserved Adam naming, pipeline pathing, claim registers, browser-contract-gap discipline, repo-drift self-check, and the non-negotiable Adam spine.
+Behavior implemented or modified:
+The prompt is now materially harder to run in a drifted or overclaiming mode. Governance must resolve before drafting. PRE/POST notes cannot be silently skipped. Missing operator fields now default through audited continuation instead of either fabrication or clarification churn. Traversal, runtime mining, statement lineage, archaeology, and figure generation now have inspectable schemas and failure states.
+Evidence produced (tests / traces / commands / exports):
+Prompt verification by `git diff -- /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md /Users/brianray/Adam/codex_notes_garden.md`
+Presence checks by `rg -n` for restored hard sections and thresholds inside `/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+Manual spot checks with numbered reads over the edited prompt sections
+Status register changes:
+- Implemented:
+  - `wp_draft_prompt.md` now contains the restored governance, run-note, traversal, archaeology, runtime-mining, figure-threshold, and acceptance-test constraints described above.
+- Instrumented:
+  - Verification was limited to diff and section-presence checks because this was a prompt-only edit.
+- Conceptual:
+  - Future whitepaper runs still need to execute these strengthened rules to prove the prompt produces the intended harder audit behavior in practice.
+- Unknown:
+  - Whether additional hidden whitepaper artifacts outside the current repo tree would warrant more archaeology surfaces once a real drafting run is executed.
+Truth-table / limitations updates:
+None. No status-table or limitations surface changed because repo runtime behavior was not modified.
+Remaining uncertainties:
+- No runtime whitepaper generation run was executed in this turn, so the prompt’s new procedural hardness is verified textually rather than through a live paper build.
+- The working tree still contains unrelated pre-existing dirt (`.DS_Store`, `.playwright-cli/`, earlier `codex_notes_garden.md` history).
+Next shortest proof path:
+Run the repaired prompt against a real Adam whitepaper generation pass, then inspect whether it emits the required governance log, traversal log, statement archive, runtime evidence registry, episode registry, figure registry, PRE/POST notes, and honest `PASS` / `PARTIAL` / `FAIL` outcome without silent omission.
+
+## [2026-03-17T15:51:50Z] PRE-FLIGHT
+Operator task:
+Apply a bounded patch pass to `/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`: keep structure/order/wording intact while adding six targeted protocol inserts, one heading/sentence replacement, one baseline filter, one operational-precedence section, one large-corpus bound, one execution-status section, one internal-audit/public-paper readability section, one top-of-file missingness cleanup, one conditional operator-identity term, and only minimal synthetic-language dedup if clearly non-load-bearing.
+Task checksum:
+`6db7dce9c63584f55fbab9505c853509c72c3792007d63cdce8222abf188fc4f`
+Repo situation:
+Worktree remains dirty from prior turns. The prompt was already strengthened in the previous pass and must now be patched surgically rather than rewritten. Current enforcement sections for governance, PRE/POST notes, run-config audit, traversal, archaeology, runtime evidence, figure bundle, and acceptance states are already present and must be preserved.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+Natural-language contracts in force:
+Use `apply_patch` for edits. Preserve Adam-specific naming/pathing and current repo truth supremacy. Keep the prompt as a patch of the current version, not a rewrite. Append-only notes discipline remains mandatory.
+Files/modules likely in scope:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - The prompt already has fail-closed governance, mandatory PRE/POST notes, run-config audit, traversal logs, archaeology, claim maps, vanished-claims ledger, runtime evidence mining, observed `DONE` episodes, figure bundle contract, 5,000-word floor, and `PASS` / `PARTIAL` / `FAIL` states.
+- Instrumented:
+  - Current verification path is textual: section-presence and diff review after the bounded patch.
+- Conceptual:
+  - The requested additions are protocol refinements, not runtime-behavior changes.
+- Unknown:
+  - None blocking this bounded patch.
+Risks / invariants:
+Do not remove or soften existing enforcement sections. Do not shift section order or perform broad cleanup. Remove the Claude mention entirely. Keep synthetic-data constraints intact even if lightly deduplicating wording.
+Evidence plan:
+Patch only the specified spans, then verify by grep/diff that each requested insertion or replacement exists and that no major enforcement section disappeared.
+Shortest proof path:
+Append this PRE-FLIGHT note, apply one bounded patch to the prompt, verify the requested headings/blocks and cleanup edits, then append POST-FLIGHT with the exact changes and residual limits.
+
+## [2026-03-17T15:55:30Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. This was a bounded patch to an existing scratch-space prompt, not a `docs/` contract edit.
+Natural-language contracts added/revised/preserved:
+Preserved the prompt’s strengthened enforcement surfaces while patching only the requested inserts/replacements: verify-first Adam spine, baseline candidate filter, operational instruction precedence, large-corpus traversal bound, execution-status vocabulary, internal-audit/public-paper separation, upstream-artifact missingness handling, and conditional operator-identity wording.
+Behavior implemented or modified:
+The prompt now explicitly yields its Adam spine to stronger opened repo evidence, filters baseline candidates to manuscript-bearing artifacts, distinguishes operational-instruction precedence from evidence precedence, records non-write execution blocking without collapsing it into `WRITE_BLOCKED`, bounds large-corpus opening honestly, keeps audit vocabulary out of the public paper by default, and removes the last Claude reference.
+Evidence produced (tests / traces / commands / exports):
+- `rg -n` verification for the requested inserted headings/phrases and absence of `Claude`
+- manual section reads around the patched insertion points
+- `git diff --stat -- /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md /Users/brianray/Adam/codex_notes_garden.md`
+Status register changes:
+- Implemented:
+  - All user-requested patch points are present in `wp_draft_prompt.md`.
+- Instrumented:
+  - Verification remained textual and diff-based because this was a prompt-only patch pass.
+- Conceptual:
+  - None added.
+- Unknown:
+  - None blocking this bounded patch.
+Truth-table / limitations updates:
+None.
+Remaining uncertainties:
+- No live whitepaper-generation run was executed, so the new patch points are textually verified rather than exercised through a full paper build.
+- The worktree remains dirty from prior unrelated turns.
+Next shortest proof path:
+Run the prompt in a real whitepaper-generation pass and confirm the new baseline filter, execution-status vocabulary, operational-precedence rule, and verify-first spine behave as intended in emitted audit artifacts.
+
+## [2026-03-17T15:15:00Z] PRE-FLIGHT
+Operator task:
+Make Action 08 / Open Browser Observatory feel responsive from the TUI when selected by number, rather than appearing dead during long export rebuilds.
+Task checksum:
+Observatory launch responsiveness / session-scoped bootstrap override.
+Repo situation:
+Working tree already dirty before this turn: `.DS_Store`, prior `codex_notes_garden.md`, observatory crash fix in `eden/observatory/exporters.py` and `eden/observatory/server.py`, unrelated scratch prompt files. Recent diagnosis proved ActionStrip numeric selection works, but browser open is delayed until `export_observability(...)` completes (~81s on the live graph).
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+Natural-language contracts in force:
+TUI is the primary runtime surface; browser observatory is an observability/export surface. Launch actions should remain operator-visible and truthful. Session-scoped observatory access must not silently drift to a stale session when a current session is available.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+Status register:
+- Implemented:
+  - ActionStrip numeric selection changes the selected runtime action.
+  - Observatory worker launches browser only after export refresh completes.
+- Instrumented:
+  - Live reproduction showed `8` sets `menu.value == observatory` while `last_feedback` remains in export phase before browser open.
+- Conceptual:
+  - Immediate-open path using existing experiment export plus URL session override.
+- Unknown:
+  - Whether the frontend can safely honor `session_id` query overrides without a rebuilt HTML bootstrap.
+Risks / invariants:
+Do not break existing observatory export correctness. Preserve experiment-specific routing. If immediate-open uses an existing HTML shell, session scoping must stay truthful.
+Evidence plan:
+Patch the TUI to open existing experiment observatory HTML immediately when available, add frontend query-param session override, add regressions for digit-path responsiveness and override behavior, then run focused tests and full pytest.
+Shortest proof path:
+Append this note, patch launch/session override, verify focused tests, and reproduce that pressing `8` then `Enter` opens the browser before export completion.
+
+## [2026-03-17T15:37:39Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/style.css`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+Natural-language contracts added/revised/preserved:
+Preserved the browser observatory as a secondary observability surface while revising the launch contract so the TUI may open an existing experiment shell immediately and keep the current session truthful via URL session override.
+Behavior implemented or modified:
+- `Open Browser Observatory` now appends `?session_id=<current_session>` to experiment-shell launches so the live API and session endpoints bind to the active session instead of a stale exported session.
+- When an experiment already has `observatory_index.html`, the TUI opens the browser before the fresh export finishes and continues refreshing payloads in the background.
+- Atlas session observatory launches now carry the selected session override as well.
+- The React app now honors `session_id` query overrides and rewrites session-scoped live API endpoints accordingly.
+Evidence produced (tests / traces / commands / exports):
+- `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py` -> `23 passed in 61.85s`
+- `npm test` in `/Users/brianray/Adam/web/observatory` -> `8 passed`
+- `npm run build` in `/Users/brianray/Adam/web/observatory` rebuilt the checked-in bundle and refreshed `build-meta.json`
+- `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `ok: true` with source/build hash `935d07b6731da793`
+- `./.venv/bin/pytest -q` -> `100 passed in 88.09s`
+- Direct runtime reproduction proved the early-open path: pressing `8` then `Enter` produced browser target `http://127.0.0.1:8741/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/observatory_index.html?session_id=d6bd99c2-c672-425e-8fdf-ac9a4ec414f3` while export was still in progress.
+Status register changes:
+- Implemented:
+  - Immediate observatory browser open from an existing shell with truthful current-session override.
+  - Frontend session-override handling for reopened shells.
+- Instrumented:
+  - Live reproduction now distinguishes `browser opened` from `background export still running`.
+- Conceptual:
+  - None added.
+- Unknown:
+  - None blocking this bounded fix.
+Truth-table / limitations updates:
+No truth-table or limitations update. Capability status did not change; the turn repaired launch responsiveness and stale-session drift inside an already implemented surface.
+Remaining uncertainties:
+- First launch for an experiment with no existing `observatory_index.html` still waits for the initial export, which is truthful and expected.
+- The current live graph remains slow to rebuild (`~81s`) even though browser launch is no longer blocked on that rebuild when a shell already exists.
+Next shortest proof path:
+Restart the running Adam app so the patched TUI code is loaded, then press `8` followed by `Enter` from the action strip and confirm the browser opens immediately while the top-strip progress continues through payload refresh.
+
+## [2026-03-17T16:19:29Z] PRE-FLIGHT
+Operator task:
+Apply a micro-patch pass to `/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md` to remove remaining consistency gaps around execution-status vocabulary, governance-unresolved degraded mode, PDF-build conditionality, durable status artifacts, and future-proof fallback wording for current `./eden/` runtime references.
+Task checksum:
+`a152651a00c61f7156840a8e5437ffac2a7878ead45f0c5cbc860c7d4fde8f08`
+Repo situation:
+Worktree remains dirty from prior turns. The prompt is already structurally hardened and must not be rewritten or reordered. This turn is limited to the targeted consistency fixes requested by the operator.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+Natural-language contracts in force:
+Use `apply_patch` for edits. Preserve existing rigor, section order, and most wording. Keep fail-closed governance, evidence, archaeology, figure, and audit obligations intact while removing stale contradictions.
+Files/modules likely in scope:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - The prompt already contains strong governance, run-note, traversal, runtime-evidence, figure-bundle, and acceptance-test enforcement.
+- Instrumented:
+  - This turn’s verification path is textual and diff-based.
+- Conceptual:
+  - The requested changes are consistency patches, not new runtime claims.
+- Unknown:
+  - None blocking this bounded patch.
+Risks / invariants:
+Do not weaken any existing enforcement. Do not let provenance manifests become baseline manuscripts. Do not leave PDF-build state contradictory across canonization, outputs, and acceptance tests. Keep `./eden/` references as preferred current paths while allowing explicit current-equivalent fallbacks.
+Evidence plan:
+Patch only the named sections, then verify the new status vocabulary, degraded-mode fail classification, PDF-build status handling, execution-status artifact, and future-proof runtime-path wording with grep/diff.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch the prompt in place, verify the targeted strings and nearby sections, then append POST-FLIGHT with exact consistency fixes applied.
+
+## [2026-03-17T16:25:10Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. This was a micro-patch to a scratch-space prompt only.
+Natural-language contracts added/revised/preserved:
+Preserved the prompt’s existing governance, archaeology, runtime-evidence, figure, and audit enforcement while patching remaining contradictions around execution-status vocabulary, governance-unresolved degraded mode, PDF-build conditionality, durable status artifacts, and future-proof fallback wording for current `./eden/` references.
+Behavior implemented or modified:
+The prompt now has a true `SKIPPED` execution state, explicitly fail-closes unresolved governance as `FAIL` with inventory-only degraded outputs, keeps provenance manifests out of baseline-manuscript eligibility, treats canonization as conditional on a verified compiled PDF, allows `pdf/` to hold either the PDF or an explicit build-status note, requires durable execution/build status logging, and treats `./eden/` paths and `-m eden` / `app.py` commands as preferred current candidates with explicit current-equivalent fallback and supersession recording.
+Evidence produced (tests / traces / commands / exports):
+- `rg -n` verification for the requested new status/state/path phrases inside `/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- manual section reads around governance, baseline filtering, run version, execution status, canonization, outputs, acceptance tests, and runtime-path bullets
+- `git diff -- /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md /Users/brianray/Adam/codex_notes_garden.md`
+Status register changes:
+- Implemented:
+  - All requested micro-patch consistency fixes are present in `wp_draft_prompt.md`.
+- Instrumented:
+  - Verification remained textual and diff-based because this was a prompt-only patch.
+- Conceptual:
+  - None added.
+- Unknown:
+  - None blocking this bounded patch.
+Truth-table / limitations updates:
+None.
+Remaining uncertainties:
+- No live whitepaper-generation run was executed, so the new PDF-build and degraded-governance branches are textually verified rather than exercised through a real run.
+- Optional duplicate-term cleanup for standalone `local-first` was intentionally left untouched to avoid unnecessary semantic churn.
+Next shortest proof path:
+Execute the prompt in one real whitepaper-generation run and confirm the emitted audit artifacts now contain explicit `SKIPPED` / blocked status handling, a PDF build-status report when appropriate, and fail-only degraded outputs if governance resolution is intentionally broken.
+
+## [2026-03-17T16:31:57Z] PRE-FLIGHT
+Operator task:
+Restore typed knowledge relations and second-order memode representation in the observatory/network export path so the graph does not collapse all visible edges to `CO_OCCURS_WITH`.
+Task checksum:
+Typed ingest relations + assemblies-visible memode edges.
+Repo situation:
+Worktree is already dirty from prior runtime/observatory/docs/test work. User-provided GraphML export `/Users/brianray/Downloads/eden-graph (3).graphml` currently contains only `CO_OCCURS_WITH` edges, which matches the current ingest/runtime derivation path and the browser export behavior for the semantic-only slice.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+Natural-language contracts in force:
+Memes remain first-class and memodes remain derived second-order structures. The ingest pipeline may auto-derive graph facts, but claims must stay provenance-visible. `Assemblies` is a distinct graph UI grammar from `Semantic Map`, and Gephi exports are for the current browser-visible graph slice rather than an invented topology.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/eden/observatory/graph_planes.py`
+`/Users/brianray/Adam/eden/observatory/contracts.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/tests/test_ingest.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_observatory_measurements.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+Status register:
+- Implemented:
+  - Persistent graph edges carry `edge_type`, provenance, and weight.
+  - Observatory memode audit already distinguishes support-edge allowlist members from informational relations.
+- Instrumented:
+  - Browser exports preserve edge `type` and semantic export labels for the currently visible slice.
+- Conceptual:
+  - Auto-derived knowledge relation typing beyond co-occurrence during ingest/runtime indexing.
+  - Assemblies-mode graph slice that exposes memode nodes and memode-materialization edges as first-class exportable topology.
+- Unknown:
+  - Which minimal relation vocabulary best covers author/work and related knowledge assertions without overclaim from weak text heuristics.
+Risks / invariants:
+Do not collapse informational relations into memode support without explicit admissibility logic. Preserve ontology vocabulary and keep provenance explicit for auto-derived relation guesses. Do not break semantic clustering, which is meme-only by contract.
+Evidence plan:
+Patch ingest/runtime relation derivation, patch assemblies-mode/export graph selection, add focused regressions for typed relations and memode-visible exports, then run `./.venv/bin/pytest -q`.
+Shortest proof path:
+Add bounded auto-derived relation heuristics plus explicit memode edge types, surface them through the assemblies/export slice, and prove with ingest/runtime/frontend serializer tests plus the full pytest run.
+
+## [2026-03-17T16:50:34Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/semantic_relations.py`
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/observatory/contracts.py`
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/eden/observatory/graph_planes.py`
+`/Users/brianray/Adam/eden/observatory/service.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx`
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/tests/test_semantic_relations.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_observatory_server.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`
+Specs changed:
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Preserved meme-first / memode-second-order ontology. Revised the edge contract so informational knowledge relations (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES`) remain explicit and non-memetic unless admitted by support-edge rules. Revised observatory contract so `Assemblies` exposes the meme-plus-memode plane through dedicated `assembly_nodes` / `assembly_edges`.
+Behavior implemented or modified:
+Ingest, turn indexing, and document-brief indexing now derive bounded typed knowledge relations from explicit surface patterns and persist them with provenance. Memode membership now persists through explicit `MEMODE_HAS_MEMBER` edges. Observatory graph payload now emits a distinct assemblies plane, and the React workbench/export path uses it so assemblies exports and edge tables can show memode topology and typed knowledge relations instead of only the support-edge slice.
+Evidence produced (tests / traces / commands / exports):
+`./.venv/bin/pytest -q tests/test_semantic_relations.py tests/test_ingest.py tests/test_runtime_e2e.py tests/test_observatory_server.py tests/test_observatory_measurements.py` -> `36 passed`
+`npm --prefix web/observatory test -- --run src/workbench/graphUtils.test.ts src/App.test.tsx` -> `9 passed`
+`npm --prefix web/observatory run build` -> rebuilt checked-in observatory bundle and refreshed `build-meta.json`
+`./.venv/bin/pytest -q` -> `108 passed`
+Status register changes:
+- Implemented:
+  - Bounded auto-derived typed knowledge relations in ingest/runtime indexing.
+  - Explicit persistent memode membership edge type `MEMODE_HAS_MEMBER`.
+  - Dedicated `assembly_nodes` / `assembly_edges` observatory payload plane and Assemblies-mode export visibility.
+- Instrumented:
+  - Typed relations and memode edges now propagate into browser-local exports through the rebuilt static bundle.
+- Conceptual:
+  - Broader relation vocabulary beyond the current conservative rule set.
+- Unknown:
+  - Real-world precision/recall of the heuristic rules on noisier PDFs outside the current regression cases.
+Truth-table / limitations updates:
+Updated truth table rows for persistent memes/memodes, layered observatory payload, auto-derived typed relations, and browser export interoperability. Added explicit limitations for heuristic relation derivation and the requirement to use `Assemblies` for informational/memode topology inspection.
+Remaining uncertainties:
+The relation rules are deliberately narrow and surface-form dependent. They prove the graph no longer has to flatten everything to `CO_OCCURS_WITH`, but they do not yet cover arbitrary bibliographic or conceptual relations.
+Next shortest proof path:
+Run a real ingest against the user's cited corpus/whitepaper neighborhood, inspect the resulting `Assemblies` export in Gephi, and expand the rule vocabulary only where the persisted false-negative cases are concrete and attributable.
+
+## [2026-03-17T16:32:00Z] PRE-FLIGHT
+Operator task:
+Stop chain-of-thought / planning spill from bleeding into Adam's operator-facing chat reply, with special attention to the observed `Thinking Process` leak in session `d6bd99c2-c672-425e-8fdf-ac9a4ec414f3`.
+Task checksum:
+Reasoning-leak membrane hardening.
+Repo situation:
+Worktree remains dirty from prior turns. Recent observatory and prompt changes are unrelated. Live transcript evidence shows turn T4 persisted raw planning text in both `response_text` and `membrane_text`, so the miss happened before or during membrane cleanup rather than only in UI rendering.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+Natural-language contracts in force:
+The v1 loop requires membrane application before turn persistence. Hidden chain-of-thought must not be exposed. TUI transcript cards render persisted membrane output, so membrane correctness is load-bearing.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/models/base.py`
+`/Users/brianray/Adam/eden/models/mlx_backend.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/tests/test_model_output.py`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+Status register:
+- Implemented:
+  - Membrane cleanup strips recognized `<think>` blocks and explicit `Thinking Process:` reasoning blocks.
+  - MLX adapter can do an answer-only fallback when split output shows reasoning without a clean answer.
+- Instrumented:
+  - Stored turn metadata on the leaked turn proves `reasoning_text` was empty and `answer_text` carried the full planning spill.
+- Conceptual:
+  - Hardening `Thinking Process` parsing without colon and fail-closed membrane repair for reasoning-only spills.
+- Unknown:
+  - Whether additional planner markers beyond `Thinking Process` need the same treatment once the current leak class is fixed.
+Risks / invariants:
+Do not over-strip legitimate answers. Preserve visible reasoning in the telemetry lens while preventing it from entering `membrane_text`. Prefer a fail-closed placeholder over chain-of-thought leakage if no clean answer can be recovered.
+Evidence plan:
+Patch the splitter and membrane, add regressions for the observed leak shape and reasoning-only fallback, run focused tests, then run full `./.venv/bin/pytest -q`.
+Shortest proof path:
+Append this note, patch parser/membrane, add regression coverage using the observed `Thinking Process` shape, and verify the membrane returns a clean operator-facing reply or safe repair instead of planning text.
+
+## [2026-03-17T16:36:05Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/models/base.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/tests/test_model_output.py`
+`/Users/brianray/Adam/tests/test_runtime_membrane.py`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+Natural-language contracts added/revised/preserved:
+Preserved the v1 turn order and membrane role while tightening the contract so visible planning spills (`<think>`, `Thinking Process`, reasoning-only scaffolds) are explicitly membrane violations and fail closed if no recoverable operator-facing answer exists.
+Behavior implemented or modified:
+- `split_model_output` and `split_model_output_progressive` now recognize `Thinking Process` / `Reasoning Process` headers with or without a colon.
+- The splitter now recovers operator-facing text from explicit `Final Answer`, `Answer`, `Final Version`, and `Final Response` markers, including indented markdown-emphasized markers like the leaked `*Final Version:*` shape.
+- `sanitize_operator_response` now drops reasoning-only spills instead of passing them through when no clean answer can be recovered.
+Evidence produced (tests / traces / commands / exports):
+- Stored turn inspection proved the live leak missed the splitter entirely: `reasoning_text=False`, `answer_completion_fallback=False`, and both `response_text` / `membrane_text` carried the full planning spill.
+- `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_model_output.py /Users/brianray/Adam/tests/test_runtime_membrane.py` -> `10 passed in 0.03s`
+- Direct live proof against the leaked turn payload after patch: `runtime.sanitize_operator_response(turn['response_text'])` returned the clean answer beginning `Brian, I have a clear sense of this schema...` with membrane event `REASONING_SPLIT`; `Thinking Process` no longer remained in the sanitized text.
+- `./.venv/bin/pytest -q` -> `105 passed in 89.65s`
+Status register changes:
+- Implemented:
+  - Parser coverage for `Thinking Process` without colon.
+  - Recovery of indented `*Final Version:*` answer blocks from planner spill.
+  - Fail-closed membrane handling for reasoning-only spills.
+- Instrumented:
+  - Live DB inspection and post-patch sanitize replay against the actual leaked turn.
+- Conceptual:
+  - None added.
+- Unknown:
+  - Additional planner prefixes beyond the now-supported `Thinking Process` / `Reasoning Process` may exist in future model failures and would need their own regression if observed.
+Truth-table / limitations updates:
+No truth-table or limitations update. The capability was already intended to exist; this turn repaired a concrete leak in that existing membrane behavior.
+Remaining uncertainties:
+- Existing persisted leaked turns remain in history until explicitly regenerated or edited; this patch prevents new occurrences in the current leak class but does not rewrite old turn artifacts automatically.
+Next shortest proof path:
+Restart the running Adam app so the patched runtime is loaded, then provoke a comparable high-reasoning turn and confirm the transcript card shows only the clean operator-facing answer while the reasoning lens, if populated, remains separate.
+
+## [2026-03-17T16:38:39Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. This was a prompt-only micro-patch; no canonical `docs/` surface changed.
+Natural-language contracts added/revised/preserved:
+Revised the whitepaper prompt so unresolved-governance degraded mode cleanly overrides generic run outputs, audit families, phase progression, and note-surface assumptions. Preserved all previously restored governance, archaeology, evidence, figure, and acceptance-test hardness.
+Behavior implemented or modified:
+- Added an explicit governance-gate precedence rule so unresolved governance short-circuits baseline selection, empirical extraction, figure generation, rewrite/refactor, citation verification, LaTeX build, and canonization.
+- Made PRE / POST note handling governance-dependent so the run does not guess a canonical notes surface when governance is unresolved; degraded-mode PRE/POST are now `SKIPPED` with status-log recording.
+- Made full output-family and audit-family requirements conditional on governance-resolved runs, with degraded mode restricted to governance log plus short inventory / degraded-mode report and optional unified status logging.
+- Added an explicit Phase 0 hard stop and cleaned acceptance wording so drafting under unresolved governance is a fail-closed `FAIL`.
+- Broadened public-paper audit-marker wording from `WRITE_BLOCKED` only to the full execution-status family.
+Evidence produced (tests / traces / commands / exports):
+- `git diff -- /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md /Users/brianray/Adam/codex_notes_garden.md`
+- `date -u +"%Y-%m-%dT%H:%M:%SZ"`
+- `sed -n` spot checks over the patched governance, run-note, phase, output, audit, and acceptance sections
+- `rg -n` presence checks for new headings and conditional degraded-mode language
+Status register changes:
+- Implemented:
+  - `wp_draft_prompt.md` now makes governance-unresolved degraded mode fully coherent with run notes, phases, outputs, audits, and acceptance logic.
+- Instrumented:
+  - Verification remained textual: diff review plus targeted section-presence checks.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - No live whitepaper-generation run was executed; this turn only repaired the governing prompt text.
+Truth-table / limitations updates:
+None. No Adam capability status changed.
+Remaining uncertainties:
+- The working tree remains dirty from prior unrelated edits; they were left untouched.
+- The prompt has not yet been exercised by a fresh whitepaper-generation run after this micro-patch.
+Next shortest proof path:
+Run the repaired whitepaper-generation prompt end-to-end on a bounded draft instance and verify that unresolved-governance mode emits only the degraded artifacts while governance-resolved mode still produces the full audited output family.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 
 import pytest
@@ -202,6 +203,27 @@ def test_memode_audit_plane_distinguishes_support_from_informational_relations(t
     assert any(row["admissibility"]["passes"] for row in audit["memodes"])
     assert any(edge["relation_class"] == "materialized_support" for row in audit["memodes"] for edge in row["support_edges"])
     assert any(edge["relation_class"] == "knowledge_informational" for edge in audit["informational_relations"])
+
+
+def test_graph_payload_tolerates_null_labels_in_snapshot(tmp_path, runtime, monkeypatch) -> None:
+    experiment, session, _ = _seed_session(runtime, tmp_path)
+    snapshot = copy.deepcopy(runtime.store.graph_snapshot(experiment["id"]))
+    target = snapshot["memes"][0]
+    target["label"] = None
+
+    original_graph_snapshot = runtime.exporter.store.graph_snapshot
+
+    def _patched_graph_snapshot(experiment_id: str):
+        if experiment_id == experiment["id"]:
+            return snapshot
+        return original_graph_snapshot(experiment_id)
+
+    monkeypatch.setattr(runtime.exporter.store, "graph_snapshot", _patched_graph_snapshot)
+
+    payload = runtime.observatory_service.graph_payload(experiment_id=experiment["id"], session_id=session["id"])
+    rendered = next(node for node in payload["semantic_nodes"] if node["id"] == target["id"])
+    assert isinstance(rendered["label"], str)
+    assert rendered["label"]
 
 
 def test_measurement_only_action_persists_without_topology_mutation(tmp_path, runtime) -> None:

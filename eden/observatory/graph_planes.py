@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from typing import Any
 
+from ..semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 from .clustering import build_cluster_summaries
 from .contracts import ASSEMBLY_RENDER_MODES, MEMODE_SUPPORT_EDGE_ALLOWLIST
 
@@ -297,16 +298,23 @@ def build_graph_planes(
             runtime_nodes.append(deepcopy(node))
 
     semantic_edges = []
+    assembly_nodes = [deepcopy(node) for node in nodes if node.get("kind") in {"meme", "memode"}]
+    assembly_node_ids = {node["id"] for node in assembly_nodes}
+    assembly_edges = []
     runtime_edges = []
     semantic_edge_ids: set[str] = set()
     for edge in edges:
         source = node_lookup.get(edge["source"])
         target = node_lookup.get(edge["target"])
+        if source and target and source.get("kind") in {"meme", "memode"} and target.get("kind") in {"meme", "memode"}:
+            assembly_edges.append(deepcopy(edge))
         if source and target and source.get("kind") == "meme" and target.get("kind") == "meme" and edge.get("type") in MEMODE_SUPPORT_EDGE_ALLOWLIST:
             semantic_edges.append(deepcopy(edge))
             if edge.get("id"):
                 semantic_edge_ids.add(str(edge["id"]))
-        elif edge.get("type") != "MATERIALIZES_AS_MEMODE":
+        elif source and target and source.get("id") in assembly_node_ids and target.get("id") in assembly_node_ids:
+            continue
+        elif edge.get("type") not in {"MATERIALIZES_AS_MEMODE", MEMODE_MEMBERSHIP_EDGE_TYPE}:
             runtime_edges.append(deepcopy(edge))
 
     cluster_summaries, cluster_lookup = build_cluster_summaries(
@@ -339,6 +347,8 @@ def build_graph_planes(
     return {
         "semantic_nodes": sorted(semantic_nodes, key=lambda item: item["id"]),
         "semantic_edges": sorted(semantic_edges, key=lambda item: (item["source"], item["target"], item.get("type", ""), item.get("id", ""))),
+        "assembly_nodes": sorted(assembly_nodes, key=lambda item: (item.get("kind", ""), item["id"])),
+        "assembly_edges": sorted(assembly_edges, key=lambda item: (item["source"], item["target"], item.get("type", ""), item.get("id", ""))),
         "runtime_nodes": sorted(runtime_nodes, key=lambda item: (item.get("kind", ""), item["id"])),
         "runtime_edges": sorted(runtime_edges, key=lambda item: (item["source"], item["target"], item.get("type", ""), item.get("id", ""))),
         "assemblies": sorted(assemblies, key=lambda item: item["id"]),

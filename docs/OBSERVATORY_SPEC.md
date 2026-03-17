@@ -86,6 +86,7 @@ Generated per experiment under `exports/<experiment_id>/`:
   - `Compare`
 - `Semantic Map` shows memes as first-class visible nodes, semantic edges, cluster hull/label summaries, and memode overlays
 - memodes render as second-order assemblies with `hulls`, `collapsed-meta-node`, or `hidden` overlay modes; they are not default peer dots
+- `Assemblies` exposes the meme-plus-memode plane directly: meme support edges, informational knowledge relations, and explicit memode membership edges are all exportable/readable there without pretending they belong to the clustering-only semantic map
 - label disclosure is progressive and non-hover-dependent:
   - cluster labels first
   - selected / pinned / high-centrality meme labels next
@@ -123,6 +124,7 @@ Generated per experiment under `exports/<experiment_id>/`:
 
 - graph payloads expose layout, appearance, filter, statistics, and export capability metadata so the React shell can stay declarative instead of hard-coding instrument assumptions
 - graph payload nodes and edges can expose `export_label` alongside stable internal ids so graph-document downloads can carry semantic labels into Gephi without sacrificing referential identity
+- graph payloads expose `assembly_nodes` and `assembly_edges` as a distinct second-order plane so `Assemblies` mode can show/export memode topology without collapsing it into the meme-only semantic slice
 - graph payload layout metadata includes:
   - `layout_families`
   - `layout_catalog`
@@ -259,6 +261,8 @@ SSE emits small invalidation payloads only. It does not push full graph or basin
 TUI behavior:
 
 - `Observatory` ensures the local server is running and opens the current experiment index page
+- when an experiment-scoped `observatory_index.html` shell already exists, the TUI may open it immediately and continue refreshing payloads in the background instead of blocking browser launch on export completion
+- session-scoped launches may append `?session_id=<session_id>` so the live API and session endpoints bind to the current session rather than the stale session baked into an older export shell
 - repeated use is safe and does not create ghost server state
 - observatory-originated edits are logged back into the runtime trace surfaces
 - static exports must be HTTP-served, either by the EDEN observatory server or another static file server; direct `file://` opening is not a supported runtime path for the v1 bundle

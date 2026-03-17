@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import time
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -964,7 +966,11 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         modal.query_one("#atlas_observatory_btn", Button).press()
         await pilot.pause(0.8)
         assert export_calls == [(experiment["id"], first_session["id"])]
-        assert any(url.endswith(f"{experiment['id']}/observatory_index.html") for url in opened_urls)
+        assert any(
+            urlparse(url).path.endswith(f"{experiment['id']}/observatory_index.html")
+            and parse_qs(urlparse(url).query).get("session_id") == [first_session["id"]]
+            for url in opened_urls
+        )
         modal.query_one("#atlas_turns_api_btn", Button).press()
         await pilot.pause(0.3)
         assert opened_urls[-1].endswith(f"api/sessions/{first_session['id']}/turns")
@@ -1066,7 +1072,8 @@ async def test_open_browser_observatory_refreshes_current_export_and_targets_ind
 
         assert export_calls == [(app.ui_state.experiment_id, app.ui_state.session_id)]
         assert opened_urls
-        assert opened_urls[0].endswith(f"{app.ui_state.experiment_id}/observatory_index.html")
+        assert urlparse(opened_urls[0]).path.endswith(f"{app.ui_state.experiment_id}/observatory_index.html")
+        assert parse_qs(urlparse(opened_urls[0]).query).get("session_id") == [app.ui_state.session_id]
         assert "observatory_index.html" in app.ui_state.last_feedback
 
     runtime.stop_observatory()
@@ -1121,7 +1128,8 @@ async def test_runtime_action_menu_selection_executes_observatory(runtime, monke
         await pilot.pause(0.8)
 
         assert opened_urls
-        assert opened_urls[0].endswith(f"{app.ui_state.experiment_id}/observatory_index.html")
+        assert urlparse(opened_urls[0]).path.endswith(f"{app.ui_state.experiment_id}/observatory_index.html")
+        assert parse_qs(urlparse(opened_urls[0]).query).get("session_id") == [app.ui_state.session_id]
         assert "observatory_index.html" in app.ui_state.last_feedback
         assert menu.value == "observatory"
 
@@ -1129,6 +1137,49 @@ async def test_runtime_action_menu_selection_executes_observatory(runtime, monke
         await pilot.pause(0.8)
 
         assert len(opened_urls) == 2
+
+    runtime.stop_observatory()
+
+
+@pytest.mark.asyncio
+async def test_runtime_action_menu_digit_shortcut_opens_existing_observatory_shell_before_slow_export(runtime, monkeypatch) -> None:
+    opened_urls: list[str] = []
+    export_started = threading.Event()
+    export_can_finish = threading.Event()
+    original_export = runtime.export_observability
+
+    # Seed an existing shell so the browser can open immediately before the refresh completes.
+    original_export(experiment_id=runtime.primary_experiment()["id"], session_id=None)
+
+    def slow_export(*, experiment_id: str, session_id: str | None = None):
+        export_started.set()
+        export_can_finish.wait(timeout=5.0)
+        return original_export(experiment_id=experiment_id, session_id=session_id)
+
+    def capture_open(url: str) -> BrowserOpenResult:
+        opened_urls.append(url)
+        return BrowserOpenResult(ok=True, method="mock")
+
+    monkeypatch.setattr(runtime, "export_observability", slow_export)
+    monkeypatch.setattr("eden.tui.app.open_browser_url", capture_open)
+
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(200, 60)) as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+        menu = app.screen.query_one("#runtime_action_menu", ActionStrip)
+        menu.focus()
+        await pilot.press("8")
+        await pilot.press("enter")
+        await pilot.pause(0.3)
+
+        assert export_started.is_set()
+        assert opened_urls
+        assert urlparse(opened_urls[0]).path.endswith(f"{app.ui_state.experiment_id}/observatory_index.html")
+        assert parse_qs(urlparse(opened_urls[0]).query).get("session_id") == [app.ui_state.session_id]
+
+        export_can_finish.set()
+        await pilot.pause(1.0)
 
     runtime.stop_observatory()
 

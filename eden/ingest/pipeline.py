@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from ..logging import RuntimeLog
-from ..utils import safe_excerpt, sentence_chunks, sha256_file, top_phrases
+from ..semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE, extract_semantic_candidates
+from ..utils import safe_excerpt, sentence_chunks, sha256_file, slugify
 from .extractors import iter_extract_document
 
 
@@ -191,17 +192,18 @@ class IngestService:
                         },
                         title=path.name,
                     )
-                    phrase_candidates = top_phrases(chunk, limit=6)
+                    semantic_candidates = extract_semantic_candidates(chunk, limit=6)
                     member_ids: list[str] = []
-                    for phrase, score in phrase_candidates:
+                    member_ids_by_label: dict[str, str] = {}
+                    for candidate in semantic_candidates["meme_candidates"]:
                         meme = self.store.upsert_meme(
                             experiment_id=experiment_id,
-                            label=phrase,
+                            label=str(candidate["label"]),
                             text=chunk,
                             domain=domain,
                             source_kind=source_kind,
                             scope="global",
-                            evidence_inc=score,
+                            evidence_inc=float(candidate["score"]),
                             metadata={
                                 "document_id": doc["id"],
                                 "chunk_id": chunk_id,
@@ -213,7 +215,9 @@ class IngestService:
                                 "quality_flags": page_quality_flags,
                             },
                         )
-                        member_ids.append(meme["id"])
+                        member_id = str(meme["id"])
+                        member_ids.append(member_id)
+                        member_ids_by_label.setdefault(slugify(str(meme.get("label") or candidate["label"])), member_id)
                         meme_count += 1
                         self.store.add_edge(
                             experiment_id=experiment_id,
@@ -224,6 +228,29 @@ class IngestService:
                             edge_type="DERIVED_FROM",
                             provenance={"chunk_id": chunk_id, "page_number": page_number},
                         )
+                    for relation in semantic_candidates["relation_candidates"]:
+                        source_id = member_ids_by_label.get(slugify(relation["source_label"]))
+                        target_id = member_ids_by_label.get(slugify(relation["target_label"]))
+                        if not source_id or not target_id or source_id == target_id:
+                            continue
+                        self.store.add_edge(
+                            experiment_id=experiment_id,
+                            src_kind="meme",
+                            src_id=source_id,
+                            dst_kind="meme",
+                            dst_id=target_id,
+                            edge_type=relation["edge_type"],
+                            provenance={
+                                "document_id": doc["id"],
+                                "chunk_id": chunk_id,
+                                "page_number": page_number,
+                                "assertion_origin": "auto_derived",
+                                "evidence_label": "AUTO_DERIVED",
+                                "confidence": relation["confidence"],
+                                "relation_rule": relation["rule"],
+                                "sentence_excerpt": relation["sentence_excerpt"],
+                            },
+                        )
                     for idx, left in enumerate(member_ids):
                         for right in member_ids[idx + 1 :]:
                             self.store.add_edge(
@@ -233,7 +260,13 @@ class IngestService:
                                 dst_kind="meme",
                                 dst_id=right,
                                 edge_type="CO_OCCURS_WITH",
-                                provenance={"document_id": doc["id"], "chunk_id": chunk_id},
+                                provenance={
+                                    "document_id": doc["id"],
+                                    "chunk_id": chunk_id,
+                                    "assertion_origin": "auto_derived",
+                                    "evidence_label": "AUTO_DERIVED",
+                                    "confidence": 1.0,
+                                },
                             )
                     if len(member_ids) >= 2:
                         label = " / ".join(self.store.get_meme(member_id)["label"] for member_id in member_ids[:3])
@@ -271,7 +304,7 @@ class IngestService:
                                 src_id=memode["id"],
                                 dst_kind="meme",
                                 dst_id=member_id,
-                                edge_type="MATERIALIZES_AS_MEMODE",
+                                edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE,
                                 provenance={"document_id": doc["id"], "chunk_id": chunk_id},
                             )
                 notes.append(f"page={page_number or '-'} parser={parser} quality={page_quality_score:.3f}")

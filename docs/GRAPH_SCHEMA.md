@@ -75,6 +75,7 @@ EDEN v1 uses SQLite for local reliability, with graph semantics implemented in d
 - `src_kind`, `src_id`, `dst_kind`, `dst_id`
 - `edge_type`, `weight`
 - `provenance_json`
+- current persisted relation families include support edges (`CO_OCCURS_WITH`, `SUPPORTS`, `REINFORCES`, `REFINES`, `CONTRADICTS`), informational knowledge edges (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES`), document/runtime edges, and explicit memode materialization / membership edges (`MATERIALIZES_AS_MEMODE`, `MEMODE_HAS_MEMBER`)
 
 ## Health metrics derived on demand
 

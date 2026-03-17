@@ -156,14 +156,18 @@ class _ObservatoryHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": "Malformed API path."}, status=404)
             return
         _, session_id, action_name = parts[1:4]
-        if action_name == "turns":
-            self._send_json(self._service.session_turns(session_id=session_id))
-            return
-        if action_name == "active-set":
-            self._send_json(self._service.session_active_set(session_id=session_id))
-            return
-        if action_name == "trace":
-            self._send_json(self._service.session_trace(session_id=session_id))
+        try:
+            if action_name == "turns":
+                self._send_json(self._service.session_turns(session_id=session_id))
+                return
+            if action_name == "active-set":
+                self._send_json(self._service.session_active_set(session_id=session_id))
+                return
+            if action_name == "trace":
+                self._send_json(self._service.session_trace(session_id=session_id))
+                return
+        except Exception as exc:  # pragma: no cover
+            self._send_json({"error": f"Unhandled observatory API failure: {type(exc).__name__}: {exc}"}, status=500)
             return
         self._send_json({"error": f"Unknown action '{action_name}'."}, status=404)
 
@@ -181,32 +185,36 @@ class _ObservatoryHandler(http.server.SimpleHTTPRequestHandler):
         if action_name == "events":
             self._handle_sse(experiment_id=experiment_id, session_id=session_id)
             return
-        if action_name == "payload":
-            self._send_json(self._service.experiment_payload(experiment_id=experiment_id, session_id=session_id))
-            return
-        if action_name == "overview":
-            self._send_json(self._service.experiment_overview(experiment_id=experiment_id, session_id=session_id))
-            return
-        if action_name == "graph":
-            self._send_json(self._service.graph_payload(experiment_id=experiment_id, session_id=session_id))
-            return
-        if action_name == "basin":
-            self._send_json(self._service.basin_payload(experiment_id=experiment_id, session_id=session_id))
-            return
-        if action_name == "geometry":
-            self._send_json(self._service.geometry_payload(experiment_id=experiment_id, session_id=session_id))
-            return
-        if action_name == "measurement-events":
-            self._send_json(self._service.measurement_payload(experiment_id=experiment_id, session_id=session_id))
-            return
-        if action_name == "tanakh":
-            self._send_json(self._service.tanakh_payload(experiment_id=experiment_id, session_id=session_id))
-            return
-        if action_name == "sessions":
-            self._send_json(self._service.list_sessions(experiment_id=experiment_id))
-            return
-        if action_name == "jobs":
-            self._send_json({"jobs": []})
+        try:
+            if action_name == "payload":
+                self._send_json(self._service.experiment_payload(experiment_id=experiment_id, session_id=session_id))
+                return
+            if action_name == "overview":
+                self._send_json(self._service.experiment_overview(experiment_id=experiment_id, session_id=session_id))
+                return
+            if action_name == "graph":
+                self._send_json(self._service.graph_payload(experiment_id=experiment_id, session_id=session_id))
+                return
+            if action_name == "basin":
+                self._send_json(self._service.basin_payload(experiment_id=experiment_id, session_id=session_id))
+                return
+            if action_name == "geometry":
+                self._send_json(self._service.geometry_payload(experiment_id=experiment_id, session_id=session_id))
+                return
+            if action_name == "measurement-events":
+                self._send_json(self._service.measurement_payload(experiment_id=experiment_id, session_id=session_id))
+                return
+            if action_name == "tanakh":
+                self._send_json(self._service.tanakh_payload(experiment_id=experiment_id, session_id=session_id))
+                return
+            if action_name == "sessions":
+                self._send_json(self._service.list_sessions(experiment_id=experiment_id))
+                return
+            if action_name == "jobs":
+                self._send_json({"jobs": []})
+                return
+        except Exception as exc:  # pragma: no cover
+            self._send_json({"error": f"Unhandled observatory API failure: {type(exc).__name__}: {exc}"}, status=500)
             return
         self._send_json({"error": f"Unknown action '{action_name}'."}, status=404)
 

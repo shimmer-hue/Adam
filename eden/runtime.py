@@ -30,9 +30,10 @@ from .observatory.server import ObservatoryServer
 from .observatory.service import ObservatoryService
 from .regard import ema, feedback_signal
 from .retrieval import RetrievalService
+from .semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE, extract_semantic_candidates
 from .storage.graph_store import GraphStore
 from .tanakh import DEFAULT_TANAKH_REF, TanakhService
-from .utils import now_utc, safe_excerpt, slugify, top_phrases
+from .utils import now_utc, safe_excerpt, slugify
 
 
 CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
@@ -950,6 +951,14 @@ class EdenRuntime:
         if reasoning_text and cleaned_answer and cleaned_answer != cleaned:
             cleaned = cleaned_answer.strip()
             events.append({"event_type": "REASONING_SPLIT", "detail": "Removed a visible reasoning block from the operator-facing answer."})
+        elif reasoning_text and cleaned_answer == cleaned:
+            cleaned = ""
+            events.append(
+                {
+                    "event_type": "REASONING_ONLY_DROPPED",
+                    "detail": "Dropped a reasoning-only spill that did not contain a clean operator-facing answer.",
+                }
+            )
         if SUPPORT_SECTION_RE.search(cleaned):
             cleaned = SUPPORT_SECTION_RE.split(cleaned, maxsplit=1)[0].strip()
             events.append({"event_type": "SUPPORT_STRIPPED", "detail": "Removed Basis / Next Step scaffolding from the visible answer."})
@@ -1028,21 +1037,29 @@ class EdenRuntime:
     ) -> dict[str, list[str]]:
         member_ids: list[str] = []
         member_labels_by_id: dict[str, str] = {}
+        member_ids_by_label: dict[str, str] = {}
         memode_ids: list[str] = []
-        for phrase, score in top_phrases(text, limit=6):
+        semantic_candidates = extract_semantic_candidates(text, limit=6)
+        for candidate in semantic_candidates["meme_candidates"]:
             meme = self.store.upsert_meme(
                 experiment_id=experiment_id,
-                label=phrase,
+                label=str(candidate["label"]),
                 text=text,
                 domain=domain,
                 source_kind=source_kind,
                 scope=f"session:{session_id}",
-                evidence_inc=score,
-                metadata={"session_id": session_id, "turn_id": turn_id, "origin": actor},
+                evidence_inc=float(candidate["score"]),
+                metadata={
+                    "session_id": session_id,
+                    "turn_id": turn_id,
+                    "origin": actor,
+                    "candidate_kind": str(candidate.get("kind") or ""),
+                },
             )
             member_id = str(meme["id"])
             member_ids.append(member_id)
-            member_labels_by_id.setdefault(member_id, str(meme.get("label") or phrase))
+            member_labels_by_id.setdefault(member_id, str(meme.get("label") or candidate["label"]))
+            member_ids_by_label.setdefault(slugify(str(meme.get("label") or candidate["label"])), member_id)
             self.store.add_edge(
                 experiment_id=experiment_id,
                 src_kind="turn",
@@ -1051,6 +1068,28 @@ class EdenRuntime:
                 dst_id=member_id,
                 edge_type="OCCURS_IN",
                 provenance={"actor": actor},
+            )
+        for relation in semantic_candidates["relation_candidates"]:
+            source_id = member_ids_by_label.get(slugify(relation["source_label"]))
+            target_id = member_ids_by_label.get(slugify(relation["target_label"]))
+            if not source_id or not target_id or source_id == target_id:
+                continue
+            self.store.add_edge(
+                experiment_id=experiment_id,
+                src_kind="meme",
+                src_id=source_id,
+                dst_kind="meme",
+                dst_id=target_id,
+                edge_type=relation["edge_type"],
+                provenance={
+                    "turn_id": turn_id,
+                    "actor": actor,
+                    "assertion_origin": "auto_derived",
+                    "evidence_label": "AUTO_DERIVED",
+                    "confidence": relation["confidence"],
+                    "relation_rule": relation["rule"],
+                    "sentence_excerpt": relation["sentence_excerpt"],
+                },
             )
         for idx, left in enumerate(member_ids):
             for right in member_ids[idx + 1 :]:
@@ -1061,7 +1100,13 @@ class EdenRuntime:
                     dst_kind="meme",
                     dst_id=right,
                     edge_type="CO_OCCURS_WITH",
-                    provenance={"turn_id": turn_id, "actor": actor},
+                    provenance={
+                        "turn_id": turn_id,
+                        "actor": actor,
+                        "assertion_origin": "auto_derived",
+                        "evidence_label": "AUTO_DERIVED",
+                        "confidence": 1.0,
+                    },
                 )
         memode_member_ids = list(member_labels_by_id.keys())[: min(4, len(member_labels_by_id))]
         memode_label_parts = list(member_labels_by_id.values())[:3]
@@ -1093,7 +1138,7 @@ class EdenRuntime:
                     src_id=memode["id"],
                     dst_kind="meme",
                     dst_id=member_id,
-                    edge_type="MATERIALIZES_AS_MEMODE",
+                    edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE,
                     provenance={"turn_id": turn_id},
                 )
         return {"meme_ids": member_ids, "memode_ids": memode_ids}
@@ -1111,6 +1156,8 @@ class EdenRuntime:
         if not briefing_text:
             return {"meme_ids": [], "memode_ids": []}
         member_ids: list[str] = []
+        member_labels_by_id: dict[str, str] = {}
+        member_ids_by_label: dict[str, str] = {}
         memode_ids: list[str] = []
         metadata = {
             "document_id": document_id,
@@ -1118,18 +1165,22 @@ class EdenRuntime:
             "origin": "operator_ingest_brief",
             "session_id": session_id,
         }
-        for phrase, score in top_phrases(briefing_text, limit=6):
+        semantic_candidates = extract_semantic_candidates(briefing_text, limit=6)
+        for candidate in semantic_candidates["meme_candidates"]:
             meme = self.store.upsert_meme(
                 experiment_id=experiment_id,
-                label=phrase,
+                label=str(candidate["label"]),
                 text=briefing_text,
                 domain="behavior",
                 source_kind="document_brief",
                 scope="global",
-                evidence_inc=score,
-                metadata=metadata,
+                evidence_inc=float(candidate["score"]),
+                metadata={**metadata, "candidate_kind": str(candidate.get("kind") or "")},
             )
-            member_ids.append(meme["id"])
+            member_id = str(meme["id"])
+            member_ids.append(member_id)
+            member_labels_by_id.setdefault(member_id, str(meme.get("label") or candidate["label"]))
+            member_ids_by_label.setdefault(slugify(str(meme.get("label") or candidate["label"])), member_id)
             self.store.add_edge(
                 experiment_id=experiment_id,
                 src_kind="document",
@@ -1138,6 +1189,29 @@ class EdenRuntime:
                 dst_id=meme["id"],
                 edge_type="CONTEXTUALIZES_DOCUMENT",
                 provenance={"source_path": source_path, "session_id": session_id},
+            )
+        for relation in semantic_candidates["relation_candidates"]:
+            source_id = member_ids_by_label.get(slugify(relation["source_label"]))
+            target_id = member_ids_by_label.get(slugify(relation["target_label"]))
+            if not source_id or not target_id or source_id == target_id:
+                continue
+            self.store.add_edge(
+                experiment_id=experiment_id,
+                src_kind="meme",
+                src_id=source_id,
+                dst_kind="meme",
+                dst_id=target_id,
+                edge_type=relation["edge_type"],
+                provenance={
+                    "document_id": document_id,
+                    "source_path": source_path,
+                    "session_id": session_id,
+                    "assertion_origin": "auto_derived",
+                    "evidence_label": "AUTO_DERIVED",
+                    "confidence": relation["confidence"],
+                    "relation_rule": relation["rule"],
+                    "sentence_excerpt": relation["sentence_excerpt"],
+                },
             )
         for idx, left in enumerate(member_ids):
             for right in member_ids[idx + 1 :]:
@@ -1148,12 +1222,18 @@ class EdenRuntime:
                     dst_kind="meme",
                     dst_id=right,
                     edge_type="CO_OCCURS_WITH",
-                    provenance={"document_id": document_id, "source_path": source_path},
+                    provenance={
+                        "document_id": document_id,
+                        "source_path": source_path,
+                        "assertion_origin": "auto_derived",
+                        "evidence_label": "AUTO_DERIVED",
+                        "confidence": 1.0,
+                    },
                 )
         if len(member_ids) >= 2:
             memode = self.store.upsert_memode(
                 experiment_id=experiment_id,
-                label=f"ingest lens / {' / '.join(self.store.get_meme(member_id)['label'] for member_id in member_ids[:3])}",
+                label=f"ingest lens / {' / '.join(member_labels_by_id[member_id] for member_id in member_ids[:3])}",
                 member_ids=member_ids[: min(4, len(member_ids))],
                 summary=safe_excerpt(briefing_text, limit=320),
                 domain="behavior",
@@ -1177,7 +1257,7 @@ class EdenRuntime:
                     src_id=memode["id"],
                     dst_kind="meme",
                     dst_id=member_id,
-                    edge_type="MATERIALIZES_AS_MEMODE",
+                    edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE,
                     provenance={"document_id": document_id},
                 )
         return {"meme_ids": member_ids, "memode_ids": memode_ids}

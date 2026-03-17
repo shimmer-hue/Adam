@@ -107,12 +107,22 @@ export function hashText(value: string): string {
 export function visibleGraphForMode(payload: any, mode: GraphMode): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const semanticNodes = (payload?.semantic_nodes ?? []) as GraphNode[];
   const semanticEdges = (payload?.semantic_edges ?? []) as GraphEdge[];
+  const assemblyNodes = dedupeNodes([
+    ...((payload?.assembly_nodes ?? []) as GraphNode[]),
+    ...semanticNodes,
+    ...((payload?.assemblies ?? []) as GraphNode[]),
+  ]);
+  const assemblyEdges = ((payload?.assembly_edges ?? payload?.semantic_edges ?? []) as GraphEdge[]);
   const runtimeNodes = (payload?.runtime_nodes ?? []) as GraphNode[];
   const runtimeEdges = (payload?.runtime_edges ?? []) as GraphEdge[];
   const latestActive = new Set<string>(payload?.latest_active_ids ?? payload?.active_set_slices?.at?.(-1)?.node_ids ?? []);
 
   if (mode === "Runtime") {
     return { nodes: runtimeNodes, edges: runtimeEdges };
+  }
+
+  if (mode === "Assemblies") {
+    return { nodes: assemblyNodes, edges: assemblyEdges };
   }
 
   if (mode === "Active Set") {
@@ -125,6 +135,15 @@ export function visibleGraphForMode(payload: any, mode: GraphMode): { nodes: Gra
   }
 
   return { nodes: semanticNodes, edges: semanticEdges };
+}
+
+function dedupeNodes(nodes: GraphNode[]): GraphNode[] {
+  const nodeMap = new Map<string, GraphNode>();
+  for (const node of nodes) {
+    if (!node?.id) continue;
+    nodeMap.set(node.id, node);
+  }
+  return [...nodeMap.values()];
 }
 
 export function applyPreviewPatch(nodes: GraphNode[], edges: GraphEdge[], patch: GraphPatch | null | undefined): { nodes: GraphNode[]; edges: GraphEdge[] } {
