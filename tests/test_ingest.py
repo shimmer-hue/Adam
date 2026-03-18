@@ -82,7 +82,7 @@ def test_markdown_ingest_persists_all_extracted_units(runtime, tmp_path: Path) -
     assert len({int(row["chunk_index"]) for row in chunk_indexes}) == len(chunk_indexes)
 
 
-def test_ingest_derives_typed_relations_and_memode_membership_edges(runtime, tmp_path: Path) -> None:
+def test_ingest_derives_typed_relations_without_materializing_knowledge_memodes(runtime, tmp_path: Path) -> None:
     experiment = runtime.initialize_experiment("blank")
     source = tmp_path / "relation_seed.md"
     source.write_text(
@@ -98,9 +98,17 @@ def test_ingest_derives_typed_relations_and_memode_membership_edges(runtime, tmp
 
     edges = runtime.store.list_edges(experiment["id"])
     edge_types = {edge["edge_type"] for edge in edges}
+    document = runtime.store.get_document_by_sha(experiment["id"], sha256_file(source))
+    assert document is not None
+    document_edges = [
+        edge
+        for edge in edges
+        if edge["src_id"] == document["id"] or edge["dst_id"] == document["id"]
+    ]
 
     assert "AUTHOR_OF" in edge_types
-    assert MEMODE_MEMBERSHIP_EDGE_TYPE in edge_types
+    assert all(edge["edge_type"] != "MATERIALIZES_AS_MEMODE" for edge in document_edges)
+    assert MEMODE_MEMBERSHIP_EDGE_TYPE not in {edge["edge_type"] for edge in document_edges}
 
 
 def test_ingest_failure_marks_document_failed(runtime, sample_files, monkeypatch) -> None:

@@ -62,13 +62,17 @@ EDEN v1 uses SQLite for local reliability, with graph semantics implemented in d
 - `evidence_n`, `usage_count`, `reward_ema`, `risk_ema`, `edit_ema`
 - `feedback_count`, `skip_count`, `contradiction_count`, `membrane_conflicts`
 - `activation_tau`, `last_active_at`
+- compatibility note: this table now stores both behavior-domain performative memes and knowledge-domain constative information rows; operator-facing `kind` is projected from `domain` plus relation metadata rather than taken from the table name
+- `metadata_json` may carry ontology hints such as `entity_type`, `relation_role`, and `candidate_kind`
 
 ### `memodes`
 
 - `label`, `member_hash`, `summary`, `domain`, `scope`
 - `metadata_json.member_ids`
+- `metadata_json.supporting_edge_ids`
 - `evidence_n`, `usage_count`, `reward_ema`, `risk_ema`, `edit_ema`
 - `feedback_count`, `activation_tau`, `last_active_at`
+- memodes are behavior-only by contract even though historical rows may still exist in the compatibility table
 
 ### `edges`
 
@@ -76,6 +80,7 @@ EDEN v1 uses SQLite for local reliability, with graph semantics implemented in d
 - `edge_type`, `weight`
 - `provenance_json`
 - current persisted relation families include support edges (`CO_OCCURS_WITH`, `SUPPORTS`, `REINFORCES`, `REFINES`, `CONTRADICTS`), informational knowledge edges (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES`), document/runtime edges, and explicit memode materialization / membership edges (`MATERIALIZES_AS_MEMODE`, `MEMODE_HAS_MEMBER`)
+- observatory/export projection may derive additional non-persisted informational edges from existing knowledge text when a legacy graph rowset predates typed-relation persistence; those edges are labeled `assertion_origin = "projection_derived"` and `evidence_label = "DERIVED"`
 
 ## Health metrics derived on demand
 

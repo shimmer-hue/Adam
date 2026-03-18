@@ -32,16 +32,19 @@ def _seed_session(runtime, tmp_path):
 def _connected_meme_pair(runtime, experiment_id: str) -> tuple[str, str]:
     for edge in runtime.store.list_edges(experiment_id):
         if edge["src_kind"] == "meme" and edge["dst_kind"] == "meme" and edge["edge_type"] in MEMODE_SUPPORT_EDGE_ALLOWLIST:
-            return edge["src_id"], edge["dst_id"]
+            left = runtime.store.get_meme(edge["src_id"])
+            right = runtime.store.get_meme(edge["dst_id"])
+            if left["domain"] == "behavior" and right["domain"] == "behavior":
+                return edge["src_id"], edge["dst_id"]
     raise AssertionError("Expected at least one qualifying semantic meme edge in the persistent graph.")
 
 
-def _isolated_meme(runtime, experiment_id: str, label: str) -> dict[str, str]:
+def _isolated_meme(runtime, experiment_id: str, label: str, *, domain: str = "knowledge") -> dict[str, str]:
     return runtime.store.upsert_meme(
         experiment_id=experiment_id,
         label=label,
         text=f"{label} should stay disconnected from the qualifying semantic subgraph.",
-        domain="knowledge",
+        domain=domain,
         source_kind="operator_test",
         metadata={"origin": "pytest"},
     )
@@ -202,7 +205,7 @@ def test_memode_audit_plane_distinguishes_support_from_informational_relations(t
     assert audit["summary"]["materialized_support_edges"] >= 1
     assert any(row["admissibility"]["passes"] for row in audit["memodes"])
     assert any(edge["relation_class"] == "materialized_support" for row in audit["memodes"] for edge in row["support_edges"])
-    assert any(edge["relation_class"] == "knowledge_informational" for edge in audit["informational_relations"])
+    assert any(edge["relation_class"] == "member_informational" for row in audit["memodes"] for edge in row["informational_edges"])
 
 
 def test_graph_payload_tolerates_null_labels_in_snapshot(tmp_path, runtime, monkeypatch) -> None:
@@ -299,7 +302,8 @@ def test_preview_graph_patch_reports_edge_add_selection_and_delta(tmp_path, runt
 
 def test_memode_assert_rejects_missing_support_edges(tmp_path, runtime) -> None:
     experiment, session, memes = _seed_session(runtime, tmp_path)
-    isolated = _isolated_meme(runtime, experiment["id"], "Disconnected observatory meme")
+    left_id, _ = _connected_meme_pair(runtime, experiment["id"])
+    isolated = _isolated_meme(runtime, experiment["id"], "Disconnected observatory meme", domain="behavior")
     with pytest.raises(ValueError, match="qualifying semantic support edge"):
         runtime.commit_observatory_action(
             experiment_id=experiment["id"],
@@ -307,10 +311,10 @@ def test_memode_assert_rejects_missing_support_edges(tmp_path, runtime) -> None:
             turn_id=None,
             action={
                 "action_type": "memode_assert",
-                "selected_node_ids": [memes[0]["id"], isolated["id"]],
+                "selected_node_ids": [left_id, isolated["id"]],
                 "label": "Invalid disconnected memode",
                 "summary": "This should fail because there is no qualifying support edge.",
-                "domain": "knowledge",
+                "domain": "behavior",
                 "confidence": 0.7,
                 "operator_label": "test_operator",
                 "evidence_label": "OPERATOR_ASSERTED",
@@ -321,15 +325,15 @@ def test_memode_assert_rejects_missing_support_edges(tmp_path, runtime) -> None:
 
 def test_memode_support_allowlist_and_passenger_rejection(tmp_path, runtime) -> None:
     experiment, session, _ = _seed_session(runtime, tmp_path)
-    left = _isolated_meme(runtime, experiment["id"], "Left support test meme")
-    right = _isolated_meme(runtime, experiment["id"], "Right support test meme")
-    passenger = _isolated_meme(runtime, experiment["id"], "Passenger meme")
+    left = _isolated_meme(runtime, experiment["id"], "Left support test meme", domain="behavior")
+    right = _isolated_meme(runtime, experiment["id"], "Right support test meme", domain="behavior")
+    passenger = _isolated_meme(runtime, experiment["id"], "Passenger meme", domain="behavior")
     base_action = {
         "action_type": "memode_assert",
         "selected_node_ids": [left["id"], right["id"]],
         "label": "Support check memode",
         "summary": "Used to verify the qualifying-edge allowlist and denylist.",
-        "domain": "knowledge",
+        "domain": "behavior",
         "confidence": 0.72,
         "operator_label": "test_operator",
         "evidence_label": "OPERATOR_ASSERTED",

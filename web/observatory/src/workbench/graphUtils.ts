@@ -358,6 +358,9 @@ export function csvForNodes(nodes: GraphNode[]): string {
     ["Id", "id"],
     ["Label", "label"],
     ["Kind", "kind"],
+    ["EntityType", "entity_type"],
+    ["SpeechActMode", "speech_act_mode"],
+    ["StorageKind", "storage_kind"],
     ["Domain", "domain"],
     ["SourceKind", "source_kind"],
     ["ClusterSignature", "cluster_signature"],
@@ -412,6 +415,9 @@ export function graphMLForGraph(nodes: GraphNode[], edges: GraphEdge[]): string 
   const keys = [
     `<key id="node_label" for="node" attr.name="label" attr.type="string"/>`,
     `<key id="node_kind" for="node" attr.name="kind" attr.type="string"/>`,
+    `<key id="node_entity_type" for="node" attr.name="entity_type" attr.type="string"/>`,
+    `<key id="node_speech_act_mode" for="node" attr.name="speech_act_mode" attr.type="string"/>`,
+    `<key id="node_storage_kind" for="node" attr.name="storage_kind" attr.type="string"/>`,
     `<key id="node_domain" for="node" attr.name="domain" attr.type="string"/>`,
     `<key id="node_source_kind" for="node" attr.name="source_kind" attr.type="string"/>`,
     `<key id="node_cluster_signature" for="node" attr.name="cluster_signature" attr.type="string"/>`,
@@ -427,7 +433,11 @@ export function graphMLForGraph(nodes: GraphNode[], edges: GraphEdge[]): string 
       (node) =>
         `<node id="${xmlEscape(node.id)}"><data key="node_label">${xmlEscape(nodeExportLabel(node))}</data><data key="node_kind">${xmlEscape(
           String(node.kind ?? ""),
-        )}</data><data key="node_domain">${xmlEscape(String(node.domain ?? ""))}</data><data key="node_source_kind">${xmlEscape(
+        )}</data><data key="node_entity_type">${xmlEscape(String(node.entity_type ?? ""))}</data><data key="node_speech_act_mode">${xmlEscape(
+          String(node.speech_act_mode ?? ""),
+        )}</data><data key="node_storage_kind">${xmlEscape(String(node.storage_kind ?? ""))}</data><data key="node_domain">${xmlEscape(
+          String(node.domain ?? ""),
+        )}</data><data key="node_source_kind">${xmlEscape(
           String(node.source_kind ?? ""),
         )}</data><data key="node_cluster_signature">${xmlEscape(String(node.cluster_signature ?? ""))}</data></node>`,
     )
@@ -451,6 +461,9 @@ export function gexfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
   const nodeLookup = buildNodeLookup(nodes);
   const nodeAttributes = [
     `<attribute id="kind" title="kind" type="string"/>`,
+    `<attribute id="entity_type" title="entity_type" type="string"/>`,
+    `<attribute id="speech_act_mode" title="speech_act_mode" type="string"/>`,
+    `<attribute id="storage_kind" title="storage_kind" type="string"/>`,
     `<attribute id="domain" title="domain" type="string"/>`,
     `<attribute id="source_kind" title="source_kind" type="string"/>`,
     `<attribute id="cluster_signature" title="cluster_signature" type="string"/>`,
@@ -466,7 +479,11 @@ export function gexfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
       (node) =>
         `<node id="${xmlEscape(node.id)}" label="${xmlEscape(nodeExportLabel(node))}"><attvalues><attvalue for="kind" value="${xmlEscape(
           String(node.kind ?? ""),
-        )}"/><attvalue for="domain" value="${xmlEscape(String(node.domain ?? ""))}"/><attvalue for="source_kind" value="${xmlEscape(
+        )}"/><attvalue for="entity_type" value="${xmlEscape(String(node.entity_type ?? ""))}"/><attvalue for="speech_act_mode" value="${xmlEscape(
+          String(node.speech_act_mode ?? ""),
+        )}"/><attvalue for="storage_kind" value="${xmlEscape(String(node.storage_kind ?? ""))}"/><attvalue for="domain" value="${xmlEscape(
+          String(node.domain ?? ""),
+        )}"/><attvalue for="source_kind" value="${xmlEscape(
           String(node.source_kind ?? ""),
         )}"/><attvalue for="cluster_signature" value="${xmlEscape(String(node.cluster_signature ?? ""))}"/></attvalues></node>`,
     )
@@ -487,7 +504,7 @@ export function gexfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
 }
 
 export function gdfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
-  const nodeHeader = "nodedef>name VARCHAR,label VARCHAR,kind VARCHAR,domain VARCHAR,source_kind VARCHAR,cluster_signature VARCHAR,degree DOUBLE,recent_active_set_presence DOUBLE";
+  const nodeHeader = "nodedef>name VARCHAR,label VARCHAR,kind VARCHAR,entity_type VARCHAR,speech_act_mode VARCHAR,storage_kind VARCHAR,domain VARCHAR,source_kind VARCHAR,cluster_signature VARCHAR,degree DOUBLE,recent_active_set_presence DOUBLE";
   const edgeHeader = "edgedef>node1 VARCHAR,node2 VARCHAR,label VARCHAR,weight DOUBLE,evidence_label VARCHAR,assertion_origin VARCHAR,confidence DOUBLE";
   const nodeLookup = buildNodeLookup(nodes);
   const nodeRows = nodes.map((node) =>
@@ -495,6 +512,9 @@ export function gdfForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
       csvEscape(node.id),
       csvEscape(nodeExportLabel(node)),
       csvEscape(node.kind),
+      csvEscape(node.entity_type),
+      csvEscape(node.speech_act_mode),
+      csvEscape(node.storage_kind),
       csvEscape(node.domain),
       csvEscape(node.source_kind),
       csvEscape(node.cluster_signature),
@@ -524,6 +544,9 @@ export function gmlForGraph(nodes: GraphNode[], edges: GraphEdge[]): string {
     id ${gmlValue(node.id)}
     label ${gmlValue(nodeExportLabel(node))}
     kind ${gmlValue(String(node.kind ?? ""))}
+    entity_type ${gmlValue(String(node.entity_type ?? ""))}
+    speech_act_mode ${gmlValue(String(node.speech_act_mode ?? ""))}
+    storage_kind ${gmlValue(String(node.storage_kind ?? ""))}
     domain ${gmlValue(String(node.domain ?? ""))}
     source_kind ${gmlValue(String(node.source_kind ?? ""))}
     cluster_signature ${gmlValue(String(node.cluster_signature ?? ""))}
@@ -553,7 +576,7 @@ export function graphVizDotForGraph(nodes: GraphNode[], edges: GraphEdge[]): str
       (node) =>
         `  ${dotValue(node.id)} [label=${dotValue(nodeExportLabel(node))}, kind=${dotValue(String(node.kind ?? ""))}, domain=${dotValue(
           String(node.domain ?? ""),
-        )}, source_kind=${dotValue(String(node.source_kind ?? ""))}];`,
+        )}, entity_type=${dotValue(String(node.entity_type ?? ""))}, speech_act_mode=${dotValue(String(node.speech_act_mode ?? ""))}, storage_kind=${dotValue(String(node.storage_kind ?? ""))}, source_kind=${dotValue(String(node.source_kind ?? ""))}];`,
     )
     .join("\n");
   const edgeLines = edges
@@ -583,6 +606,9 @@ export function netdrawVnaForGraph(nodes: GraphNode[], edges: GraphEdge[]): stri
       vnaValue(node.id),
       vnaValue(nodeExportLabel(node)),
       vnaValue(String(node.kind ?? "")),
+      vnaValue(String(node.entity_type ?? "")),
+      vnaValue(String(node.speech_act_mode ?? "")),
+      vnaValue(String(node.storage_kind ?? "")),
       vnaValue(String(node.domain ?? "")),
       vnaValue(String(node.source_kind ?? "")),
     ].join("\t"),
@@ -599,7 +625,7 @@ export function netdrawVnaForGraph(nodes: GraphNode[], edges: GraphEdge[]): stri
   );
   return [
     "*node data",
-    "ID\tname\tkind\tdomain\tsource_kind",
+    "ID\tname\tkind\tentity_type\tspeech_act_mode\tstorage_kind\tdomain\tsource_kind",
     ...nodeLines,
     "*tie data",
     "from\tto\tstrength\ttype\tevidence_label\tassertion_origin",

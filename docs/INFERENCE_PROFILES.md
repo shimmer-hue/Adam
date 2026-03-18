@@ -78,6 +78,16 @@ Left-side controls:
   - persisted session/profile flag surfaced in runtime status and metadata
   - current MLX path does not switch sampler settings, retrieval policy, or hidden extra passes on this flag alone
 
+## Explicit session-start graph normalization
+
+- session start may run a separate graph-normalization pass over legacy knowledge rows
+- the deterministic path upgrades missing author/work information nodes and typed informational edges into the persistent graph when they can be grounded from existing text
+- on the real MLX path, EDEN can ask Adam in a bounded JSON-only review pass to confirm or refine those legacy knowledge relations before persistence
+- this pass is explicit and visible:
+  - session metadata stores `session_graph_normalization`
+  - the trace surface records `GRAPH_NORMALIZATION`
+- this pass is separate from `adam_auto` turn-profile selection and separate from Adam's operator-facing response generation
+
 Manual numeric fields:
 
 - `temperature`: lower values are steadier; higher values produce more randomness/variation
@@ -115,4 +125,4 @@ using the installed local `mlx-lm` sampler/logits processor utilities.
 - It is not a hidden planner.
 - It is not a weight update.
 - It is not a claim about the model’s absolute maximum context window.
-- `adam_auto` is not a secret second model pass on the current MLX path.
+- `adam_auto` is not a secret second model pass on the current MLX path; the only extra MLX control path in this build is the explicit, trace-visible session-start graph-normalization review.

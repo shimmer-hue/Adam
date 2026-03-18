@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ..logging import RuntimeLog
+from ..ontology_projection import memode_materialization_allowed
 from ..semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE, extract_semantic_candidates
 from ..utils import safe_excerpt, sentence_chunks, sha256_file, slugify
 from .extractors import iter_extract_document
@@ -48,8 +49,6 @@ class IngestService:
 
     def _domain_for_source(self, source_kind: str, path: Path) -> str:
         if source_kind in {"constitution", "feedback"}:
-            return "behavior"
-        if path.name.lower().startswith("eden_whitepaper"):
             return "behavior"
         return "knowledge"
 
@@ -195,6 +194,7 @@ class IngestService:
                     semantic_candidates = extract_semantic_candidates(chunk, limit=6)
                     member_ids: list[str] = []
                     member_ids_by_label: dict[str, str] = {}
+                    supporting_edge_ids: list[str] = []
                     for candidate in semantic_candidates["meme_candidates"]:
                         meme = self.store.upsert_meme(
                             experiment_id=experiment_id,
@@ -213,6 +213,9 @@ class IngestService:
                                 "parser": parser,
                                 "quality_score": page_quality_score,
                                 "quality_flags": page_quality_flags,
+                                "entity_type": str(candidate.get("entity_type") or ""),
+                                "relation_role": str(candidate.get("relation_role") or ""),
+                                "candidate_kind": str(candidate.get("kind") or ""),
                             },
                         )
                         member_id = str(meme["id"])
@@ -233,7 +236,7 @@ class IngestService:
                         target_id = member_ids_by_label.get(slugify(relation["target_label"]))
                         if not source_id or not target_id or source_id == target_id:
                             continue
-                        self.store.add_edge(
+                        self.store.set_edge(
                             experiment_id=experiment_id,
                             src_kind="meme",
                             src_id=source_id,
@@ -253,7 +256,7 @@ class IngestService:
                         )
                     for idx, left in enumerate(member_ids):
                         for right in member_ids[idx + 1 :]:
-                            self.store.add_edge(
+                            edge = self.store.set_edge(
                                 experiment_id=experiment_id,
                                 src_kind="meme",
                                 src_id=left,
@@ -268,12 +271,15 @@ class IngestService:
                                     "confidence": 1.0,
                                 },
                             )
-                    if len(member_ids) >= 2:
+                            supporting_edge_ids.append(str(edge["id"]))
+                    member_subset = member_ids[: min(4, len(member_ids))]
+                    support_subset = sorted(dict.fromkeys(supporting_edge_ids))
+                    if memode_materialization_allowed(domain) and len(member_subset) >= 2 and support_subset:
                         label = " / ".join(self.store.get_meme(member_id)["label"] for member_id in member_ids[:3])
                         memode = self.store.upsert_memode(
                             experiment_id=experiment_id,
                             label=label,
-                            member_ids=member_ids[: min(4, len(member_ids))],
+                            member_ids=member_subset,
                             summary=safe_excerpt(chunk, limit=320),
                             domain=domain,
                             metadata={
@@ -285,6 +291,8 @@ class IngestService:
                                 "parser": parser,
                                 "quality_score": page_quality_score,
                                 "quality_flags": page_quality_flags,
+                                "supporting_edge_ids": support_subset,
+                                "member_order": member_subset,
                             },
                         )
                         memode_count += 1
@@ -297,7 +305,7 @@ class IngestService:
                             edge_type="MATERIALIZES_AS_MEMODE",
                             provenance={"chunk_id": chunk_id},
                         )
-                        for member_id in member_ids[: min(4, len(member_ids))]:
+                        for member_id in member_subset:
                             self.store.add_edge(
                                 experiment_id=experiment_id,
                                 src_kind="memode",

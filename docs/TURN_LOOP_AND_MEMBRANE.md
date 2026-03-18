@@ -11,6 +11,14 @@
 7. Accept explicit feedback.
 8. Update graph channels and derive new memes/memodes from feedback.
 
+## Session-start graph normalization
+
+- session start can run an explicit graph-normalization pass before the first operator turn
+- the pass is limited to legacy knowledge rows whose current graph state is still missing author/work information nodes or typed informational edges
+- deterministic relation extraction runs first; on the MLX path, a bounded Adam-identity JSON review can refine those candidate relations before persistence
+- the pass is not part of Adam's operator-facing reply generation and does not mutate behavior-domain memodes
+- every run is recorded as a visible `GRAPH_NORMALIZATION` trace event and stored in session metadata under `session_graph_normalization`
+
 ## What the membrane does
 
 - strips control characters

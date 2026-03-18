@@ -195,6 +195,7 @@ function computeNodeColor(
   if (state.nodeAssembly) return "#cfeeb0";
   if (state.nodeActive) return "#ffcb73";
   if (appearance.nodeColorBy === "domain") return colorFor(String(node.domain ?? node.id));
+  if (appearance.nodeColorBy === "entity_type") return colorFor(String(node.entity_type ?? node.kind ?? node.id));
   if (appearance.nodeColorBy === "cluster") return colorFor(String(node.cluster_signature ?? node.id));
   if (appearance.nodeColorBy === "evidence_label") return colorFor(String(node.evidence_label ?? node.id));
   if (appearance.nodeColorBy === "active_set_presence") return Number(node.recent_active_set_presence ?? 0) > 0 ? "#f8cb7e" : "#7e6b5a";

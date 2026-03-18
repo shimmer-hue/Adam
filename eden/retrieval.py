@@ -8,6 +8,7 @@ from typing import Any
 import networkx as nx
 
 from .config import RuntimeSettings
+from .ontology_projection import project_node_ontology
 from .regard import explicit_feedback_relevance, regard_breakdown, selection_score
 from .utils import cosine_similarity, now_utc, safe_excerpt
 
@@ -15,11 +16,14 @@ from .utils import cosine_similarity, now_utc, safe_excerpt
 @dataclass(slots=True)
 class CandidateScore:
     node_kind: str
+    display_kind: str
     node_id: str
     label: str
     domain: str
     scope: str
     source_kind: str
+    entity_type: str
+    speech_act_mode: str
     semantic_similarity: float
     activation: float
     regard: float
@@ -52,7 +56,7 @@ class RetrievalService:
 
     def _format_candidate_block(self, item: CandidateScore) -> str:
         lines = [
-            f"[{item.domain.upper()}:{item.node_kind}] {item.label}",
+            f"[{item.domain.upper()}:{item.display_kind}] {item.label}",
             f"selection={item.selection:.3f} regard={item.regard:.3f} activation={item.activation:.3f}",
             f"provenance={item.provenance}",
         ]
@@ -73,7 +77,7 @@ class RetrievalService:
             f"evidence_items={len(items)}",
         ]
         for item in items:
-            summary = f"- [{item.node_kind}] {item.label} selection={item.selection:.3f}"
+            summary = f"- [{item.display_kind}] {item.label} selection={item.selection:.3f}"
             if item.page_number is not None:
                 summary += f" page={item.page_number}"
             if item.quality_score is not None:
@@ -190,6 +194,12 @@ class RetrievalService:
             metrics = graph_metrics.get(node["id"], {"degree": 0.0, "clustering": 0.0, "triangles": 0.0, "component_size": 1.0, "memode_count": 0.0})
             regard = regard_breakdown(node, metrics, now, settings.regard_weights)
             metadata = node.get("metadata", {})
+            projection = project_node_ontology(
+                storage_kind=node_kind,
+                domain=str(node.get("domain", "knowledge")),
+                label=str(node.get("label", "untitled")),
+                metadata=metadata,
+            )
             source_session = metadata.get("session_id")
             session_bias = 1.0 if source_session and source_session == session_id else 0.0
             scope = node.get("scope", "global")
@@ -228,11 +238,14 @@ class RetrievalService:
             scored.append(
                 CandidateScore(
                     node_kind=node_kind,
+                    display_kind=str(projection["kind"]),
                     node_id=node["id"],
                     label=node.get("label", "untitled"),
                     domain=node.get("domain", "knowledge"),
                     scope=scope,
                     source_kind=node.get("source_kind", "unknown"),
+                    entity_type=str(projection["entity_type"]),
+                    speech_act_mode=str(projection["speech_act_mode"]),
                     semantic_similarity=semantic,
                     activation=regard.activation,
                     regard=regard.total,
@@ -308,7 +321,9 @@ class RetrievalService:
                 {
                     "label": candidate.label,
                     "kind": candidate.node_kind,
+                    "display_kind": candidate.display_kind,
                     "domain": candidate.domain,
+                    "entity_type": candidate.entity_type,
                     "selection": round(candidate.selection, 4),
                     "semantic_similarity": round(candidate.semantic_similarity, 4),
                     "activation": round(candidate.activation, 4),

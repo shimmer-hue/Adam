@@ -36,10 +36,17 @@ The extractor normalizes ligatures and line-wrap artifacts, scores each parser c
 3. Stream page-like text units from the extractor instead of materializing the full document payload before storage.
 4. Chunk text into manageable blocks.
 5. Store `document_chunks` with parser, page provenance, and extraction-quality metadata as chunk materialization progresses.
-6. Extract top phrases heuristically into memes.
-7. Add bounded auto-derived relation edges inside each chunk when explicit surface rules fire (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES` today), then add `CO_OCCURS_WITH` fallback edges across the chunk-local meme set.
-8. Materialize a memode when a chunk yields at least two memes and persist explicit `MEMODE_HAS_MEMBER` membership edges from the memode to its member memes.
+6. Extract top phrases heuristically into compatibility-table semantic units. Behavior-domain material projects outward as performative `meme`; knowledge-domain material projects outward as constative `information`.
+7. Add bounded auto-derived relation edges inside each chunk when explicit surface rules fire (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES` today), then add `CO_OCCURS_WITH` fallback edges across the chunk-local member set.
+8. Materialize a memode only when a behavior-domain chunk yields at least two behavior memes plus at least one qualifying support edge, and persist explicit `MEMODE_HAS_MEMBER` membership edges from the memode to its member memes together with `supporting_edge_ids`.
 9. Mark the document `ingested` on success or `failed` with error and extraction-quality metadata if extraction/ingest aborts.
+10. If a document was ingested before typed-relation/entity backfill existed, session-start graph normalization can later upgrade the persisted graph by materializing missing knowledge `information` entities plus typed informational edges from the already-stored text without forcing a full re-ingest.
+
+## Domain defaults
+
+- `constitution` and `feedback` source kinds ingest into `behavior`
+- ordinary external documents ingest into `knowledge`
+- the whitepaper sample is validated as a document extractor fixture, not silently promoted to `behavior` merely because of its filename
 
 ## Provenance kept
 

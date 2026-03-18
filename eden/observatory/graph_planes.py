@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from typing import Any
 
+from ..ontology_projection import memode_members_are_behavioral
 from ..semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 from .clustering import build_cluster_summaries
 from .contracts import ASSEMBLY_RENDER_MODES, MEMODE_SUPPORT_EDGE_ALLOWLIST
@@ -82,11 +83,17 @@ def build_memode_audit_plane(
     edges: list[dict[str, Any]],
     assemblies: list[dict[str, Any]],
 ) -> dict[str, Any]:
+    node_lookup = {node["id"]: node for node in nodes}
     meme_lookup = {node["id"]: node for node in nodes if node.get("kind") == "meme"}
     meme_edges = [
         deepcopy(edge)
         for edge in edges
         if edge.get("source") in meme_lookup and edge.get("target") in meme_lookup
+    ]
+    relation_edges = [
+        deepcopy(edge)
+        for edge in edges
+        if edge.get("type") not in {"MATERIALIZES_AS_MEMODE", MEMODE_MEMBERSHIP_EDGE_TYPE}
     ]
     edge_lookup = {_edge_identity(edge): edge for edge in meme_edges}
     materialized_support_edge_ids: set[str] = set()
@@ -104,6 +111,14 @@ def build_memode_audit_plane(
             edge
             for edge in meme_edges
             if str(edge.get("source") or "") in member_set and str(edge.get("target") or "") in member_set
+        ]
+        incident_member_edges = [
+            edge
+            for edge in relation_edges
+            if (
+                str(edge.get("source") or "") in member_set
+                or str(edge.get("target") or "") in member_set
+            )
         ]
         candidate_support_edges = [
             edge
@@ -129,14 +144,14 @@ def build_memode_audit_plane(
         unsupported_member_ids = [member_id for member_id in member_ids if member_id not in supported_member_ids]
         informational_edges = [
             edge
-            for edge in member_edges
+            for edge in incident_member_edges
             if _edge_identity(edge) not in support_edge_keys
         ]
         knowledge_informational_edges = [
             edge
             for edge in informational_edges
-            if meme_lookup.get(str(edge.get("source") or ""), {}).get("domain") == "knowledge"
-            and meme_lookup.get(str(edge.get("target") or ""), {}).get("domain") == "knowledge"
+            if node_lookup.get(str(edge.get("source") or ""), {}).get("domain") == "knowledge"
+            and node_lookup.get(str(edge.get("target") or ""), {}).get("domain") == "knowledge"
         ]
         passes = (
             len(member_ids) >= 2
@@ -172,19 +187,19 @@ def build_memode_audit_plane(
                 ],
                 "declared_support_edge_ids": declared_support_edge_ids,
                 "declared_support_edges": [
-                    _edge_audit_payload(edge, meme_lookup, relation_class="declared_support")
+                    _edge_audit_payload(edge, node_lookup, relation_class="declared_support")
                     for edge in declared_support_edges
                 ],
                 "support_edge_ids": sorted(support_edge_keys),
                 "support_edges": [
-                    _edge_audit_payload(edge, meme_lookup, relation_class="materialized_support", overlapping_memode_ids=[str(assembly.get("id") or "")])
+                    _edge_audit_payload(edge, node_lookup, relation_class="materialized_support", overlapping_memode_ids=[str(assembly.get("id") or "")])
                     for edge in sorted(candidate_support_edges, key=lambda item: (_edge_identity(item), str(item.get("type") or "")))
                 ],
                 "informational_edge_ids": sorted(_edge_identity(edge) for edge in informational_edges),
                 "informational_edges": [
                     _edge_audit_payload(
                         edge,
-                        meme_lookup,
+                        node_lookup,
                         relation_class="knowledge_informational"
                         if edge in knowledge_informational_edges
                         else "member_informational",
@@ -204,7 +219,7 @@ def build_memode_audit_plane(
         )
 
     informational_relations: list[dict[str, Any]] = []
-    for edge in meme_edges:
+    for edge in relation_edges:
         identity = _edge_identity(edge)
         if identity in materialized_support_edge_ids:
             continue
@@ -213,16 +228,20 @@ def build_memode_audit_plane(
         overlapping_memodes = sorted(
             set(meme_memberships.get(source_id, [])) & set(meme_memberships.get(target_id, []))
         )
-        if str(edge.get("type") or "") in MEMODE_SUPPORT_EDGE_ALLOWLIST:
+        source_node = node_lookup.get(source_id, {})
+        target_node = node_lookup.get(target_id, {})
+        if source_node.get("kind") == "meme" and target_node.get("kind") == "meme" and str(edge.get("type") or "") in MEMODE_SUPPORT_EDGE_ALLOWLIST:
             relation_class = "unmaterialized_support_candidate"
-        elif meme_lookup.get(source_id, {}).get("domain") == "knowledge" and meme_lookup.get(target_id, {}).get("domain") == "knowledge":
+        elif source_node.get("domain") == "knowledge" and target_node.get("domain") == "knowledge":
             relation_class = "knowledge_informational"
+        elif source_node.get("kind") == "information" or target_node.get("kind") == "information":
+            relation_class = "member_informational"
         else:
             relation_class = "non_memetic_relation"
         informational_relations.append(
             _edge_audit_payload(
                 edge,
-                meme_lookup,
+                node_lookup,
                 relation_class=relation_class,
                 overlapping_memode_ids=overlapping_memodes,
             )
@@ -267,20 +286,28 @@ def build_graph_planes(
     semantic_nodes = []
     assemblies = []
     runtime_nodes = []
+    projected_node_lookup = {node["id"]: node for node in nodes}
     for node in nodes:
         if node.get("kind") == "meme":
             semantic = deepcopy(node)
             semantic["render_coords"] = {"force": semantic_coord_lookup.get(node["id"], {"x": 0.0, "y": 0.0})}
             semantic_nodes.append(semantic)
         elif node.get("kind") == "memode":
+            if not bool(node.get("projectable_in_assemblies", False)):
+                runtime_nodes.append(deepcopy(node))
+                continue
             metadata = json.loads(node.get("metadata_json") or "{}") if node.get("metadata_json") else {}
+            member_ids = list(node.get("member_ids") or metadata.get("member_ids") or [])
+            if not memode_members_are_behavioral(member_ids, projected_node_lookup):
+                runtime_nodes.append(deepcopy(node))
+                continue
             assemblies.append(
                 {
                     "id": node["id"],
                     "label": node.get("label", ""),
                     "summary": node.get("summary", ""),
                     "domain": node.get("domain", ""),
-                    "member_meme_ids": list(node.get("member_ids") or metadata.get("member_ids") or []),
+                    "member_meme_ids": member_ids,
                     "supporting_edge_ids": list(node.get("supporting_edge_ids") or metadata.get("supporting_edge_ids") or []),
                     "member_order": list(node.get("member_order") or metadata.get("member_order") or []),
                     "invariance_summary": str(node.get("invariance_summary") or metadata.get("invariance_summary") or node.get("summary", "")),
@@ -298,7 +325,12 @@ def build_graph_planes(
             runtime_nodes.append(deepcopy(node))
 
     semantic_edges = []
-    assembly_nodes = [deepcopy(node) for node in nodes if node.get("kind") in {"meme", "memode"}]
+    assembly_nodes = [
+        deepcopy(node)
+        for node in nodes
+        if node.get("kind") in {"meme", "information"}
+        or (node.get("kind") == "memode" and bool(node.get("projectable_in_assemblies", False)))
+    ]
     assembly_node_ids = {node["id"] for node in assembly_nodes}
     assembly_edges = []
     runtime_edges = []
@@ -306,7 +338,7 @@ def build_graph_planes(
     for edge in edges:
         source = node_lookup.get(edge["source"])
         target = node_lookup.get(edge["target"])
-        if source and target and source.get("kind") in {"meme", "memode"} and target.get("kind") in {"meme", "memode"}:
+        if source and target and source.get("id") in assembly_node_ids and target.get("id") in assembly_node_ids:
             assembly_edges.append(deepcopy(edge))
         if source and target and source.get("kind") == "meme" and target.get("kind") == "meme" and edge.get("type") in MEMODE_SUPPORT_EDGE_ALLOWLIST:
             semantic_edges.append(deepcopy(edge))

@@ -322,7 +322,7 @@ type ActionForm = {
 };
 
 const SURFACES: Surface[] = ["overview", "graph", "basin", "geometry", "tanakh", "measurements"];
-const DEFAULT_GRAPH_MODE: GraphMode = "Semantic Map";
+const DEFAULT_GRAPH_MODE: GraphMode = "Assemblies";
 const DEFAULT_ASSEMBLY_RENDER_MODE: AssemblyRenderMode = "hulls";
 const DEFAULT_LIFT_MODE: LiftMode = "flat";
 const DEFAULT_INTERACTION_MODE: InteractionMode = "INSPECT";

@@ -84,9 +84,10 @@ Generated per experiment under `exports/<experiment_id>/`:
   - `Runtime`
   - `Active Set`
   - `Compare`
-- `Semantic Map` shows memes as first-class visible nodes, semantic edges, cluster hull/label summaries, and memode overlays
+- `Semantic Map` shows behavior-domain memes only, semantic support edges, cluster hull/label summaries, and memode overlays
 - memodes render as second-order assemblies with `hulls`, `collapsed-meta-node`, or `hidden` overlay modes; they are not default peer dots
-- `Assemblies` exposes the meme-plus-memode plane directly: meme support edges, informational knowledge relations, and explicit memode membership edges are all exportable/readable there without pretending they belong to the clustering-only semantic map
+- `Assemblies` exposes the ontology-projected second-order plane directly: behavior memes, constative information nodes, informational knowledge relations, and explicit behavior-memode membership edges are all exportable/readable there without pretending they belong to the clustering-only semantic map
+- for legacy graphs that still store only snippet-like knowledge rows, `Assemblies` may project additional author/work/information nodes with `storage_kind = "projection"` so exports stay truthful before session-start normalization persists those entities into the graph proper
 - label disclosure is progressive and non-hover-dependent:
   - cluster labels first
   - selected / pinned / high-centrality meme labels next
@@ -110,6 +111,7 @@ Generated per experiment under `exports/<experiment_id>/`:
   - presets and layout snapshots persist in browser-local storage keyed by experiment identity plus manifest / graph hash
   - layout, filter, appearance, and table state do not enter the measurement ledger
 - appearance controls can style node / edge color, size, label visibility, and opacity from EDEN attributes such as kind, domain, cluster, evidence label, active-set presence, degree, weight, and regard/reward/risk where present
+- node appearance/filter metadata now also carries `entity_type`, `speech_act_mode`, and `storage_kind` so browser/export surfaces can distinguish projected ontology from compatibility-table storage
 - filter controls can constrain text, attribute/range slices, connected components, isolated-node visibility, and ego neighborhoods without mutating graph facts
 - the Data Lab provides node/edge tables, sorting, bulk selection, CSV/JSON export of the current selection, and precision-drawer handoff
 - the `Memode Audit` workbench provides:
@@ -125,6 +127,8 @@ Generated per experiment under `exports/<experiment_id>/`:
 - graph payloads expose layout, appearance, filter, statistics, and export capability metadata so the React shell can stay declarative instead of hard-coding instrument assumptions
 - graph payload nodes and edges can expose `export_label` alongside stable internal ids so graph-document downloads can carry semantic labels into Gephi without sacrificing referential identity
 - graph payloads expose `assembly_nodes` and `assembly_edges` as a distinct second-order plane so `Assemblies` mode can show/export memode topology without collapsing it into the meme-only semantic slice
+- graph payload nodes expose projected ontology fields: `kind`, `entity_type`, `speech_act_mode`, and `storage_kind`
+- graph payloads may include projected legacy information entities whose stable ids begin with `projection::information::`; these are export/runtime read-path repairs rather than persisted graph rows
 - graph payload layout metadata includes:
   - `layout_families`
   - `layout_catalog`

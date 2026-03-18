@@ -94,6 +94,8 @@ def _iter_relation_candidates(text: str) -> list[dict[str, Any]]:
                         "source_label": author,
                         "target_label": work,
                         "edge_type": "AUTHOR_OF",
+                        "source_entity_type": "author",
+                        "target_entity_type": "work",
                         "confidence": confidence,
                         "rule": rule_name,
                         "sentence_excerpt": safe_excerpt(sentence, limit=220),
@@ -114,6 +116,8 @@ def _iter_relation_candidates(text: str) -> list[dict[str, Any]]:
                         "source_label": source,
                         "target_label": target,
                         "edge_type": edge_type,
+                        "source_entity_type": "information",
+                        "target_entity_type": "information",
                         "confidence": confidence,
                         "rule": rule_name,
                         "sentence_excerpt": safe_excerpt(sentence, limit=220),
@@ -127,22 +131,34 @@ def extract_semantic_candidates(text: str, *, limit: int = 6) -> dict[str, list[
     meme_candidates: list[dict[str, Any]] = []
     seen_labels: set[str] = set()
 
-    def append_candidate(label: str, *, score: float, kind: str) -> None:
+    def append_candidate(label: str, *, score: float, kind: str, entity_type: str = "") -> None:
         normalized = slugify(label)
         if not normalized or normalized in seen_labels:
             return
         seen_labels.add(normalized)
-        meme_candidates.append(
-            {
-                "label": label,
-                "score": float(score),
-                "kind": kind,
-            }
-        )
+        candidate = {
+            "label": label,
+            "score": float(score),
+            "kind": kind,
+        }
+        if entity_type:
+            candidate["entity_type"] = entity_type
+            candidate["relation_role"] = entity_type
+        meme_candidates.append(candidate)
 
     for relation in relation_candidates:
-        append_candidate(relation["source_label"], score=2.4, kind="relation_entity")
-        append_candidate(relation["target_label"], score=2.4, kind="relation_entity")
+        append_candidate(
+            relation["source_label"],
+            score=2.4,
+            kind="relation_entity",
+            entity_type=str(relation.get("source_entity_type") or ""),
+        )
+        append_candidate(
+            relation["target_label"],
+            score=2.4,
+            kind="relation_entity",
+            entity_type=str(relation.get("target_entity_type") or ""),
+        )
     for phrase, score in top_phrases(text, limit=limit):
         append_candidate(phrase, score=score, kind="phrase")
 

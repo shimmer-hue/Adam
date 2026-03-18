@@ -7,6 +7,7 @@ from typing import Any
 
 import networkx as nx
 
+from ..ontology_projection import memode_members_are_behavioral
 from ..semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 from ..utils import now_utc, safe_excerpt
 from .contracts import MEMODE_SUPPORT_EDGE_ALLOWLIST, MEMODE_SUPPORT_EDGE_DENYLIST
@@ -558,6 +559,9 @@ class ObservatoryService:
                 directed.add_edge(source_id, target_id, weight=next_weight, edge_type=edge_type, provenance=provenance)
             return change
         if action_type == "memode_assert":
+            requested_domain = str(action.get("domain", "behavior")).strip().lower() or "behavior"
+            if requested_domain != "behavior":
+                raise ValueError("Known memodes are restricted to behavior-domain meme nodes and must use domain='behavior'.")
             subgraph = self._validated_memode_subgraph(experiment_id=experiment_id, candidate_ids=action.get("selected_node_ids") or [], node_lookup=node_lookup)
             member_ids = subgraph["member_ids"]
             temp_id = "__preview_memode__"
@@ -566,7 +570,7 @@ class ObservatoryService:
                 id=temp_id,
                 label=str(action.get("label", "Known Memode")).strip() or "Known Memode",
                 kind="memode",
-                domain=str(action.get("domain", "behavior")).strip() or "behavior",
+                domain="behavior",
                 source_kind="memode",
                 summary=str(action.get("summary", "")).strip(),
                 provenance=str(action.get("operator_label", "local_operator")).strip(),
@@ -675,6 +679,9 @@ class ObservatoryService:
             )
             return {"edge": removed, "summary": f"edge_remove {source_id} -> {target_id} [{edge_type}]"}
         if action_type == "memode_assert":
+            requested_domain = str(action.get("domain", "behavior")).strip().lower() or "behavior"
+            if requested_domain != "behavior":
+                raise ValueError("Known memodes are restricted to behavior-domain meme nodes and must use domain='behavior'.")
             subgraph = self._validated_memode_subgraph(
                 experiment_id=experiment_id,
                 candidate_ids=action.get("selected_node_ids") or [],
@@ -686,7 +693,7 @@ class ObservatoryService:
                 label=str(action.get("label", "Known Memode")).strip() or "Known Memode",
                 member_ids=member_ids,
                 summary=str(action.get("summary", "")).strip() or "Operator-asserted memode.",
-                domain=str(action.get("domain", "behavior")).strip() or "behavior",
+                domain="behavior",
                 metadata={
                     "operator_label": str(action.get("operator_label", "local_operator")).strip(),
                     "evidence_label": str(action.get("evidence_label", "OPERATOR_ASSERTED")).strip(),
@@ -993,10 +1000,17 @@ class ObservatoryService:
         candidate_ids: list[str],
         node_lookup: dict[str, dict[str, Any]],
     ) -> dict[str, Any]:
-        member_ids = [node_id for node_id in candidate_ids if node_lookup.get(node_id, {}).get("kind") == "meme"]
+        member_ids = [
+            node_id
+            for node_id in candidate_ids
+            if node_lookup.get(node_id, {}).get("kind") == "meme"
+            and str(node_lookup.get(node_id, {}).get("domain") or "").lower() == "behavior"
+        ]
         member_ids = sorted(dict.fromkeys(member_ids))
         if len(member_ids) < 2:
-            raise ValueError("Known memodes require at least two selected meme nodes.")
+            raise ValueError("Known memodes require at least two selected behavior meme nodes.")
+        if not memode_members_are_behavioral(member_ids, node_lookup):
+            raise ValueError("Known memodes may only be built from behavior-domain meme nodes.")
         support_graph = nx.Graph()
         support_graph.add_nodes_from(member_ids)
         supporting_edge_ids: list[str] = []
@@ -1044,7 +1058,12 @@ class ObservatoryService:
                         kind = "document"
                     else:
                         kind = group[:-1]
-                lookup[item["id"]] = {"id": item["id"], "kind": kind}
+                lookup[item["id"]] = {
+                    "id": item["id"],
+                    "kind": kind,
+                    "domain": str(item.get("domain") or ""),
+                    "source_kind": str(item.get("source_kind") or ""),
+                }
         return lookup
 
     def _node_kinds(self, experiment_id: str, source_id: str, target_id: str) -> tuple[str, str]:

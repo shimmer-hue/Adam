@@ -25,6 +25,7 @@ from .models.base import split_model_output
 from .models.mlx_backend import MLXModelAdapter
 from .models.catalog import DEFAULT_LOCAL_MLX_MODEL, local_mlx_model_status, prepare_local_mlx_model
 from .models.mock import MockModelAdapter
+from .ontology_projection import memode_materialization_allowed
 from .observatory.exporters import ObservatoryExporter
 from .observatory.server import ObservatoryServer
 from .observatory.service import ObservatoryService
@@ -46,6 +47,9 @@ PRIMARY_EXPERIMENT_KEY = "primary_experiment"
 PRIMARY_EXPERIMENT_NAME = "Adam Graph"
 PRIMARY_EXPERIMENT_MODE = "persistent"
 OPERATOR_LABEL = "Brian the operator"
+GRAPH_NORMALIZATION_MLX_REVIEW_LIMIT = 8
+GRAPH_NORMALIZATION_ENTITY_TYPES = {"author", "work", "information"}
+GRAPH_NORMALIZATION_EDGE_TYPES = {"AUTHOR_OF", "INFLUENCES", "REFERENCES"}
 
 
 def _normalize_archive_folder(folder: Any) -> str:
@@ -582,7 +586,478 @@ class EdenRuntime:
             requested_mode=request.mode,
             budget_mode=request.budget_mode,
         )
+        try:
+            normalization_report = self._normalize_legacy_knowledge_graph(
+                experiment_id=experiment["id"],
+                session_id=session["id"],
+            )
+            session = self.store.update_session_metadata(
+                session["id"],
+                {"session_graph_normalization": normalization_report},
+            )
+        except Exception as exc:
+            report = {
+                "status": "error",
+                "ran_at": now_utc(),
+                "error": f"{type(exc).__name__}: {exc}",
+                "mode": "session_start_graph_normalization",
+            }
+            self.runtime_log.emit(
+                "WARNING",
+                "graph_normalization_failed",
+                "Session-start graph normalization failed.",
+                experiment_id=experiment["id"],
+                session_id=session["id"],
+                error=report["error"],
+            )
+            self.store.record_trace_event(
+                experiment_id=experiment["id"],
+                session_id=session["id"],
+                turn_id=None,
+                event_type="GRAPH_NORMALIZATION",
+                level="WARNING",
+                message="Session-start graph normalization failed",
+                payload=report,
+            )
+            session = self.store.update_session_metadata(
+                session["id"],
+                {"session_graph_normalization": report},
+            )
         return session
+
+    def _meme_row_metadata(self, row: dict[str, Any]) -> dict[str, Any]:
+        raw = row.get("metadata_json")
+        if isinstance(raw, dict):
+            return raw
+        if not raw:
+            return {}
+        try:
+            return json.loads(str(raw))
+        except json.JSONDecodeError:
+            return {}
+
+    def _relation_entity_lookup(self, memes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        lookup: dict[str, dict[str, Any]] = {}
+        priority_by_canonical: dict[str, int] = {}
+        for row in memes:
+            if str(row.get("domain") or "").lower() != "knowledge":
+                continue
+            canonical = slugify(str(row.get("canonical_label") or row.get("label") or ""))
+            if not canonical:
+                continue
+            metadata = self._meme_row_metadata(row)
+            priority = (
+                2
+                if str(metadata.get("candidate_kind") or "") == "relation_entity"
+                or str(metadata.get("entity_type") or "") in GRAPH_NORMALIZATION_ENTITY_TYPES
+                else 1
+            )
+            if canonical not in lookup or priority > priority_by_canonical.get(canonical, 0):
+                lookup[canonical] = row
+                priority_by_canonical[canonical] = priority
+        return lookup
+
+    def _extract_json_payload(self, text: str) -> Any:
+        stripped = str(text or "").strip()
+        if not stripped:
+            return None
+        for opener, closer in (("[", "]"), ("{", "}")):
+            start = stripped.find(opener)
+            end = stripped.rfind(closer)
+            if start == -1 or end == -1 or end <= start:
+                continue
+            fragment = stripped[start : end + 1]
+            try:
+                return json.loads(fragment)
+            except json.JSONDecodeError:
+                continue
+        return None
+
+    def _sanitize_relation_review_payload(
+        self,
+        payload: Any,
+        *,
+        fallback_relations: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        if isinstance(payload, dict):
+            raw_relations = payload.get("relations") or []
+        elif isinstance(payload, list):
+            raw_relations = payload
+        else:
+            return []
+        fallback_lookup = {
+            (
+                slugify(str(item.get("source_label") or "")),
+                slugify(str(item.get("target_label") or "")),
+                str(item.get("edge_type") or "").upper(),
+            ): item
+            for item in fallback_relations
+        }
+        sanitized: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for item in raw_relations:
+            if not isinstance(item, dict):
+                continue
+            source_label = str(item.get("source_label") or "").strip()
+            target_label = str(item.get("target_label") or "").strip()
+            edge_type = str(item.get("edge_type") or "").strip().upper()
+            if edge_type not in GRAPH_NORMALIZATION_EDGE_TYPES:
+                continue
+            source_canonical = slugify(source_label)
+            target_canonical = slugify(target_label)
+            if not source_canonical or not target_canonical or source_canonical == target_canonical:
+                continue
+            fallback = fallback_lookup.get((source_canonical, target_canonical, edge_type), {})
+            source_entity_type = str(item.get("source_entity_type") or fallback.get("source_entity_type") or "information").strip().lower()
+            target_entity_type = str(item.get("target_entity_type") or fallback.get("target_entity_type") or "information").strip().lower()
+            if edge_type == "AUTHOR_OF":
+                source_entity_type = "author"
+                target_entity_type = "work"
+            if source_entity_type not in GRAPH_NORMALIZATION_ENTITY_TYPES:
+                source_entity_type = "information"
+            if target_entity_type not in GRAPH_NORMALIZATION_ENTITY_TYPES:
+                target_entity_type = "information"
+            key = (source_canonical, target_canonical, edge_type)
+            if key in seen:
+                continue
+            seen.add(key)
+            confidence = item.get("confidence", fallback.get("confidence", 0.72))
+            try:
+                confidence_value = max(0.0, min(1.0, float(confidence)))
+            except (TypeError, ValueError):
+                confidence_value = float(fallback.get("confidence", 0.72) or 0.72)
+            sanitized.append(
+                {
+                    "source_label": source_label,
+                    "target_label": target_label,
+                    "edge_type": edge_type,
+                    "source_entity_type": source_entity_type,
+                    "target_entity_type": target_entity_type,
+                    "confidence": confidence_value,
+                    "rule": str(item.get("rule") or "adam_identity_graph_normalizer_v1"),
+                    "sentence_excerpt": str(item.get("sentence_excerpt") or fallback.get("sentence_excerpt") or ""),
+                }
+            )
+        return sanitized
+
+    def _graph_normalization_system_prompt(self) -> str:
+        return (
+            f"You are {self.agent_profile['name']}, rewriting your own externalized graph in EDEN.\n"
+            "This is not a Brian-facing answer.\n"
+            "Treat this as graph repair for legacy knowledge rows.\n"
+            "Behavior-domain nodes are performative memes.\n"
+            "Knowledge-domain authors, works, and factual relations are constative information nodes, not memes.\n"
+            "Memodes are behavior-only second-order objects and must never be created in this pass.\n"
+            "Use only grounded relations visible in the supplied text.\n"
+            "Allowed edge types: AUTHOR_OF, INFLUENCES, REFERENCES.\n"
+            "Allowed entity types: author, work, information.\n"
+            'Return strict JSON only in the form {"relations":[...]} and no prose.'
+        )
+
+    def _graph_normalization_prompt(
+        self,
+        *,
+        row: dict[str, Any],
+        relations: list[dict[str, Any]],
+    ) -> str:
+        return (
+            "Normalize this one legacy knowledge row.\n\n"
+            f"Legacy label: {str(row.get('label') or '').strip()}\n"
+            f"Legacy text excerpt: {safe_excerpt(str(row.get('text') or ''), limit=900)}\n\n"
+            "Deterministic candidates:\n"
+            f"{json.dumps(relations, ensure_ascii=True)}\n\n"
+            "If a candidate is unsupported by the text, drop it. If a relation is supported but needs cleaner entity typing, fix it.\n"
+            'Return only JSON: {"relations":[{"source_label":"...","source_entity_type":"author|work|information","target_label":"...","target_entity_type":"author|work|information","edge_type":"AUTHOR_OF|INFLUENCES|REFERENCES","confidence":0.0,"sentence_excerpt":"..."}]}.'
+        )
+
+    def _adam_identity_relation_review(
+        self,
+        *,
+        row: dict[str, Any],
+        relations: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        if self.settings.model_backend.lower() != "mlx":
+            return []
+        model_status = self.mlx_model_status()
+        if not model_status.get("ready"):
+            return []
+        adapter = self._get_model_adapter()
+        model_result = adapter.generate(
+            system_prompt=self._graph_normalization_system_prompt(),
+            conversation_prompt=self._graph_normalization_prompt(row=row, relations=relations),
+            max_tokens=360,
+            temperature=0.0,
+            top_p=1.0,
+            repetition_penalty=0.0,
+        )
+        payload = self._extract_json_payload(
+            str(model_result.answer_text or model_result.text or "")
+        )
+        return self._sanitize_relation_review_payload(payload, fallback_relations=relations)
+
+    def _attach_information_entity_provenance(
+        self,
+        *,
+        experiment_id: str,
+        entity_id: str,
+        source_row: dict[str, Any],
+        metadata: dict[str, Any],
+        session_id: str,
+    ) -> None:
+        document_id = str(metadata.get("document_id") or "")
+        if document_id:
+            self.store.add_edge(
+                experiment_id=experiment_id,
+                src_kind="document",
+                src_id=document_id,
+                dst_kind="meme",
+                dst_id=entity_id,
+                edge_type="DERIVED_FROM",
+                provenance={
+                    "source_path": metadata.get("source_path", ""),
+                    "page_number": metadata.get("page_number"),
+                    "normalization": "legacy_knowledge_graph_normalization",
+                    "session_id": session_id,
+                },
+            )
+        turn_id = str(metadata.get("turn_id") or "")
+        if turn_id:
+            self.store.add_edge(
+                experiment_id=experiment_id,
+                src_kind="turn",
+                src_id=turn_id,
+                dst_kind="meme",
+                dst_id=entity_id,
+                edge_type="OCCURS_IN",
+                provenance={
+                    "actor": metadata.get("origin", "legacy_knowledge_graph_normalization"),
+                    "session_id": session_id,
+                },
+            )
+
+    def _upsert_normalized_information_entity(
+        self,
+        *,
+        experiment_id: str,
+        source_row: dict[str, Any],
+        metadata: dict[str, Any],
+        label: str,
+        entity_type: str,
+        evidence_inc: float,
+        canonical_lookup: dict[str, dict[str, Any]],
+        session_id: str,
+    ) -> tuple[dict[str, Any], bool]:
+        canonical = slugify(label)
+        existing = canonical_lookup.get(canonical)
+        if existing is not None:
+            existing_metadata = self._meme_row_metadata(existing)
+            existing_text = str(existing.get("text") or label)
+            entity = self.store.upsert_meme(
+                experiment_id=experiment_id,
+                label=str(existing.get("label") or label),
+                text=existing_text,
+                domain="knowledge",
+                source_kind=str(existing.get("source_kind") or source_row.get("source_kind") or "document"),
+                scope=str(existing.get("scope") or source_row.get("scope") or "global"),
+                evidence_inc=max(0.05, evidence_inc * 0.25),
+                metadata={
+                    **existing_metadata,
+                    "candidate_kind": "relation_entity",
+                    "entity_type": entity_type,
+                    "relation_role": entity_type,
+                    "source_path": existing_metadata.get("source_path") or metadata.get("source_path", ""),
+                    "title": existing_metadata.get("title") or metadata.get("title", ""),
+                    "page_number": existing_metadata.get("page_number") or metadata.get("page_number"),
+                    "document_id": existing_metadata.get("document_id") or metadata.get("document_id"),
+                    "session_id": existing_metadata.get("session_id") or metadata.get("session_id") or session_id,
+                    "turn_id": existing_metadata.get("turn_id") or metadata.get("turn_id"),
+                    "normalization_origin": existing_metadata.get("normalization_origin") or "legacy_knowledge_graph_normalization",
+                },
+            )
+            canonical_lookup[canonical] = entity
+            return entity, False
+        entity = self.store.upsert_meme(
+            experiment_id=experiment_id,
+            label=label,
+            text=str(source_row.get("text") or label),
+            domain="knowledge",
+            source_kind=str(source_row.get("source_kind") or "document"),
+            scope=str(source_row.get("scope") or "global"),
+            evidence_inc=max(0.35, evidence_inc),
+            metadata={
+                "candidate_kind": "relation_entity",
+                "entity_type": entity_type,
+                "relation_role": entity_type,
+                "source_path": metadata.get("source_path", ""),
+                "title": metadata.get("title", ""),
+                "page_number": metadata.get("page_number"),
+                "document_id": metadata.get("document_id"),
+                "session_id": metadata.get("session_id") or session_id,
+                "turn_id": metadata.get("turn_id"),
+                "origin": metadata.get("origin", "legacy_knowledge_graph_normalization"),
+                "normalization_origin": "legacy_knowledge_graph_normalization",
+            },
+        )
+        canonical_lookup[canonical] = entity
+        self._attach_information_entity_provenance(
+            experiment_id=experiment_id,
+            entity_id=str(entity["id"]),
+            source_row=source_row,
+            metadata=metadata,
+            session_id=session_id,
+        )
+        return entity, True
+
+    def _normalize_legacy_knowledge_graph(
+        self,
+        *,
+        experiment_id: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        memes = self.store.list_memes(experiment_id)
+        knowledge_rows = [row for row in memes if str(row.get("domain") or "").lower() == "knowledge"]
+        canonical_lookup = self._relation_entity_lookup(knowledge_rows)
+        existing_edge_keys = {
+            (str(edge.get("src_id") or ""), str(edge.get("dst_id") or ""), str(edge.get("edge_type") or ""))
+            for edge in self.store.list_edges(experiment_id)
+            if edge.get("src_kind") == "meme" and edge.get("dst_kind") == "meme"
+        }
+        candidate_rows: list[dict[str, Any]] = []
+        for row in knowledge_rows:
+            metadata = self._meme_row_metadata(row)
+            if str(metadata.get("candidate_kind") or "") == "relation_entity":
+                continue
+            text = str(row.get("text") or "").strip()
+            if not text:
+                continue
+            unresolved_relations: list[dict[str, Any]] = []
+            for relation in extract_semantic_candidates(text, limit=6)["relation_candidates"]:
+                source = canonical_lookup.get(slugify(str(relation.get("source_label") or "")))
+                target = canonical_lookup.get(slugify(str(relation.get("target_label") or "")))
+                edge_type = str(relation.get("edge_type") or "").upper()
+                if not source or not target:
+                    unresolved_relations.append(relation)
+                    continue
+                if (str(source.get("id") or ""), str(target.get("id") or ""), edge_type) not in existing_edge_keys:
+                    unresolved_relations.append(relation)
+            if unresolved_relations:
+                candidate_rows.append({"row": row, "metadata": metadata, "relations": unresolved_relations})
+        report = {
+            "status": "completed",
+            "ran_at": now_utc(),
+            "mode": "deterministic",
+            "candidate_rows": len(candidate_rows),
+            "rows_processed": 0,
+            "rows_changed": 0,
+            "nodes_added": 0,
+            "edges_added": 0,
+            "relations_materialized": 0,
+            "mlx_review_attempted": False,
+            "mlx_review_rows": 0,
+            "mlx_review_applied_rows": 0,
+            "mlx_review_error": "",
+        }
+        if not candidate_rows:
+            self.store.record_trace_event(
+                experiment_id=experiment_id,
+                session_id=session_id,
+                turn_id=None,
+                event_type="GRAPH_NORMALIZATION",
+                level="INFO",
+                message="Session-start graph normalization found no legacy knowledge gaps",
+                payload=report,
+            )
+            return report
+        use_mlx_review = self.settings.model_backend.lower() == "mlx" and bool(self.mlx_model_status().get("ready"))
+        report["mlx_review_attempted"] = use_mlx_review
+        if use_mlx_review:
+            report["mode"] = "adam_identity_mlx"
+        for index, bundle in enumerate(candidate_rows):
+            row = bundle["row"]
+            metadata = bundle["metadata"]
+            relations = list(bundle["relations"])
+            assertion_origin = "legacy_normalization_deterministic"
+            if use_mlx_review and index < GRAPH_NORMALIZATION_MLX_REVIEW_LIMIT:
+                report["mlx_review_rows"] += 1
+                try:
+                    reviewed_relations = self._adam_identity_relation_review(row=row, relations=relations)
+                except Exception as exc:
+                    report["mlx_review_error"] = f"{type(exc).__name__}: {exc}"
+                    reviewed_relations = []
+                if reviewed_relations:
+                    relations = reviewed_relations
+                    assertion_origin = "adam_identity_mlx"
+                    report["mlx_review_applied_rows"] += 1
+            report["rows_processed"] += 1
+            row_changed = False
+            for relation in relations:
+                source_node, source_added = self._upsert_normalized_information_entity(
+                    experiment_id=experiment_id,
+                    source_row=row,
+                    metadata=metadata,
+                    label=str(relation.get("source_label") or ""),
+                    entity_type=str(relation.get("source_entity_type") or "information"),
+                    evidence_inc=float(relation.get("confidence", 0.5) or 0.5),
+                    canonical_lookup=canonical_lookup,
+                    session_id=session_id,
+                )
+                target_node, target_added = self._upsert_normalized_information_entity(
+                    experiment_id=experiment_id,
+                    source_row=row,
+                    metadata=metadata,
+                    label=str(relation.get("target_label") or ""),
+                    entity_type=str(relation.get("target_entity_type") or "information"),
+                    evidence_inc=float(relation.get("confidence", 0.5) or 0.5),
+                    canonical_lookup=canonical_lookup,
+                    session_id=session_id,
+                )
+                if source_added:
+                    report["nodes_added"] += 1
+                    row_changed = True
+                if target_added:
+                    report["nodes_added"] += 1
+                    row_changed = True
+                edge_key = (str(source_node["id"]), str(target_node["id"]), str(relation.get("edge_type") or "").upper())
+                edge_existed = edge_key in existing_edge_keys
+                self.store.set_edge(
+                    experiment_id=experiment_id,
+                    src_kind="meme",
+                    src_id=str(source_node["id"]),
+                    dst_kind="meme",
+                    dst_id=str(target_node["id"]),
+                    edge_type=str(relation.get("edge_type") or "").upper(),
+                    provenance={
+                        "turn_id": metadata.get("turn_id"),
+                        "session_id": session_id,
+                        "document_id": metadata.get("document_id"),
+                        "source_path": metadata.get("source_path", ""),
+                        "title": metadata.get("title", ""),
+                        "page_number": metadata.get("page_number"),
+                        "assertion_origin": assertion_origin,
+                        "evidence_label": "AUTO_DERIVED",
+                        "confidence": float(relation.get("confidence", 0.72) or 0.72),
+                        "relation_rule": relation.get("rule", ""),
+                        "sentence_excerpt": relation.get("sentence_excerpt", ""),
+                        "source_meme_id": str(row.get("id") or ""),
+                    },
+                )
+                if not edge_existed:
+                    existing_edge_keys.add(edge_key)
+                    report["edges_added"] += 1
+                    row_changed = True
+                report["relations_materialized"] += 1
+            if row_changed:
+                report["rows_changed"] += 1
+        self.store.record_trace_event(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            turn_id=None,
+            event_type="GRAPH_NORMALIZATION",
+            level="INFO",
+            message="Session-start graph normalization completed",
+            payload=report,
+        )
+        return report
 
     def session_profile_request(self, session_id: str) -> dict[str, Any]:
         return self._session_profile_request(session_id).to_dict()
@@ -1039,6 +1514,7 @@ class EdenRuntime:
         member_labels_by_id: dict[str, str] = {}
         member_ids_by_label: dict[str, str] = {}
         memode_ids: list[str] = []
+        supporting_edge_ids: list[str] = []
         semantic_candidates = extract_semantic_candidates(text, limit=6)
         for candidate in semantic_candidates["meme_candidates"]:
             meme = self.store.upsert_meme(
@@ -1053,6 +1529,8 @@ class EdenRuntime:
                     "session_id": session_id,
                     "turn_id": turn_id,
                     "origin": actor,
+                    "entity_type": str(candidate.get("entity_type") or ""),
+                    "relation_role": str(candidate.get("relation_role") or ""),
                     "candidate_kind": str(candidate.get("kind") or ""),
                 },
             )
@@ -1074,7 +1552,7 @@ class EdenRuntime:
             target_id = member_ids_by_label.get(slugify(relation["target_label"]))
             if not source_id or not target_id or source_id == target_id:
                 continue
-            self.store.add_edge(
+            self.store.set_edge(
                 experiment_id=experiment_id,
                 src_kind="meme",
                 src_id=source_id,
@@ -1093,7 +1571,7 @@ class EdenRuntime:
             )
         for idx, left in enumerate(member_ids):
             for right in member_ids[idx + 1 :]:
-                self.store.add_edge(
+                edge = self.store.set_edge(
                     experiment_id=experiment_id,
                     src_kind="meme",
                     src_id=left,
@@ -1108,10 +1586,12 @@ class EdenRuntime:
                         "confidence": 1.0,
                     },
                 )
+                supporting_edge_ids.append(str(edge["id"]))
         memode_member_ids = list(member_labels_by_id.keys())[: min(4, len(member_labels_by_id))]
         memode_label_parts = list(member_labels_by_id.values())[:3]
         memode_label = " / ".join(memode_label_parts) or safe_excerpt(text, limit=72)
-        if len(memode_member_ids) >= 2:
+        support_subset = sorted(dict.fromkeys(supporting_edge_ids))
+        if memode_materialization_allowed(domain) and len(memode_member_ids) >= 2 and support_subset:
             memode = self.store.upsert_memode(
                 experiment_id=experiment_id,
                 label=memode_label,
@@ -1119,7 +1599,13 @@ class EdenRuntime:
                 summary=safe_excerpt(text, limit=320),
                 domain=domain,
                 scope=f"session:{session_id}",
-                metadata={"turn_id": turn_id, "session_id": session_id, "origin": actor},
+                metadata={
+                    "turn_id": turn_id,
+                    "session_id": session_id,
+                    "origin": actor,
+                    "supporting_edge_ids": support_subset,
+                    "member_order": memode_member_ids,
+                },
             )
             memode_ids.append(memode["id"])
             self.store.add_edge(
@@ -1159,6 +1645,7 @@ class EdenRuntime:
         member_labels_by_id: dict[str, str] = {}
         member_ids_by_label: dict[str, str] = {}
         memode_ids: list[str] = []
+        supporting_edge_ids: list[str] = []
         metadata = {
             "document_id": document_id,
             "source_path": source_path,
@@ -1175,7 +1662,12 @@ class EdenRuntime:
                 source_kind="document_brief",
                 scope="global",
                 evidence_inc=float(candidate["score"]),
-                metadata={**metadata, "candidate_kind": str(candidate.get("kind") or "")},
+                metadata={
+                    **metadata,
+                    "candidate_kind": str(candidate.get("kind") or ""),
+                    "entity_type": str(candidate.get("entity_type") or ""),
+                    "relation_role": str(candidate.get("relation_role") or ""),
+                },
             )
             member_id = str(meme["id"])
             member_ids.append(member_id)
@@ -1195,7 +1687,7 @@ class EdenRuntime:
             target_id = member_ids_by_label.get(slugify(relation["target_label"]))
             if not source_id or not target_id or source_id == target_id:
                 continue
-            self.store.add_edge(
+            self.store.set_edge(
                 experiment_id=experiment_id,
                 src_kind="meme",
                 src_id=source_id,
@@ -1215,7 +1707,7 @@ class EdenRuntime:
             )
         for idx, left in enumerate(member_ids):
             for right in member_ids[idx + 1 :]:
-                self.store.add_edge(
+                edge = self.store.set_edge(
                     experiment_id=experiment_id,
                     src_kind="meme",
                     src_id=left,
@@ -1230,15 +1722,23 @@ class EdenRuntime:
                         "confidence": 1.0,
                     },
                 )
-        if len(member_ids) >= 2:
+                supporting_edge_ids.append(str(edge["id"]))
+        member_subset = member_ids[: min(4, len(member_ids))]
+        support_subset = sorted(dict.fromkeys(supporting_edge_ids))
+        if memode_materialization_allowed("behavior") and len(member_subset) >= 2 and support_subset:
             memode = self.store.upsert_memode(
                 experiment_id=experiment_id,
                 label=f"ingest lens / {' / '.join(member_labels_by_id[member_id] for member_id in member_ids[:3])}",
-                member_ids=member_ids[: min(4, len(member_ids))],
+                member_ids=member_subset,
                 summary=safe_excerpt(briefing_text, limit=320),
                 domain="behavior",
                 scope="global",
-                metadata={**metadata, "briefing_excerpt": safe_excerpt(briefing_text, limit=220)},
+                metadata={
+                    **metadata,
+                    "briefing_excerpt": safe_excerpt(briefing_text, limit=220),
+                    "supporting_edge_ids": support_subset,
+                    "member_order": member_subset,
+                },
             )
             memode_ids.append(memode["id"])
             self.store.add_edge(
@@ -1250,7 +1750,7 @@ class EdenRuntime:
                 edge_type="CONTEXTUALIZES_DOCUMENT",
                 provenance={"source_path": source_path, "session_id": session_id},
             )
-            for member_id in member_ids[: min(4, len(member_ids))]:
+            for member_id in member_subset:
                 self.store.add_edge(
                     experiment_id=experiment_id,
                     src_kind="memode",

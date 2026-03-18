@@ -5829,3 +5829,336 @@ Remaining uncertainties:
 - The prompt has not yet been exercised by a fresh whitepaper-generation run after this micro-patch.
 Next shortest proof path:
 Run the repaired whitepaper-generation prompt end-to-end on a bounded draft instance and verify that unresolved-governance mode emits only the degraded artifacts while governance-resolved mode still produces the full audited output family.
+
+## [2026-03-17T17:07:19Z] PRE-FLIGHT
+Operator task:
+Patch `/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md` to close the last degraded-mode consistency gaps without changing structure, enforcement, or full-run behavior.
+Task checksum:
+Whitepaper prompt degraded-mode micro-patch round 4.
+Repo situation:
+Worktree remains dirty from prior unrelated turns. The target prompt is already structurally strong; the remaining issues are narrow wording contradictions around degraded-mode status logging, minimal `RUN_CONFIG` handling, and the lingering `inventory-only` phrasing.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+Natural-language contracts in force:
+Fail-closed governance remains authoritative. Unresolved governance must short-circuit drafting and canonization. Prompt edits must preserve current Adam-specific pathing and all restored evidence, archaeology, figure, and acceptance-test rigor.
+Files/modules likely in scope:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - The prompt already hard-gates governance, phases, outputs, audits, and acceptance states.
+- Instrumented:
+  - Current contradictions are visible by direct section read and `rg` hits in the target prompt.
+- Conceptual:
+  - None needed beyond the requested wording fixes.
+- Unknown:
+  - No runtime whitepaper-generation execution has validated the degraded-mode path after the recent prompt hardening.
+Risks / invariants:
+Do not relax degraded-mode limits or re-open full-run outputs under unresolved governance. Preserve section order and keep the patch strictly local.
+Evidence plan:
+Apply a minimal line-level patch, then verify the changed sections by search and diff.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch only the degraded-mode wording contradictions, and confirm the new text consistently requires the execution/build status log and uses the broader degraded-mode output wording.
+
+## [2026-03-17T17:08:32Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. This was a prompt-only micro-patch; no canonical `docs/` surface changed.
+Natural-language contracts added/revised/preserved:
+Revised degraded-mode wording so execution/build status logging is mandatory under unresolved governance, minimal degraded-mode `RUN_CONFIG` handling is explicit, and outcome language no longer understates the required degraded artifacts. Preserved all existing fail-closed governance, audit, and output-gating rules.
+Behavior implemented or modified:
+- Made the degraded-mode execution/build status log required wherever degraded artifacts are enumerated.
+- Added a degraded-mode `RUN_CONFIG` clarification that captures only minimal gating/context state and records it inside degraded-mode artifacts instead of requiring the full run-config audit.
+- Replaced the stale `inventory-only` degraded-output wording with `degraded-mode limited audit outputs`.
+- Reworded the degraded-mode definition so it no longer implies that the short inventory report is the only allowed artifact.
+Evidence produced (tests / traces / commands / exports):
+- `rg -n "MANDATORY PRE / POST RUN-NOTE DISCIPLINE|RUN CONFIG / CONTROL-FLOW GUARD|AUDIT ARTIFACTS|RUN OUTCOME STATES|ACCEPTANCE TESTS|inventory-only|degraded mode|execution/build status log|run-config audit" /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `sed -n '68,120p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `sed -n '196,246p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `sed -n '998,1165p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `git diff -- /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md /Users/brianray/Adam/codex_notes_garden.md`
+Status register changes:
+- Implemented:
+  - `wp_draft_prompt.md` now consistently requires the degraded-mode execution/build status log and describes degraded governance failure as limited audit outputs rather than inventory-only output.
+- Instrumented:
+  - Verification remained textual through search, targeted section reads, and diff review.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - No live whitepaper-generation run has yet exercised the degraded-mode branch after this wording repair.
+Truth-table / limitations updates:
+None. No Adam capability status changed.
+Remaining uncertainties:
+- The working tree remains dirty from prior unrelated edits; they were left untouched.
+- Prompt execution under actual unresolved-governance conditions has not yet been replayed end-to-end.
+Next shortest proof path:
+Exercise the prompt with governance intentionally unresolved and confirm that only the governance resolution log, degraded-mode report, and execution/build status log are emitted.
+
+## [2026-03-17T17:28:04Z] PRE-FLIGHT
+Operator task:
+Repair the ontology/export mismatch proven by `/Users/brianray/Downloads/eden-graph (4).graphml`: knowledge-domain nodes must stop exporting as `meme`, knowledge constatives must surface as `information` with finer roles such as `author` and `work` where supported, and memodes must only materialize from behavior-domain memetic structure rather than any multi-node knowledge chunk.
+Task checksum:
+GraphML evidence shows `8273` nodes all exported as `kind=meme` and `26625` edges all exported as `type=CO_OCCURS_WITH`; attached Austin/Foucault/whitepaper sources reinforce the intended performative-vs-constative split and the memode requirement of at least two memetic nodes plus memetic relation support.
+Repo situation:
+Worktree is dirty from prior unrelated edits: `.DS_Store`, one deleted PDF in `assets/cannonical_secondary_sources/`, `scratch_space_writing_tasks/wp_draft_prompt.md`, and prior appended notes in `codex_notes_garden.md`. Leave unrelated changes untouched. Current repo docs still partially universalize memes as the base primitive, which is now in conflict with the operator’s ontology correction and the observed export failure.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+Natural-language contracts in force:
+Storage compatibility may remain on `memes`/`memodes`, but operator-facing ontology and exports must distinguish behavior-domain performative memes from knowledge-domain constative information. Informational relations such as `AUTHOR_OF` remain non-memetic. Memodes remain derived second-order objects and must not be silently materialized from knowledge-only constatives.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/semantic_relations.py`
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/retrieval.py`
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/eden/observatory/graph_planes.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_observatory_server.py`
+`/Users/brianray/Adam/tests/test_observatory_measurements.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Status register:
+- Implemented:
+  - Auto-derived typed knowledge edges (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES`) and explicit `MEMODE_HAS_MEMBER` edges already exist in code.
+- Instrumented:
+  - Direct GraphML inspection proves the current export still flattens all node kinds to `meme` and all visible edge types to `CO_OCCURS_WITH`.
+- Conceptual:
+  - Session-start MLX/Qwen graph normalization remains only an operator proposal; no implementation/evidence exists in this turn.
+- Unknown:
+  - Whether existing metadata is sufficient to classify all knowledge nodes cleanly into `author`, `work`, or generic `information` without adding a new persistence column.
+Risks / invariants:
+Do not break SQLite/runtime compatibility by renaming the `memes` table or internal storage kinds in one turn. Do not let knowledge informational relations count as memode support. Keep memode audit truthful by restricting memetic support to behavior-domain nodes. Avoid claiming an LLM graph-rewriter exists unless code and evidence prove it.
+Evidence plan:
+Implement an ontology projection layer for exported/retrieved node kinds, gate memode materialization to behavior-domain memetic candidates, update specs to match, and add regression tests that prove knowledge nodes export as `information`/`author`/`work` while knowledge-only ingest no longer creates memodes.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch ontology projection plus behavior-only memode materialization, run focused tests, rebuild observatory if touched, then run `./.venv/bin/pytest -q`.
+
+## [2026-03-17T17:52:03Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/ontology_projection.py`
+`/Users/brianray/Adam/eden/semantic_relations.py`
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/retrieval.py`
+`/Users/brianray/Adam/eden/observatory/contracts.py`
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/eden/observatory/graph_planes.py`
+`/Users/brianray/Adam/eden/observatory/service.py`
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/tests/test_ingest.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_observatory_measurements.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`
+Natural-language contracts added/revised/preserved:
+Revised the ontology contract so behavior-domain nodes remain performative `meme`, knowledge-domain nodes project as constative `information`, and memodes are behavior-only second-order objects. Preserved storage compatibility by leaving SQLite on `memes` / `memodes` while making export/retrieval/UI surfaces project the corrected ontology outward. Preserved the bounded heuristic status of typed knowledge relations and explicitly did not claim a session-start MLX/Qwen whole-graph rewrite.
+Behavior implemented or modified:
+- Knowledge-domain compatibility rows now project as `kind="information"` with projected `entity_type` such as `author` and `work`; behavior-domain rows continue to project as `kind="meme"`.
+- `Semantic Map` now carries behavior memes only; `Assemblies` now carries behavior memes, projected information nodes, projected/ persisted informational relations, and behavior memodes.
+- Observability/export now derives missing informational relations such as `AUTHOR_OF` from existing knowledge text when the persistent graph predates typed-edge storage, so legacy graph payloads no longer have to flatten to `CO_OCCURS_WITH`.
+- Automatic memode materialization is now behavior-only in ingest/runtime indexing, and materialized memodes now retain `supporting_edge_ids` / `member_order`.
+- Observatory memode assertion now rejects knowledge-domain constatives and requires behavior-domain meme members.
+- Retrieval prompt context now displays projected node kinds instead of universalizing all knowledge rows as `meme`.
+Evidence produced (tests / traces / commands / exports):
+- Direct GraphML inspection before patch: `/Users/brianray/Downloads/eden-graph (4).graphml` showed `8273` nodes all `kind=meme` and `26625` edges all `type=CO_OCCURS_WITH`.
+- Focused frontend proof: `npm --prefix /Users/brianray/Adam/web/observatory test -- --run src/workbench/graphUtils.test.ts src/App.test.tsx` -> `9 passed`
+- Focused backend proof: `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_ingest.py /Users/brianray/Adam/tests/test_runtime_e2e.py /Users/brianray/Adam/tests/test_observatory_server.py /Users/brianray/Adam/tests/test_observatory_measurements.py` -> `35 passed`
+- Rebuilt checked-in frontend bundle: `npm --prefix /Users/brianray/Adam/web/observatory run build`
+- Full repo proof: `./.venv/bin/pytest -q` -> `109 passed`
+Status register changes:
+- Implemented:
+  - Ontology projection for knowledge constatives vs behavior memes across retrieval/export/UI.
+  - Behavior-only memode materialization and operator assertion enforcement.
+  - Export-time typed-relation backfill for legacy knowledge rows.
+- Instrumented:
+  - Rebuilt observatory bundle and updated schema/build metadata for the new payload contract.
+- Conceptual:
+  - Session-start MLX/Qwen graph normalization remains conceptual only; no code or runtime evidence for model-driven graph rewiring was added in this turn.
+- Unknown:
+  - Heuristic `author` / `work` projection still depends on explicit surface patterns and label-shape inference; broader ontology typing beyond those bounded rules is not proved.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to reflect knowledge-vs-meme ontology projection, export-time typed-relation backfill for legacy rows, and the explicit absence of session-start MLX/Qwen graph normalization.
+Remaining uncertainties:
+- Worktree remains dirty from unrelated pre-existing changes in `.DS_Store`, `scratch_space_writing_tasks/wp_draft_prompt.md`, and the deleted `assets/cannonical_secondary_sources/2013-Foucault-Archaeology_of_Knowledge_and_the_Discourse_on_Language.pdf`; they were left untouched.
+- `web/observatory/node_modules/.vite/vitest/.../results.json` was touched by the frontend test run and is a generated cache artifact, not a contract surface.
+Next shortest proof path:
+Export a fresh graph after opening the updated observatory, confirm `Assemblies` GraphML now shows `information` / `author` / `work` node kinds plus `AUTHOR_OF` edges on the operator’s real graph, then decide whether a persistent graph-normalization pass is still needed beyond the deterministic projection path.
+
+## [2026-03-17T17:42:14Z] PRE-FLIGHT
+Operator task:
+Apply a round-5 micro-patch to `/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md` to remove the last internal consistency seams around `RUN_CONFIG`, degraded-mode notes-surface handling, and degraded-mode report wording.
+Task checksum:
+Whitepaper prompt micro-patch round 5.
+Repo situation:
+Worktree remains dirty from prior unrelated turns. The target prompt is already near release-candidate quality; only three narrow wording contradictions remain and the document structure must stay intact.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+Natural-language contracts in force:
+Fail-closed governance remains authoritative. Unresolved governance must short-circuit drafting and full-run artifacts. Prompt edits must preserve current Adam-specific wording, paths, and all restored evidence, archaeology, figure, and acceptance-test rigor.
+Files/modules likely in scope:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - The prompt already hard-gates governance, outputs, audit artifacts, and degraded-mode write limits.
+- Instrumented:
+  - The remaining contradictions are visible by direct section reads and targeted search hits in the prompt.
+- Conceptual:
+  - None beyond the requested wording repairs.
+- Unknown:
+  - No live whitepaper-generation run has yet exercised the patched degraded-mode branch end-to-end.
+Risks / invariants:
+Do not weaken governance-failure behavior or reopen full-run outputs under unresolved governance. Do not touch unrelated inventory/traversal semantics outside the degraded-mode wording.
+Evidence plan:
+Apply a surgical line-level patch, verify the edited sections by search and diff, then record the exact repaired seams.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch only the `RUN_CONFIG`, run-note, and degraded-mode report wording lines, and verify the contradictions are gone without introducing any broader drift.
+
+## [2026-03-17T17:43:18Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. This was a prompt-only micro-patch; no canonical `docs/` surface changed.
+Natural-language contracts added/revised/preserved:
+Revised the whitepaper prompt so full-run `RUN_CONFIG` timing no longer conflicts with PRE-note timing, governance-unresolved notes-surface handling remains honest without forcing `MISSING`, and degraded-mode output wording no longer implies a real inventory step. Preserved all existing fail-closed governance, audit, evidence, figure, and acceptance constraints.
+Behavior implemented or modified:
+- Changed the `RUN CONFIG / CONTROL-FLOW GUARD` opening rule from “before writing” to “before drafting or full-run artifact generation,” which removes the PRE-note ordering contradiction without changing full-run rigor.
+- Made notes-surface recording conditional so governance-resolved runs still record a resolved path or `MISSING`, while governance-unresolved degraded mode records skipped notes-surface resolution in degraded-mode artifacts instead of fabricating `MISSING`.
+- Replaced the remaining degraded-mode `inventory` wording with `short degraded-mode report` in the degraded-mode output list and degraded-mode audit-artifact list.
+Evidence produced (tests / traces / commands / exports):
+- `sed -n '88,112p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `sed -n '198,230p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `rg -n "short degraded-mode report|notes-surface resolution was skipped because governance was unresolved|inventory-only" /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `git diff -- /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md /Users/brianray/Adam/codex_notes_garden.md`
+Status register changes:
+- Implemented:
+  - `wp_draft_prompt.md` now resolves the last `RUN_CONFIG` / run-note / degraded-report consistency seams without altering the surrounding enforcement model.
+- Instrumented:
+  - Verification remained textual through targeted section reads, search checks, and diff review.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - No live whitepaper-generation run has yet exercised the prompt after this final wording repair.
+Truth-table / limitations updates:
+None. No Adam capability status changed.
+Remaining uncertainties:
+- The working tree remains dirty from prior unrelated edits; they were left untouched.
+- One search command emitted shell warnings when backticks were not escaped, but the prompt verification itself still succeeded through direct section reads and diff review.
+Next shortest proof path:
+Exercise the prompt in both governance-resolved and governance-unresolved modes and confirm that PRE-note timing, degraded-mode note handling, and degraded-mode reporting all match the patched text exactly.
+
+## [2026-03-17T18:21:30Z] PRE-FLIGHT
+Operator task:
+Verify whether the attached `/Users/brianray/Downloads/eden-graph (5).graphml` and `/Users/brianray/Downloads/eden-edges (1).csv` prove the ontology/edge fix, then patch Adam so legacy knowledge rows can be normalized into author/work information structure and, if bounded and safe, wire an MLX-backed Adam-identity graph-normalization pass into session start.
+Task checksum:
+Legacy-graph normalization plus bounded MLX session-start graph-rewrite hook.
+Repo situation:
+Worktree is already dirty from prior turns and unrelated artifacts. Fresh export inspection shows node ontology projection landed partially, but the attached user-facing artifact still lacks typed knowledge edges and explicit author/work nodes; it remains dominated by chunk-level `CO_OCCURS_WITH` plus `MATERIALIZES_AS_MEMODE`.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+Natural-language contracts in force:
+Knowledge-domain rows must project outward as constative `information`, not universal `meme`. Behavior-domain rows remain performative `meme`. Memodes are behavior-only second-order objects. MLX remains the core local backend, and any session-start Adam-guided graph normalization must stay explicit, bounded, and non-hidden relative to the documented turn loop.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/eden/observatory/graph_planes.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/models/mlx_backend.py`
+`/Users/brianray/Adam/eden/ingest/pipeline.py`
+`/Users/brianray/Adam/eden/storage/graph_store.py`
+`/Users/brianray/Adam/tests/test_ingest.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - Knowledge-vs-meme ontology projection exists for newly indexed rows and export-time read paths.
+  - Typed relation persistence exists for newly indexed knowledge text when explicit rules fire.
+- Instrumented:
+  - The attached export proves current user-visible node/edge distributions and exposes the remaining ontology gap.
+- Conceptual:
+  - Session-start MLX/Qwen graph normalization remains conceptual until code plus runtime/test evidence exist.
+- Unknown:
+  - Whether a bounded Adam-identity MLX pass can safely normalize legacy graph rows without undermining the existing `input -> retrieve -> generate -> membrane -> graph update` contract.
+Risks / invariants:
+Do not silently redefine memodes as knowledge structures. Do not let an MLX normalization hook become a hidden planner or invisible second-pass governor. Preserve Adam as the response generator while keeping graph normalization attributable and bounded. Avoid touching unrelated dirty files.
+Evidence plan:
+Reproduce the export gap against live code paths, add deterministic legacy normalization so author/work information nodes and typed edges appear in assemblies/export, then add a guarded MLX session-start hook with tests/docs only if it can be proved without breaking the turn-loop contract.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch legacy normalization/export/runtime surfaces, verify with focused tests plus export-style assertions, then run `./.venv/bin/pytest -q` after docs/truth-table updates.
+
+## [2026-03-17T18:39:30Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/observatory/exporters.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+Updated the turn-loop, inference-profile, ingest, observatory, truth-table, and limitations surfaces to describe session-start graph normalization, export-time projected legacy information entities, and the explicit Adam-identity MLX review hook.
+Natural-language contracts added/revised/preserved:
+Preserved the ontology split: knowledge rows remain constative `information`; behavior rows remain performative `meme`; memodes remain behavior-only second-order objects. Revised the runtime contract so session start may run a bounded, explicit graph-normalization pass, and revised the observatory contract so `Assemblies` may project legacy author/work information nodes with `storage_kind = "projection"` before persistence catches up.
+Behavior implemented or modified:
+- The attached `/Users/brianray/Downloads/eden-graph (5).graphml` and `/Users/brianray/Downloads/eden-edges (1).csv` were not fully correct: node ontology projection had landed partially, but the export still lacked author/work nodes and typed knowledge edges.
+- Observatory/export now projects missing legacy information entities and typed relations directly into `Assemblies`, so GraphML/CSV export can show author/work nodes plus `AUTHOR_OF` even when the stored graph still only contains legacy snippet rows.
+- Session start now runs persistent legacy knowledge normalization. It materializes missing knowledge information entities and typed relations into the graph and records the run in session metadata plus `GRAPH_NORMALIZATION` trace events.
+- On the MLX path, session-start normalization can ask Adam in a bounded JSON-only pass to review/refine deterministic legacy relation candidates before persistence. This is explicit and separate from the Brian-facing response loop.
+Evidence produced (tests / traces / commands / exports):
+- Direct inspection of `/Users/brianray/Downloads/eden-graph (5).graphml` and `/Users/brianray/Downloads/eden-edges (1).csv` showed `information`/`meme` node projection but only `CO_OCCURS_WITH` and `MATERIALIZES_AS_MEMODE` edge types, with no author/work entity nodes.
+- `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_runtime_e2e.py` -> `10 passed`
+- `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_ingest.py /Users/brianray/Adam/tests/test_observatory_measurements.py /Users/brianray/Adam/tests/test_observatory_server.py` -> `29 passed`
+- `./.venv/bin/pytest -q` -> `112 passed`
+Status register changes:
+- Implemented:
+  - Export-time projection of legacy author/work information nodes plus typed informational edges in `Assemblies`.
+  - Persistent session-start normalization of unresolved legacy knowledge rows into author/work/information structure.
+- Instrumented:
+  - Adam-identity MLX review hook is wired into session-start normalization and proved through bounded test control-path evidence.
+- Conceptual:
+  - None remaining for the bounded feature added in this turn.
+- Unknown:
+  - Live-model quality of the MLX review hook on the operator's full real graph is still unproved in this turn; only the bounded code/test control path was exercised, not a live full-graph MLX normalization run.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to reflect export-time projected legacy information entities, session-start persistent normalization, and the bounded/explicit nature of the MLX review hook.
+Remaining uncertainties:
+- The worktree still contains unrelated pre-existing changes outside this turn, including `.DS_Store`, the deleted `assets/cannonical_secondary_sources/2013-Foucault-Archaeology_of_Knowledge_and_the_Discourse_on_Language.pdf`, prior ontology/observatory edits, and generated frontend artifacts; they were left untouched.
+- No fresh real-user GraphML/CSV export was generated from the operator's full graph in this turn, so the final proof for the actual production graph still requires one fresh export after starting a new session on the patched build.
+Next shortest proof path:
+Start a fresh session on the patched build, let session-start normalization run once, export `Assemblies` again, and verify that the new GraphML/edges CSV contain explicit author/work nodes plus typed edges such as `AUTHOR_OF` instead of only `CO_OCCURS_WITH`.

@@ -8,7 +8,10 @@ from typing import Any
 import networkx as nx
 import numpy as np
 
+from ..ontology_projection import memode_members_are_behavioral, project_node_ontology
+from ..semantic_relations import extract_semantic_candidates
 from ..utils import now_utc, safe_excerpt, sha256_text
+from ..utils import slugify
 from ..tanakh import DEFAULT_TANAKH_REF
 from .contracts import (
     ASSEMBLY_RENDER_MODES,
@@ -58,6 +61,156 @@ def _semantic_export_label(*candidates: Any, fallback: str, limit: int = 140) ->
             continue
         return safe_excerpt(text, limit=limit)
     return fallback
+
+
+def _row_metadata(row: dict[str, Any]) -> dict[str, Any]:
+    raw = row.get("metadata_json")
+    if isinstance(raw, dict):
+        return raw
+    if not raw:
+        return {}
+    try:
+        return json.loads(str(raw))
+    except json.JSONDecodeError:
+        return {}
+
+
+def _projected_information_node_id(canonical_label: str) -> str:
+    return f"projection::information::{canonical_label}"
+
+
+def _derive_projected_information_graph(snapshot: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    knowledge_rows = [row for row in snapshot.get("memes", []) if str(row.get("domain") or "").lower() == "knowledge"]
+    if not knowledge_rows:
+        return [], []
+    canonical_lookup: dict[str, dict[str, Any]] = {}
+    canonical_priority: dict[str, int] = {}
+    for row in knowledge_rows:
+        metadata = _row_metadata(row)
+        canonical = slugify(str(row.get("canonical_label") or row.get("label") or ""))
+        if not canonical:
+            continue
+        priority = 2 if str(metadata.get("candidate_kind") or "") == "relation_entity" or str(metadata.get("entity_type") or "") in {"author", "work", "information"} else 1
+        if canonical not in canonical_lookup or priority > canonical_priority.get(canonical, 0):
+            canonical_lookup[canonical] = row
+            canonical_priority[canonical] = priority
+    seen_keys = {
+        (str(edge.get("src_id") or ""), str(edge.get("dst_id") or ""), str(edge.get("edge_type") or ""))
+        for edge in snapshot.get("edges", [])
+    }
+    projected_nodes: dict[str, dict[str, Any]] = {}
+    projected_edges: list[dict[str, Any]] = []
+    for row in knowledge_rows:
+        metadata = _row_metadata(row)
+        if str(metadata.get("candidate_kind") or "") == "relation_entity":
+            continue
+        text = str(row.get("text") or "").strip()
+        if not text:
+            continue
+        for relation in extract_semantic_candidates(text, limit=6)["relation_candidates"]:
+            source_label = str(relation.get("source_label") or "").strip()
+            target_label = str(relation.get("target_label") or "").strip()
+            source_canonical = slugify(source_label)
+            target_canonical = slugify(target_label)
+            if not source_canonical or not target_canonical:
+                continue
+            source = canonical_lookup.get(source_canonical)
+            target = canonical_lookup.get(target_canonical)
+            if source is not None:
+                source_id = str(source.get("id") or "")
+            else:
+                source_id = _projected_information_node_id(source_canonical)
+                projected_nodes.setdefault(
+                    source_id,
+                    {
+                        "id": source_id,
+                        "label": source_label,
+                        "kind": "information",
+                        "domain": "knowledge",
+                        "source_kind": str(row.get("source_kind") or "document"),
+                        "scope": str(row.get("scope") or "global"),
+                        "storage_kind": "projection",
+                        "entity_type": str(relation.get("source_entity_type") or "information"),
+                        "speech_act_mode": "constative",
+                        "memetic_role": "non_memetic",
+                        "summary": safe_excerpt(relation.get("sentence_excerpt") or source_label, limit=160),
+                        "export_label": source_label,
+                        "evidence": float(row.get("evidence_n", 0.0) or 0.0),
+                        "reward": 0.0,
+                        "risk": 0.0,
+                        "usage_count": 0,
+                        "feedback_count": 0,
+                        "skip_count": 0,
+                        "membrane_conflicts": 0,
+                        "provenance": metadata.get("title") or metadata.get("source_path") or "",
+                        "session_id": metadata.get("session_id", ""),
+                        "created_at": row.get("created_at"),
+                        "verdicts": [],
+                        "projected_from_meme_ids": [str(row.get("id") or "")],
+                    },
+                )
+            if target is not None:
+                target_id = str(target.get("id") or "")
+            else:
+                target_id = _projected_information_node_id(target_canonical)
+                projected_nodes.setdefault(
+                    target_id,
+                    {
+                        "id": target_id,
+                        "label": target_label,
+                        "kind": "information",
+                        "domain": "knowledge",
+                        "source_kind": str(row.get("source_kind") or "document"),
+                        "scope": str(row.get("scope") or "global"),
+                        "storage_kind": "projection",
+                        "entity_type": str(relation.get("target_entity_type") or "information"),
+                        "speech_act_mode": "constative",
+                        "memetic_role": "non_memetic",
+                        "summary": safe_excerpt(relation.get("sentence_excerpt") or target_label, limit=160),
+                        "export_label": target_label,
+                        "evidence": float(row.get("evidence_n", 0.0) or 0.0),
+                        "reward": 0.0,
+                        "risk": 0.0,
+                        "usage_count": 0,
+                        "feedback_count": 0,
+                        "skip_count": 0,
+                        "membrane_conflicts": 0,
+                        "provenance": metadata.get("title") or metadata.get("source_path") or "",
+                        "session_id": metadata.get("session_id", ""),
+                        "created_at": row.get("created_at"),
+                        "verdicts": [],
+                        "projected_from_meme_ids": [str(row.get("id") or "")],
+                    },
+                )
+            edge_type = str(relation.get("edge_type") or "")
+            if not source_id or not target_id or source_id == target_id:
+                continue
+            key = (source_id, target_id, edge_type)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            projected_edges.append(
+                {
+                    "id": f"projection::{source_id}::{target_id}::{edge_type}",
+                    "source": source_id,
+                    "target": target_id,
+                    "type": edge_type,
+                    "weight": 1.0,
+                    "provenance": {
+                        "assertion_origin": "projection_derived",
+                        "evidence_label": "DERIVED",
+                        "confidence": relation.get("confidence", 0.0),
+                        "relation_rule": relation.get("rule", ""),
+                        "sentence_excerpt": relation.get("sentence_excerpt", ""),
+                        "projection_source": "semantic_relation_projection_v3",
+                        "source_path": metadata.get("source_path", ""),
+                        "title": metadata.get("title", ""),
+                        "page_number": metadata.get("page_number"),
+                        "source_meme_id": str(row.get("id") or ""),
+                    },
+                }
+            )
+    return list(projected_nodes.values()), projected_edges
 
 
 OBSERVATORY_LAYOUT_FAMILIES = [
@@ -555,14 +708,14 @@ class ObservatoryExporter:
             },
             "layout_defaults": OBSERVATORY_LAYOUT_DEFAULTS,
             "appearance_dimensions": {
-                "node_color": ["kind", "domain", "cluster", "evidence_label", "active_set_presence", "regard_balance"],
+                "node_color": ["kind", "entity_type", "domain", "cluster", "evidence_label", "active_set_presence", "regard_balance"],
                 "node_size": ["uniform", "degree", "recent_active_set_presence", "evidence", "reward", "risk"],
                 "edge_color": ["type", "evidence_label", "assertion_origin", "selection_state"],
                 "edge_opacity": ["uniform", "weight", "measurement_history", "assertion_origin"],
                 "label_modes": ["selection", "cluster", "importance", "all", "none"],
             },
             "filter_dimensions": {
-                "node_attributes": ["session_id", "kind", "domain", "source_kind", "evidence_label", "cluster_signature", "recent_active_set_presence", "degree", "created_at"],
+                "node_attributes": ["session_id", "kind", "entity_type", "speech_act_mode", "storage_kind", "domain", "source_kind", "evidence_label", "cluster_signature", "recent_active_set_presence", "degree", "created_at"],
                 "edge_attributes": ["type", "weight", "assertion_origin", "evidence_label"],
                 "toggles": ["hide_isolated", "component_largest", "selection_ego"],
                 "component_modes": ["all", "largest", "selection"],
@@ -1202,6 +1355,26 @@ class ObservatoryExporter:
         measurement_events = [self._measurement_event_payload(item) for item in snapshot.get("measurement_events", [])]
         for feedback in snapshot["feedback"]:
             feedback_by_turn[feedback["turn_id"]].append(feedback)
+        projected_relation_nodes, projected_relation_edges = _derive_projected_information_graph(snapshot)
+        meme_outgoing_types: dict[str, set[str]] = defaultdict(set)
+        meme_incoming_types: dict[str, set[str]] = defaultdict(set)
+        for edge in snapshot["edges"]:
+            if edge.get("src_kind") != "meme" or edge.get("dst_kind") != "meme":
+                continue
+            edge_type = str(edge.get("edge_type") or "")
+            meme_outgoing_types[str(edge.get("src_id") or "")].add(edge_type)
+            meme_incoming_types[str(edge.get("dst_id") or "")].add(edge_type)
+        for edge in projected_relation_edges:
+            edge_type = str(edge.get("type") or "")
+            meme_outgoing_types[str(edge.get("source") or "")].add(edge_type)
+            meme_incoming_types[str(edge.get("target") or "")].add(edge_type)
+        raw_meme_lookup = {
+            str(row["id"]): {
+                "kind": "meme",
+                "domain": str(row.get("domain") or ""),
+            }
+            for row in snapshot["memes"]
+        }
 
         def add_node(node_id: str, label: str | None, kind: str, **extra: Any) -> None:
             export_label = str(extra.pop("export_label", "") or "").strip()
@@ -1316,13 +1489,25 @@ class ObservatoryExporter:
         for meme in snapshot["memes"]:
             metadata = json.loads(meme["metadata_json"] or "{}")
             turn_id = metadata.get("turn_id", "")
+            projection = project_node_ontology(
+                storage_kind="meme",
+                domain=str(meme.get("domain") or ""),
+                label=str(meme.get("label") or ""),
+                metadata=metadata,
+                outgoing_edge_types=sorted(meme_outgoing_types.get(str(meme["id"]), set())),
+                incoming_edge_types=sorted(meme_incoming_types.get(str(meme["id"]), set())),
+            )
             add_node(
                 meme["id"],
                 meme["label"],
-                "meme",
+                str(projection["kind"]),
                 domain=meme["domain"],
                 source_kind=meme["source_kind"],
                 scope=meme["scope"],
+                storage_kind=str(projection["storage_kind"]),
+                entity_type=str(projection["entity_type"]),
+                speech_act_mode=str(projection["speech_act_mode"]),
+                memetic_role=str(projection["memetic_role"]),
                 summary=safe_excerpt(meme["text"], limit=160),
                 export_label=_semantic_export_label(
                     safe_excerpt(meme["text"], limit=160),
@@ -1343,9 +1528,38 @@ class ObservatoryExporter:
                 created_at=meme["created_at"],
                 verdicts=[item["verdict"] for item in feedback_by_turn.get(turn_id, [])],
             )
+        for node in projected_relation_nodes:
+            add_node(
+                node["id"],
+                node["label"],
+                str(node.get("kind") or "information"),
+                domain=str(node.get("domain") or "knowledge"),
+                source_kind=str(node.get("source_kind") or "document"),
+                scope=str(node.get("scope") or "global"),
+                storage_kind=str(node.get("storage_kind") or "projection"),
+                entity_type=str(node.get("entity_type") or "information"),
+                speech_act_mode=str(node.get("speech_act_mode") or "constative"),
+                memetic_role=str(node.get("memetic_role") or "non_memetic"),
+                summary=str(node.get("summary") or ""),
+                export_label=str(node.get("export_label") or node.get("label") or node["id"]),
+                evidence=float(node.get("evidence", 0.0) or 0.0),
+                reward=float(node.get("reward", 0.0) or 0.0),
+                risk=float(node.get("risk", 0.0) or 0.0),
+                usage_count=int(node.get("usage_count", 0) or 0),
+                feedback_count=int(node.get("feedback_count", 0) or 0),
+                skip_count=int(node.get("skip_count", 0) or 0),
+                membrane_conflicts=int(node.get("membrane_conflicts", 0) or 0),
+                provenance=str(node.get("provenance") or ""),
+                session_id=str(node.get("session_id") or ""),
+                created_at=node.get("created_at"),
+                verdicts=list(node.get("verdicts") or []),
+                projected_from_meme_ids=list(node.get("projected_from_meme_ids") or []),
+            )
         for memode in snapshot["memodes"]:
             metadata = json.loads(memode["metadata_json"] or "{}")
             turn_id = metadata.get("turn_id", "")
+            member_ids = list(metadata.get("member_ids") or [])
+            projectable = str(memode.get("domain") or "").lower() == "behavior" and memode_members_are_behavioral(member_ids, raw_meme_lookup)
             add_node(
                 memode["id"],
                 memode["label"],
@@ -1353,6 +1567,11 @@ class ObservatoryExporter:
                 domain=memode["domain"],
                 source_kind="memode",
                 scope=memode["scope"],
+                storage_kind="memode",
+                entity_type="memode",
+                speech_act_mode="performative",
+                memetic_role="second_order",
+                projectable_in_assemblies=projectable,
                 summary=safe_excerpt(memode["summary"], limit=160),
                 export_label=_semantic_export_label(
                     safe_excerpt(memode["summary"], limit=160),
@@ -1366,7 +1585,7 @@ class ObservatoryExporter:
                 risk=float(memode["risk_ema"]),
                 usage_count=int(memode["usage_count"]),
                 feedback_count=int(memode["feedback_count"]),
-                member_ids=metadata.get("member_ids", []),
+                member_ids=member_ids,
                 supporting_edge_ids=metadata.get("supporting_edge_ids", []),
                 invariance_summary=metadata.get("invariance_summary", memode["summary"]),
                 member_order=metadata.get("member_order", []),
@@ -1396,6 +1615,13 @@ class ObservatoryExporter:
             }
             edges.append(edge_payload)
             edge_types[(edge["src_id"], edge["dst_id"])] = edge["edge_type"]
+        for edge in projected_relation_edges:
+            if edge["source"] not in graph or edge["target"] not in graph:
+                continue
+            graph.add_edge(edge["source"], edge["target"], weight=float(edge["weight"]), edge_type=edge["type"], provenance=edge["provenance"])
+            directed.add_edge(edge["source"], edge["target"], weight=float(edge["weight"]), edge_type=edge["type"], provenance=edge["provenance"])
+            edges.append(dict(edge))
+            edge_types[(edge["source"], edge["target"])] = edge["type"]
 
         def _node_sort_key(item: dict[str, Any]) -> tuple[int, str, int, str, str]:
             kind_rank = 0 if item["kind"] == "turn" else 1 if item["kind"] == "feedback" else 2

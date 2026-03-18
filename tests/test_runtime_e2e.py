@@ -4,6 +4,7 @@ import json
 
 import eden.runtime as runtime_module
 from eden.config import DEFAULT_MLX_MODEL_DIR
+from eden.models.base import ModelResult
 from eden.semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 
 
@@ -184,6 +185,9 @@ def test_index_text_into_graph_builds_memode_label_without_refetching_memes(runt
         def add_edge(self, **kwargs) -> None:
             return None
 
+        def set_edge(self, **kwargs):
+            return {"id": f"edge-{kwargs['src_id']}-{kwargs['dst_id']}-{kwargs['edge_type']}"}
+
         def upsert_memode(self, **kwargs):
             self.memode_payload = kwargs
             return {"id": "memode-1"}
@@ -205,13 +209,11 @@ def test_index_text_into_graph_builds_memode_label_without_refetching_memes(runt
     )
 
     assert indexed["meme_ids"] == ["meme-1", "meme-2", "meme-3"]
-    assert indexed["memode_ids"] == ["memode-1"]
-    assert fake_store.memode_payload is not None
-    assert fake_store.memode_payload["label"] == "alpha / beta / gamma"
-    assert fake_store.memode_payload["member_ids"] == ["meme-1", "meme-2", "meme-3"]
+    assert indexed["memode_ids"] == []
+    assert fake_store.memode_payload is None
 
 
-def test_index_text_into_graph_derives_authorship_and_memode_membership(runtime) -> None:
+def test_index_text_into_graph_derives_authorship_without_materializing_knowledge_memodes(runtime) -> None:
     experiment = runtime.initialize_experiment("blank")
     session = runtime.start_session(experiment["id"], title="Typed relations")
     turn = runtime.store.record_turn(
@@ -237,6 +239,161 @@ def test_index_text_into_graph_derives_authorship_and_memode_membership(runtime)
 
     edge_types = {edge["edge_type"] for edge in runtime.store.list_edges(experiment["id"])}
 
-    assert indexed["memode_ids"]
+    assert indexed["memode_ids"] == []
     assert "AUTHOR_OF" in edge_types
-    assert MEMODE_MEMBERSHIP_EDGE_TYPE in edge_types
+    assert MEMODE_MEMBERSHIP_EDGE_TYPE not in edge_types
+
+
+def test_graph_payload_projects_knowledge_constatives_into_information_nodes(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(experiment["id"], title="Ontology projection")
+    turn = runtime.store.record_turn(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        user_text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        prompt_context="",
+        response_text="",
+        membrane_text="",
+        active_set=[],
+        trace=[],
+    )
+
+    runtime._index_text_into_graph(
+        experiment_id=experiment["id"],
+        turn_id=turn["id"],
+        session_id=session["id"],
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="turn_user",
+        actor="brian_operator",
+    )
+
+    payload = runtime.observatory_service.graph_payload(experiment_id=experiment["id"], session_id=session["id"])
+    assembly_nodes = payload["assembly_nodes"]
+    assembly_edges = payload["assembly_edges"]
+
+    assert any(node["kind"] == "information" and node["entity_type"] == "author" for node in assembly_nodes)
+    assert any(node["kind"] == "information" and node["entity_type"] == "work" for node in assembly_nodes)
+    assert all(node["kind"] == "meme" and node["domain"] == "behavior" for node in payload["semantic_nodes"])
+    assert any(edge["type"] == "AUTHOR_OF" for edge in assembly_edges)
+
+
+def test_graph_payload_projects_legacy_relation_entities_for_export(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Legacy relation row",
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="document",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={
+            "source_path": "/tmp/legacy.pdf",
+            "title": "legacy.pdf",
+            "page_number": 1,
+            "candidate_kind": "phrase",
+        },
+    )
+
+    payload = runtime.observatory_service.graph_payload(experiment_id=experiment["id"], session_id=None)
+    assembly_nodes = payload["assembly_nodes"]
+    assembly_edges = payload["assembly_edges"]
+
+    assert any(
+        node["label"] == "Michel Foucault"
+        and node["kind"] == "information"
+        and node["entity_type"] == "author"
+        and node["storage_kind"] == "projection"
+        for node in assembly_nodes
+    )
+    assert any(
+        node["label"] == "The Archaeology of Knowledge"
+        and node["kind"] == "information"
+        and node["entity_type"] == "work"
+        and node["storage_kind"] == "projection"
+        for node in assembly_nodes
+    )
+    assert any(
+        edge["type"] == "AUTHOR_OF"
+        and edge["assertion_origin"] == "projection_derived"
+        for edge in assembly_edges
+    )
+
+
+def test_start_session_normalizes_legacy_knowledge_rows(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Legacy relation row",
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="document",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={
+            "source_path": "/tmp/legacy.pdf",
+            "title": "legacy.pdf",
+            "page_number": 1,
+            "document_id": "doc-legacy",
+            "candidate_kind": "phrase",
+        },
+    )
+
+    session = runtime.start_session(experiment["id"], title="Legacy normalization")
+    memes = runtime.store.list_memes(experiment["id"])
+    edges = runtime.store.list_edges(experiment["id"])
+    session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
+
+    assert any(meme["label"] == "Michel Foucault" for meme in memes)
+    assert any(meme["label"] == "The Archaeology of Knowledge" for meme in memes)
+    author_edge = next(edge for edge in edges if edge["edge_type"] == "AUTHOR_OF")
+    provenance = json.loads(author_edge["provenance_json"] or "{}")
+    assert provenance["assertion_origin"] == "legacy_normalization_deterministic"
+    assert session_meta["session_graph_normalization"]["rows_changed"] >= 1
+    assert session_meta["session_graph_normalization"]["edges_added"] >= 1
+
+
+def test_start_session_uses_adam_identity_mlx_review_for_graph_normalization(runtime, monkeypatch) -> None:
+    runtime.settings.model_backend = "mlx"
+    monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
+
+    class FakeAdapter:
+        backend_name = "mlx"
+
+        def generate(self, **kwargs):
+            return ModelResult(
+                backend="mlx",
+                text='{"relations":[{"source_label":"Michel Foucault","source_entity_type":"author","target_label":"The Archaeology of Knowledge","target_entity_type":"work","edge_type":"AUTHOR_OF","confidence":0.93,"sentence_excerpt":"Michel Foucault wrote The Archaeology of Knowledge."}]}',
+                tokens_estimate=64,
+                metadata={"mode": "fake_mlx"},
+                answer_text='{"relations":[{"source_label":"Michel Foucault","source_entity_type":"author","target_label":"The Archaeology of Knowledge","target_entity_type":"work","edge_type":"AUTHOR_OF","confidence":0.93,"sentence_excerpt":"Michel Foucault wrote The Archaeology of Knowledge."}]}',
+            )
+
+    monkeypatch.setattr(runtime, "_get_model_adapter", lambda: FakeAdapter())
+
+    experiment = runtime.initialize_experiment("blank")
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Legacy Foucault row",
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="document",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={
+            "source_path": "/tmp/foucault.pdf",
+            "title": "foucault.pdf",
+            "page_number": 1,
+            "candidate_kind": "phrase",
+        },
+    )
+
+    session = runtime.start_session(experiment["id"], title="MLX normalization")
+    author_edge = next(edge for edge in runtime.store.list_edges(experiment["id"]) if edge["edge_type"] == "AUTHOR_OF")
+    provenance = json.loads(author_edge["provenance_json"] or "{}")
+    session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
+
+    assert provenance["assertion_origin"] == "adam_identity_mlx"
+    assert session_meta["session_graph_normalization"]["mode"] == "adam_identity_mlx"
+    assert session_meta["session_graph_normalization"]["mlx_review_applied_rows"] >= 1

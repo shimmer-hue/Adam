@@ -21,7 +21,10 @@ const nodes = [
     id: "meme-1",
     label: "meme key phrase",
     export_label: "Persistent meme semantic content",
-    kind: "meme",
+    kind: "information",
+    entity_type: "author",
+    speech_act_mode: "constative",
+    storage_kind: "meme",
     domain: "knowledge",
     source_kind: "operator",
     cluster_signature: "cluster-1",
@@ -33,6 +36,9 @@ const nodes = [
     label: "adaptive key phrase",
     export_label: "Adaptive meme semantic content",
     kind: "meme",
+    entity_type: "behavior_meme",
+    speech_act_mode: "performative",
+    storage_kind: "meme",
     domain: "behavior",
     source_kind: "document",
     cluster_signature: "cluster-2",
@@ -60,7 +66,7 @@ describe("graph export serializers", () => {
     const nodeCsv = csvForNodes([...nodes]);
     const edgeCsv = csvForEdges([...edges]);
 
-    expect(nodeCsv).toContain("Id,Label,Kind,Domain,SourceKind,ClusterSignature,Degree,RecentActiveSetPresence");
+    expect(nodeCsv).toContain("Id,Label,Kind,EntityType,SpeechActMode,StorageKind,Domain,SourceKind,ClusterSignature,Degree,RecentActiveSetPresence");
     expect(nodeCsv).toContain("Persistent meme semantic content");
     expect(edgeCsv).toContain("Id,Source,Target,Label,Type,Weight,EvidenceLabel,AssertionOrigin,Confidence");
     expect(edgeCsv).toContain("CO_OCCURS_WITH: Persistent meme semantic content -> Adaptive meme semantic content");
@@ -116,6 +122,9 @@ describe("graph export serializers", () => {
           id: "memode-1",
           label: "Persistence Memode",
           kind: "memode",
+          entity_type: "memode",
+          speech_act_mode: "performative",
+          storage_kind: "memode",
           domain: "behavior",
           source_kind: "memode",
         },
@@ -138,6 +147,9 @@ describe("graph export serializers", () => {
           id: "memode-1",
           label: "Persistence Memode",
           kind: "memode",
+          entity_type: "memode",
+          speech_act_mode: "performative",
+          storage_kind: "memode",
           domain: "behavior",
           source_kind: "memode",
         },

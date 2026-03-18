@@ -269,7 +269,7 @@ describe("EDEN Observatory App", () => {
     expect(screen.getByText("Large diagnostics bundle")).toBeTruthy();
     expect(screen.getByRole("button", { name: "GraphViz DOT" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Pajek NET" })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "Assemblies" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "Assemblies" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("radio", { name: "INSPECT" }).getAttribute("aria-checked")).toBe("true");
     expect((screen.getByRole("button", { name: "Preview" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Commit" }) as HTMLButtonElement).disabled).toBe(true);
@@ -277,7 +277,7 @@ describe("EDEN Observatory App", () => {
     expect(screen.getByRole("heading", { name: "1. Force-Directed Layout Algorithms" })).toBeTruthy();
     expect(screen.getByText(/Nodes repel while edges pull related nodes together/)).toBeTruthy();
     expect(screen.getByText("Runnable in browser worker")).toBeTruthy();
-    expect(screen.getByTestId("graph-panel").textContent).toContain(":3");
+    expect(screen.getByTestId("graph-panel").textContent).toContain(":4");
     expect((screen.getByLabelText(/ForceAtlas2.*Iterations/i) as HTMLInputElement).value).toBe("160");
     expect(screen.getByText("Identity")).toBeTruthy();
     expect(screen.getByText("Ontology")).toBeTruthy();
@@ -298,8 +298,8 @@ describe("EDEN Observatory App", () => {
     expect((screen.getByRole("button", { name: "Run Layout" }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByText(/distance fidelity matters more than raw scale/i)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Assemblies" }));
-    expect(screen.getByTestId("graph-panel").textContent).toContain(":4");
+    fireEvent.click(screen.getByRole("radio", { name: "Semantic Map" }));
+    expect(screen.getByTestId("graph-panel").textContent).toContain(":3");
 
     fireEvent.click(screen.getByRole("radio", { name: "Compare" }));
     expect(screen.getByText("Baseline")).toBeTruthy();
