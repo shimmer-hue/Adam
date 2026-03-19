@@ -16,10 +16,13 @@
 - session start can run an explicit wake-up audit before the first operator turn
 - phase 1 is legacy knowledge normalization:
   - it is limited to knowledge rows whose graph state is still missing author/work information nodes or typed informational edges
-  - deterministic relation extraction runs first; on the MLX path, a bounded Adam-identity JSON review can refine those candidate relations before persistence
+  - deterministic relation extraction runs first
+  - the Adam-identity MLX review layer is opt-in only via `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1`; without that flag, session start remains deterministic even when the live backend is MLX
+  - when the flag is enabled on the MLX path, a bounded Adam-identity JSON review can refine those candidate relations before persistence
 - phase 2 is behavior taxonomy:
   - it audits bounded turn-attached behavior bundles from Adam responses and explicit feedback
   - it can strengthen first-order behavior memes and materialize bounded behavior memodes when at least two selected behavior memes plus qualifying support edges are present
+  - the same `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1` opt-in gate controls whether Adam performs the bounded MLX taxonomy review instead of deterministic selection
   - any `memeplex` output is report-only and does not become a first-class graph object in this pass
 - the wake-up audit is not part of Adam's operator-facing reply generation
 - every run is recorded as visible trace:

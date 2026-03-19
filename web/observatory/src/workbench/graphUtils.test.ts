@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildNodeLookup,
   csvForEdges,
   csvForNodes,
   gdfForGraph,
@@ -8,6 +9,7 @@ import {
   gmlForGraph,
   graphMLForGraph,
   graphVizDotForGraph,
+  lookupNodesForPayload,
   netdrawVnaForGraph,
   pajekNetForGraph,
   tgfForGraph,
@@ -162,5 +164,59 @@ describe("graph export serializers", () => {
 
     expect(assemblyGraph.nodes.map((node) => node.id)).toContain("memode-1");
     expect(assemblyGraph.edges.map((edge) => edge.type)).toContain("MEMODE_HAS_MEMBER");
+  });
+
+  it("keeps rich memode ontology fields when assembly summaries share the same id", () => {
+    const payload = {
+      semantic_nodes: [...nodes],
+      semantic_edges: [...edges],
+      assembly_nodes: [
+        ...nodes,
+        {
+          id: "memode-1",
+          label: "Persistence Memode",
+          kind: "memode",
+          entity_type: "memode",
+          speech_act_mode: "performative",
+          storage_kind: "memode",
+          domain: "behavior",
+          source_kind: "memode",
+          cluster_signature: "cluster-2",
+        },
+      ],
+      assembly_edges: [
+        ...edges,
+        {
+          id: "edge-2",
+          source: "memode-1",
+          target: "meme-2",
+          type: "MEMODE_HAS_MEMBER",
+          weight: 1,
+          evidence_label: "AUTO_DERIVED",
+          assertion_origin: "auto_derived",
+          confidence: 1,
+        },
+      ],
+      assemblies: [
+        {
+          id: "memode-1",
+          label: "Persistence Memode",
+          domain: "behavior",
+          member_meme_ids: ["meme-2"],
+        },
+      ],
+      runtime_nodes: [],
+      runtime_edges: [],
+    };
+
+    const assemblyGraph = visibleGraphForMode(payload, "Assemblies");
+    const memodeNode = assemblyGraph.nodes.find((node) => node.id === "memode-1");
+    const lookup = buildNodeLookup(lookupNodesForPayload(payload));
+
+    expect(memodeNode?.kind).toBe("memode");
+    expect(memodeNode?.speech_act_mode).toBe("performative");
+    expect(memodeNode?.cluster_signature).toBe("cluster-2");
+    expect(lookup.get("memode-1")?.storage_kind).toBe("memode");
+    expect(lookup.get("memode-1")?.source_kind).toBe("memode");
   });
 });

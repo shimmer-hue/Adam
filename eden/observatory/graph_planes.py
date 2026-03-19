@@ -54,6 +54,66 @@ def _connected_support_graph(member_ids: list[str], support_edges: list[dict[str
     return len(visited) == len(member_ids)
 
 
+def _project_memode_clusters(
+    *,
+    assembly_nodes: list[dict[str, Any]],
+    runtime_nodes: list[dict[str, Any]],
+    assemblies: list[dict[str, Any]],
+    cluster_lookup: dict[str, dict[str, Any]],
+) -> None:
+    assembly_by_id = {str(assembly.get("id") or ""): assembly for assembly in assemblies}
+    memode_nodes = [
+        node
+        for node in [*assembly_nodes, *runtime_nodes]
+        if node.get("kind") == "memode"
+    ]
+    for node in memode_nodes:
+        metadata = json.loads(node.get("metadata_json") or "{}") if node.get("metadata_json") else {}
+        assembly = assembly_by_id.get(str(node.get("id") or ""), {})
+        member_ids = _dedupe_preserve_order(
+            list(node.get("member_order") or [])
+            + list(node.get("member_ids") or [])
+            + list(assembly.get("member_order") or [])
+            + list(assembly.get("member_meme_ids") or [])
+            + list(metadata.get("member_ids") or [])
+        )
+        member_clusters = [
+            cluster_lookup.get(member_id, {})
+            for member_id in member_ids
+            if cluster_lookup.get(member_id, {}).get("cluster_signature")
+        ]
+        if not member_clusters:
+            continue
+        signature_counts = Counter(str(cluster.get("cluster_signature") or "") for cluster in member_clusters)
+        dominant_signature = sorted(
+            (
+                (signature, count)
+                for signature, count in signature_counts.items()
+                if signature
+            ),
+            key=lambda item: (-item[1], item[0]),
+        )[0][0]
+        dominant_cluster = next(
+            (
+                cluster
+                for cluster in member_clusters
+                if str(cluster.get("cluster_signature") or "") == dominant_signature
+            ),
+            {},
+        )
+        node["cluster_signature"] = dominant_signature
+        node["cluster_label"] = str(dominant_cluster.get("display_label") or "")
+        cluster_lookup[str(node["id"])] = {
+            "cluster_signature": dominant_signature,
+            "display_label": str(dominant_cluster.get("display_label") or ""),
+            "auto_label_short": str(dominant_cluster.get("auto_label_short") or dominant_cluster.get("display_label") or ""),
+            "manual_label": str(dominant_cluster.get("manual_label") or ""),
+        }
+        if assembly:
+            assembly["cluster_signature"] = dominant_signature
+            assembly["cluster_label"] = str(dominant_cluster.get("display_label") or "")
+
+
 def _edge_audit_payload(edge: dict[str, Any], node_lookup: dict[str, dict[str, Any]], *, relation_class: str, overlapping_memode_ids: list[str] | None = None) -> dict[str, Any]:
     source = node_lookup.get(str(edge.get("source") or ""), {})
     target = node_lookup.get(str(edge.get("target") or ""), {})
@@ -355,8 +415,20 @@ def build_graph_planes(
         coord_lookup=semantic_coord_lookup,
         measurement_events=measurement_events,
     )
+    _project_memode_clusters(
+        assembly_nodes=assembly_nodes,
+        runtime_nodes=runtime_nodes,
+        assemblies=assemblies,
+        cluster_lookup=cluster_lookup,
+    )
     for node in semantic_nodes:
         cluster = cluster_lookup.get(node["id"], {})
+        node["cluster_signature"] = cluster.get("cluster_signature", "")
+        node["cluster_label"] = cluster.get("display_label", "")
+    for node in [*assembly_nodes, *runtime_nodes]:
+        cluster = cluster_lookup.get(node["id"], {})
+        if not cluster:
+            continue
         node["cluster_signature"] = cluster.get("cluster_signature", "")
         node["cluster_label"] = cluster.get("display_label", "")
     active_set_slices = []

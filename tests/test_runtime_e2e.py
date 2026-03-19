@@ -354,8 +354,41 @@ def test_start_session_normalizes_legacy_knowledge_rows(runtime) -> None:
     assert session_meta["session_graph_normalization"]["edges_added"] >= 1
 
 
+def test_start_session_keeps_mlx_wakeup_review_opt_in_by_default(runtime, monkeypatch) -> None:
+    runtime.settings.model_backend = "mlx"
+    monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
+    monkeypatch.setattr(
+        runtime,
+        "_adam_identity_relation_review",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("session-start MLX review should stay gated by default")),
+    )
+
+    experiment = runtime.initialize_experiment("blank")
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Legacy gated row",
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="document",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={"candidate_kind": "phrase"},
+    )
+
+    session = runtime.start_session(experiment["id"], title="MLX gate default")
+    author_edge = next(edge for edge in runtime.store.list_edges(experiment["id"]) if edge["edge_type"] == "AUTHOR_OF")
+    provenance = json.loads(author_edge["provenance_json"] or "{}")
+    session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
+
+    assert provenance["assertion_origin"] == "legacy_normalization_deterministic"
+    assert session_meta["session_graph_normalization"]["mode"] == "deterministic"
+    assert session_meta["session_graph_normalization"]["mlx_review_gate"] == "disabled_by_default"
+    assert session_meta["session_graph_wakeup"]["mode"] == "deterministic"
+
+
 def test_start_session_uses_adam_identity_mlx_review_for_graph_normalization(runtime, monkeypatch) -> None:
     runtime.settings.model_backend = "mlx"
+    monkeypatch.setenv(runtime_module.SESSION_START_MLX_REVIEW_ENV, "1")
     monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
 
     class FakeAdapter:
@@ -473,6 +506,14 @@ def test_start_session_runs_behavior_taxonomy_audit(runtime) -> None:
         if meme["label"] in {"Offer a repair plan", "Compare it against the graph", "Revise the answer"}
     }
     trace_events = runtime.store.list_trace_events(experiment["id"], session_id=wake_session["id"])
+    payload = runtime.observatory_service.graph_payload(experiment_id=experiment["id"], session_id=wake_session["id"])
+    member_cluster_signatures = {
+        node["id"]: node.get("cluster_signature", "")
+        for node in payload["semantic_nodes"]
+        if node["id"] in member_ids
+    }
+    projected_memode = next(node for node in payload["assembly_nodes"] if node["id"] == audited_memode["id"])
+    assembly_summary = next(item for item in payload["assemblies"] if item["id"] == audited_memode["id"])
 
     assert session_meta["session_graph_taxonomy"]["bundles_changed"] >= 1
     assert session_meta["session_graph_taxonomy"]["memodes_touched"] >= 1
@@ -480,11 +521,16 @@ def test_start_session_runs_behavior_taxonomy_audit(runtime) -> None:
     assert audited_metadata["turn_id"] == turn["id"]
     assert audited_metadata["supporting_edge_ids"]
     assert all(metadata["entity_type"] == "behavior_meme" for metadata in strengthened.values())
+    assert all(member_cluster_signatures.values())
+    assert projected_memode["cluster_signature"] in set(member_cluster_signatures.values())
+    assert projected_memode["cluster_label"]
+    assert assembly_summary["cluster_signature"] == projected_memode["cluster_signature"]
     assert any(event["event_type"] == "GRAPH_TAXONOMY_AUDIT" for event in trace_events)
 
 
 def test_start_session_uses_adam_identity_mlx_for_behavior_taxonomy(runtime, monkeypatch) -> None:
     runtime.settings.model_backend = "mlx"
+    monkeypatch.setenv(runtime_module.SESSION_START_MLX_REVIEW_ENV, "1")
     monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
     monkeypatch.setattr(
         runtime,
@@ -569,3 +615,27 @@ def test_start_session_uses_adam_identity_mlx_for_behavior_taxonomy(runtime, mon
     assert audited_metadata["memeplex_hint"] == "reflective repair chain"
     assert session_meta["session_graph_taxonomy"]["mode"] == "adam_identity_mlx"
     assert session_meta["session_graph_taxonomy"]["mlx_review_applied_bundles"] >= 1
+
+
+def test_session_state_snapshot_includes_resolved_profile_before_first_turn(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(
+        experiment["id"],
+        title="Profile Preview",
+        profile_request={
+            "mode": "manual",
+            "budget_mode": "wide",
+            "history_turns": 11,
+            "max_output_tokens": 1800,
+            "response_char_cap": 6400,
+        },
+    )
+
+    snapshot = runtime.session_state_snapshot(session["id"])
+
+    assert snapshot["last_turn_id"] is None
+    assert snapshot["current_profile"]["profile_name"] == "manual:wide"
+    assert snapshot["current_profile"]["history_turns"] == 11
+    assert snapshot["current_profile"]["max_output_tokens"] == 1800
+    assert snapshot["current_profile"]["response_char_cap"] == 6400
+    assert snapshot["current_budget"]["prompt_budget_tokens"] == snapshot["current_profile"]["prompt_budget_tokens"]

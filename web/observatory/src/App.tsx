@@ -22,6 +22,7 @@ import {
   graphMLForGraph,
   hashText,
   jsonForSelection,
+  lookupNodesForPayload,
   netdrawVnaForGraph,
   nodeLabel,
   pajekNetForGraph,
@@ -587,15 +588,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const snapshotsStorageKey = useMemo(() => snapshotStorageKey(bootstrap, data.graph), [bootstrap, data.graph]);
 
   const selectedNodeId = selectedNodeIds[0] ?? null;
-  const unifiedNodes = useMemo(
-    () =>
-      [
-        ...(data.graph?.semantic_nodes ?? []),
-        ...(data.graph?.runtime_nodes ?? []),
-        ...(data.graph?.assemblies ?? []),
-      ] as GraphNode[],
-    [data.graph],
-  );
+  const unifiedNodes = useMemo(() => lookupNodesForPayload(data.graph), [data.graph]);
   const nodeLookup = useMemo(() => buildNodeLookup(unifiedNodes), [unifiedNodes]);
   const selectedAssembly = useMemo(
     () => data.graph?.assemblies?.find((assembly: any) => assembly.id === selectedAssemblyId) ?? null,

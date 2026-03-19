@@ -62,6 +62,8 @@ Generated per experiment under `exports/<experiment_id>/`:
 - authoritative graph payload planes:
   - `semantic_nodes`
   - `semantic_edges`
+  - `assembly_nodes`
+  - `assembly_edges`
   - `runtime_nodes`
   - `runtime_edges`
   - `assemblies`
@@ -87,7 +89,9 @@ Generated per experiment under `exports/<experiment_id>/`:
 - `Semantic Map` shows behavior-domain memes only, semantic support edges, cluster hull/label summaries, and memode overlays
 - memodes render as second-order assemblies with `hulls`, `collapsed-meta-node`, or `hidden` overlay modes; they are not default peer dots
 - `Assemblies` exposes the ontology-projected second-order plane directly: behavior memes, constative information nodes, informational knowledge relations, and explicit behavior-memode membership edges are all exportable/readable there without pretending they belong to the clustering-only semantic map
+- `assembly_nodes` / `assembly_edges` are the authoritative graph slice for `Assemblies`; `assemblies` is a summary/audit surface and must not be treated as peer graph nodes during browser lookup or export
 - for legacy graphs that still store only snippet-like knowledge rows, `Assemblies` may project additional author/work/information nodes with `storage_kind = "projection"` so exports stay truthful before session-start normalization persists those entities into the graph proper
+- projectable behavior memodes inherit a dominant `cluster_signature` / `cluster_label` from their member behavior memes so the second-order plane remains inspectable against the semantic cluster surface
 - label disclosure is progressive and non-hover-dependent:
   - cluster labels first
   - selected / pinned / high-centrality meme labels next

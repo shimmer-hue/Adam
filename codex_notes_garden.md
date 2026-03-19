@@ -6396,3 +6396,387 @@ Remaining uncertainties:
 - Step 2 still intentionally remains advisory rather than adopting Step 3’s heavier traversal / evidence-mining machinery.
 Next shortest proof path:
 Run the three prompt steps on a bounded whitepaper cycle and confirm that Step 2 and Step 3 now select the same upstream artifacts deterministically, use the same missingness tokens, and preserve stage-specific roles while sharing one handoff grammar.
+
+## [2026-03-18T15:15:36Z] PRE-FLIGHT
+Operator task:
+Apply a cross-prompt conjunction micro-patch to `/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md` so the three-step whitepaper chain no longer has filename-collision risk in Step 1, no longer references nonexistent upstream memo input in Step 2 `RUN_CONFIG`, and removes the last small Step 1/Step 2 drift around runtime-path future-proofing and note archaeology.
+Task checksum:
+Whitepaper prompt chain conjunction round 3.
+Repo situation:
+The working tree remains dirty from prior unrelated turns. The consolidated prompt already shares governance rigor, degraded-mode behavior, shared `RUN_CONFIG` fields, shared register vocabulary, browser-gap caution, and deterministic upstream selection in Step 2 and Step 3. The remaining seams are narrow and wording-level.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+Natural-language contracts in force:
+Fail-closed governance remains authoritative. Canonical pipeline-root paths and Adam naming discipline must remain unchanged. Step roles remain distinct: Step 1 forensic intelligence brief, Step 2 advisory memo, Step 3 final whitepaper generation.
+Files/modules likely in scope:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - The prompt chain already shares governance, degraded-mode, run-note, register, comparator, research-library, and upstream-missingness discipline.
+- Instrumented:
+  - The remaining filename, pathing, and wording seams are visible in the consolidated prompt source.
+- Conceptual:
+  - None beyond the requested prompt-contract refinements.
+- Unknown:
+  - No live three-step run has yet exercised the timestamp-stable Step 1 naming after patching.
+Risks / invariants:
+Do not weaken governance or degraded-mode behavior. Do not alter stage identities. Do not rewrite unrelated sections. Keep the patch surgical and preserve the shared backbone.
+Evidence plan:
+Patch only the targeted lines, then verify timestamped Step 1 artifact names, Step 2 upstream wording, Step 1 runtime-path future-proofing, Step 2 note archaeology input, and any concise surface-resolution clause by search and diff.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch the exact lines named in the brief, and verify that the remaining cross-prompt seams are gone without changing the existing hard-governance contract.
+
+## [2026-03-18T17:35:55Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. This was a prompt-chain hygiene micro-patch; no canonical `docs/` surface changed.
+Natural-language contracts added/revised/preserved:
+Revised the consolidated whitepaper prompt chain so Step 2 now consumes the intelligence brief selected under its own deterministic upstream-resolution rule, and Step 3 now explicitly filters upstream selection to primary manuscript-bearing brief/memo artifacts while pointing later input-surface references back to those selected upstream artifacts. Preserved the existing governance rigor, degraded-mode logic, run-note discipline, shared `RUN_CONFIG` vocabulary, shared register family, browser-gap caution, and canonical pipeline-root paths.
+Behavior implemented or modified:
+- Step 2 `PRIMARY INPUTS` now references the intelligence brief selected under `UPSTREAM ARTIFACT RESOLUTION` instead of restating canonical/fallback selection logic.
+- Step 3 `UPSTREAM ARTIFACT RESOLUTION` now excludes `_support/` artifacts, support manifests, hashes, logs, status notes, and other auxiliaries from satisfying the upstream-brief/upstream-memo requirement.
+- Step 3 `WHITEPAPER INPUT SURFACES TO READ` now points to the intelligence brief and pre-writing memo selected under `UPSTREAM ARTIFACT RESOLUTION` instead of re-saying “latest” and inviting a second selection pass.
+- Step 3 legacy fallback wording now makes clear that fallback lookup belongs to `UPSTREAM ARTIFACT RESOLUTION`, not to a later independent re-resolution step.
+Evidence produced (tests / traces / commands / exports):
+- `sed -n '730,790p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `sed -n '2028,2095p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `rg -n 'Selected intelligence brief from `UPSTREAM ARTIFACT RESOLUTION`|Eligible upstream artifacts are primary manuscript-bearing brief or memo files only|_support/|the intelligence brief selected under `UPSTREAM ARTIFACT RESOLUTION`|the Codex pre-writing memo selected under `UPSTREAM ARTIFACT RESOLUTION`|latest intelligence brief from /Users/brianray/Adam/assets/white_paper_pipeline/intel_briefs|latest Codex memo from /Users/brianray/Adam/assets/white_paper_pipeline/writing_memos' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `git diff -- /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md /Users/brianray/Adam/codex_notes_garden.md`
+Status register changes:
+- Implemented:
+  - `wp_draft_prompt.md` now removes the last upstream-selection ambiguity between Step 2 and Step 3.
+- Instrumented:
+  - Verification remained textual through targeted section reads, search checks, and diff review.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - No live three-step run has yet exercised the cleaned Step 2 / Step 3 handoff with multiple same-family artifacts present.
+Truth-table / limitations updates:
+None. No Adam capability status changed.
+Remaining uncertainties:
+- The working tree remains dirty from prior unrelated edits; they were left untouched.
+- A live multi-artifact pipeline run would still be the strongest proof that the latest-artifact handoff now stays deterministic under real artifact clutter.
+Next shortest proof path:
+Create or retain multiple intelligence-brief and memo artifacts, then run Step 2 and Step 3 in sequence and verify that Step 2 consumes the selected intelligence brief while Step 3 ignores `_support/` auxiliaries and consumes only the selected primary brief/memo artifacts.
+
+## [2026-03-18T15:16:39Z] PRE-FLIGHT
+Operator task:
+Debug the current TUI/runtime regression where starting a new session appears unstable on the live MLX path and Tune Session changes appear not to save from the operator's point of view.
+Task checksum:
+Session-start wake-up / profile-save regression triage and repair.
+Repo situation:
+The working tree is already dirty from unrelated prior work in `.DS_Store`, this notepad, and `scratch_space_writing_tasks/wp_draft_prompt.md`. Current turn evidence points to two separate surfaces: TUI profile persistence logic still passes tests, while the live app abort captured in the operator screenshot lands inside MLX/Metal during session startup after the new session-start wake-up feature landed.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+Natural-language contracts in force:
+Use repo-local `.venv`. Preserve explicit session-start wake-up as a visible, bounded audit. Do not overclaim `adam_auto`. Keep MLX as the real runtime path for turn generation, but do not let the wake-up audit destabilize session startup. Preserve operator-visible persistence of requested inference profile fields.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/eden/models/mlx_backend.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Status register:
+- Implemented:
+  - Session profile requests persist in runtime/session metadata and current tests still pass for Tune Session updates.
+  - Session-start graph wake-up exists and can invoke Adam-identity MLX review hooks on the current code path.
+- Instrumented:
+  - Runtime logs and the macOS Python crash report identify a session-start MLX/Metal abort surface rather than a normal Python exception.
+- Conceptual:
+  - Whole-graph Adam self-rewrite remains bounded wake-up audit behavior, not unconstrained graph rewriting.
+- Unknown:
+  - Whether MLX session-start wake-up can be made stable by serialization alone on this machine, or should be disabled by default outside explicit opt-in.
+Risks / invariants:
+Do not break regular turn-time MLX generation. Do not silently remove wake-up audit semantics from the spec without updating docs. Keep the fix bounded: stability first, then immediate operator-visible profile confirmation.
+Evidence plan:
+Patch runtime gating for the MLX wake-up path, patch the TUI to reflect the updated current profile immediately after Apply Profile, add/adjust tests, and run targeted pytest first before full suite.
+Shortest proof path:
+Disable or gate MLX-backed wake-up review at session start while preserving deterministic wake-up, make the Tune Session save visible immediately in UI state, and verify with targeted runtime/TUI tests plus the full repo test suite.
+
+## [2026-03-18T15:24:58Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/models/mlx_backend.py`
+`/Users/brianray/Adam/eden/runtime.py`
+`/Users/brianray/Adam/eden/tui/app.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/tests/test_tui_smoke.py`
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/INFERENCE_PROFILES.md`
+`/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+`/Users/brianray/Adam/docs/TUI_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts added/revised/preserved:
+Preserved the bounded session-start wake-up audit contract. Revised the MLX wake-up clause so Adam-identity MLX review is explicit opt-in via `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1` instead of default-on. Preserved repo-local MLX as the real turn-generation backend. Tightened the TUI contract so `Apply Profile` refreshes the visible current-profile/budget surface immediately.
+Behavior implemented or modified:
+- Added a global MLX generation lock in `MLXModelAdapter.generate()` so concurrent callers cannot drive the same loaded model adapter simultaneously.
+- Added session-start MLX wake-up gating in `eden/runtime.py`; default live behavior is now deterministic wake-up, with MLX review only when the explicit env flag is set and the model is ready.
+- Added `mlx_review_gate` reporting to wake-up normalization/taxonomy metadata so the gate state is inspectable.
+- `session_state_snapshot()` now returns a resolved current profile/budget even before the first turn by running a bounded preview.
+- `Tune Session` now refreshes `current_profile` / `current_budget` immediately from `preview_turn()` after saving, so the UI reflects persisted hyperparameters without waiting for the delayed preview cycle.
+Evidence produced (tests / traces / commands / exports):
+- Crash evidence remained the operator screenshot plus macOS crash report `~/Library/Logs/DiagnosticReports/Python-2026-03-18-111047.ips`, which pointed into MLX/Metal during session start.
+- Targeted verification: `./.venv/bin/pytest -q tests/test_runtime_e2e.py::test_start_session_keeps_mlx_wakeup_review_opt_in_by_default tests/test_runtime_e2e.py::test_start_session_uses_adam_identity_mlx_review_for_graph_normalization tests/test_runtime_e2e.py::test_start_session_runs_behavior_taxonomy_audit tests/test_runtime_e2e.py::test_start_session_uses_adam_identity_mlx_for_behavior_taxonomy tests/test_runtime_e2e.py::test_session_state_snapshot_includes_resolved_profile_before_first_turn tests/test_tui_smoke.py::test_tune_session_modal_restores_title_edit_and_recent_titles`
+- Targeted result: `6 passed in 3.46s`
+- Full verification: `./.venv/bin/pytest -q`
+- Full result: `116 passed in 90.50s`
+Status register changes:
+- Implemented:
+  - Session-start MLX wake-up review is now explicit opt-in rather than default live behavior.
+  - TUI Tune Session now updates visible current-profile/current-budget state immediately after save.
+  - Pre-turn session snapshots now surface resolved current profile/budget.
+  - MLX adapter calls are serialized through one runtime lock.
+- Instrumented:
+  - Wake-up reports now expose `mlx_review_gate` so the operator can inspect why MLX review did or did not run.
+- Conceptual:
+  - A stable default-on Adam-identity MLX wake-up review path remains conceptual until live machine evidence proves it does not destabilize session start on this hardware.
+- Unknown:
+  - Whether the explicit MLX wake-up path is fully stable on this machine even with the new adapter lock; it is code/test-covered but not re-proved against a live production session in this turn.
+Truth-table / limitations updates:
+Updated implementation truth table and known limitations to reflect deterministic-by-default session-start wake-up with explicit MLX opt-in.
+Remaining uncertainties:
+- The operator-facing crash was traced and fenced, but I did not run a live macOS terminal reproduction with `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1` re-enabled on the real production graph in this turn.
+- Existing unrelated dirty files were preserved.
+Next shortest proof path:
+Launch the TUI normally, verify that `Tune Session` now reflects new values immediately and no longer aborts on `Start New Session`, then do one explicit opt-in validation run with `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1 python3 app.py` to see whether the adapter lock is sufficient for stable Adam-identity wake-up on this machine.
+
+## [2026-03-18T18:01:45Z] PRE-FLIGHT
+Operator task:
+Investigate why exported browser graph artifacts still show a behavior-domain subset with blank ontology/export attributes and why the operator perceives the graph export as knowledge-only.
+Task checksum:
+Observatory browser-export node-plane regression on `eden-graph (6).graphml`.
+Repo situation:
+The working tree remains dirty from prior unrelated turns plus the completed session-start stability patch. The attached GraphML was generated from the browser workbench export path, not the Python static-export writer. Artifact inspection shows `8486` nodes total: `7263` `information`, `1023` `meme`, and `200` blank-ontology behavior nodes. Those `200` ids resolve to `memodes` in SQLite, and the React `Assemblies` slice currently mixes `assembly_nodes` with sparse `assemblies` summary rows under the same ids.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+Natural-language contracts in force:
+`Assemblies` must expose/export the ontology-projected second-order plane truthfully. Browser exports are for the current browser-visible graph slice, but they must preserve projected node fields (`kind`, `entity_type`, `speech_act_mode`, `storage_kind`) rather than downgrading memodes into sparse summary records. Memodes remain second-order behavior objects, not bare summary rows.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/eden/observatory/graph_planes.py`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Status register:
+- Implemented:
+  - Python payload generation already emits full memode node records in `assembly_nodes`.
+  - Browser exports serialize whatever node list the current workbench slice supplies.
+- Instrumented:
+  - The attached GraphML proves the bad subset size and attribute pattern; SQLite row lookup proves those bad ids are memodes.
+- Conceptual:
+  - Any further enrichment of memode `cluster_signature` from member meme clusters is not yet proved in the export path.
+- Unknown:
+  - Whether frontend-only repair is sufficient, or whether backend payload should also derive memode cluster signatures for better operator legibility.
+Risks / invariants:
+Do not collapse `assemblies` summary rows into graph nodes. Do not remove actual memode nodes from `Assemblies` mode. Preserve current export format support and keep Python/browser contract alignment explicit.
+Evidence plan:
+Patch the React graph slice to stop letting sparse `assemblies` summaries overwrite rich `assembly_nodes`, optionally enrich memode cluster signatures if needed, add regression tests, and validate with targeted Vitest plus repo pytest if backend payload changes.
+Shortest proof path:
+Make `Assemblies` mode and export operate on `assembly_nodes` rather than `assemblies` summary rows, add a regression test using a sparse assembly summary object, and re-run the relevant browser/runtime tests before checking the exported node counts/fields again.
+
+## [2026-03-18T15:16:34Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. This was a prompt-chain micro-patch; no canonical `docs/` surface changed.
+Natural-language contracts added/revised/preserved:
+Revised the consolidated whitepaper prompt chain so Step 1 now uses timestamp-stable artifact filenames, Step 2 no longer references a nonexistent upstream pre-writing memo in its `RUN_CONFIG` advisory wording, Step 1 runtime-path anchors now match the future-proof `./eden/` / current-equivalent pattern used elsewhere, and Step 2 now treats `./codex_notes_garden.md` as an explicit archaeology input. Preserved all existing governance rigor, degraded-mode behavior, run-note discipline, register vocabulary, browser-gap discipline, canonical pipeline-root paths, and Adam naming discipline.
+Behavior implemented or modified:
+- Step 1 required and support artifact filenames now use `<YYYYMMDD_HHMMSS>` rather than date-only or day-only naming, reducing same-day collision risk and aligning with deterministic latest-artifact resolution downstream.
+- Step 1 `Implementation surfaces` and basin D now point to `./eden/` / `./eden/regard.py` with current-equivalent fallback wording instead of treating legacy path names as permanently canonical.
+- Step 2 `RUN CONFIG / CONTROL-FLOW GUARD` now correctly treats only the current intelligence brief as an upstream advisory `RUN_CONFIG` source.
+- Step 2 `Repo archaeology surfaces` now explicitly includes `./codex_notes_garden.md`.
+- Step 2 `SURFACE RESOLUTION RULE` now has the same compact search-order grammar used elsewhere in the chain.
+Evidence produced (tests / traces / commands / exports):
+- `rg -n \"adam_intelligence_<YYYYMMDD_HHMMSS>|adam_mechanism_matrix_<YYYYMMDD_HHMMSS>|implementation_work_order_<YYYYMMDD_HHMMSS>|synthetic_clay_patchkit_<YYYYMMDD_HHMMSS>|adam_intelligence_<timestamp>|Upstream \`RUN_CONFIG\` echoes from the current intelligence brief are advisory inputs only|current runtime code under \`./eden/\` or the current equivalent runtime package/directory|\`./eden/regard.py\` or the current equivalent regard-implementation module|./codex_notes_garden.md|Search order:\" /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `sed -n '168,188p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `sed -n '420,525p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `sed -n '680,820p' /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md`
+- `git diff -- /Users/brianray/Adam/scratch_space_writing_tasks/wp_draft_prompt.md /Users/brianray/Adam/codex_notes_garden.md`
+Status register changes:
+- Implemented:
+  - `wp_draft_prompt.md` now removes the remaining Step 1 / Step 2 conjunction seams named in this patch brief.
+- Instrumented:
+  - Verification remained textual through targeted section reads, search checks, and diff review.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - No live three-step run has yet exercised the timestamp-stable Step 1 filenames and downstream latest-artifact selection together.
+Truth-table / limitations updates:
+None. No Adam capability status changed.
+Remaining uncertainties:
+- The working tree remains dirty from prior unrelated edits; they were left untouched.
+- One search command emitted shell warnings because backticks in the pattern were interpreted by the shell, but the verification itself still succeeded through direct section reads and diff review.
+Next shortest proof path:
+Run Step 1 twice on the same day with different times, then confirm that Step 2 and Step 3 resolve the intended latest intelligence brief deterministically without filename collision or mtime-only fallback.
+
+## [2026-03-18T18:11:08Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/eden/observatory/graph_planes.py`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+`/Users/brianray/Adam/tests/test_runtime_e2e.py`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+Natural-language contracts added/revised/preserved:
+Preserved the contract that `Assemblies` is the second-order graph plane and not an alias for summary rows. Revised the observatory contract so `assembly_nodes` / `assembly_edges` are explicit authoritative graph planes, `assemblies` is a summary/audit surface rather than peer graph nodes, and projectable behavior memodes inherit a dominant member-meme cluster identity for inspection/export.
+Behavior implemented or modified:
+- Browser `Assemblies` graph/export now excludes sparse `assemblies` summary rows from graph-node dedupe, so memode nodes keep their full projected ontology fields instead of being overwritten by summary payloads.
+- App-wide node lookup now resolves against graph planes (`assembly_nodes`, `semantic_nodes`, `runtime_nodes`) and no longer indexes `assemblies` summaries as if they were nodes.
+- Projectable memodes in observatory graph planes now receive `cluster_signature` / `cluster_label` from the dominant cluster among their member behavior memes, and the matching `assemblies` summary rows are annotated with the same cluster identity.
+- Regression coverage now proves both the frontend memode-field preservation path and the backend memode-cluster projection path.
+Evidence produced (tests / traces / commands / exports):
+- Artifact inspection before patch:
+  - `/Users/brianray/Downloads/eden-graph (6).graphml` contained `8486` nodes total with `7263` `information`, `1023` `meme`, and `200` blank-ontology behavior nodes.
+  - SQLite lookup against `/Users/brianray/Adam/data/eden.db` showed the `200` bad ids were memodes, not missing memes.
+- `npm --prefix /Users/brianray/Adam/web/observatory test -- --run src/workbench/graphUtils.test.ts src/App.test.tsx`
+- `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_runtime_e2e.py -k 'behavior_taxonomy_audit or legacy_relation_entities_for_export or typed_informational_edges_in_graph_payload'`
+- `npm --prefix /Users/brianray/Adam/web/observatory run build`
+- `./.venv/bin/pytest -q`
+Status register changes:
+- Implemented:
+  - The browser export/lookup regression that blanked memode ontology fields via `assemblies` summary overwrite is fixed.
+  - Projectable behavior memodes now carry derived cluster identity in observatory payload planes.
+- Instrumented:
+  - The attached GraphML plus SQLite lookups remain the evidence surface for the pre-patch failure mode.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - I did not re-open a freshly regenerated GraphML from the patched UI in Gephi during this turn; the repair is proved by code/tests, not by a new manual Gephi screenshot.
+Truth-table / limitations updates:
+None. Capability status did not change; the turn repaired an observatory/export regression and clarified the payload contract.
+Remaining uncertainties:
+- The working tree remains dirty from prior unrelated edits (`runtime`, `tui`, docs, generated frontend bundle, scratch files). They were preserved.
+- Knowledge-domain projected information nodes still do not participate in the meme-only semantic clustering surface by design; only projectable behavior memodes now inherit cluster identity from member behavior memes.
+Next shortest proof path:
+Start the observatory from the patched build, export a fresh `Assemblies` GraphML, and confirm that the formerly blank memode ids now retain `kind = memode`, `entity_type = memode`, `speech_act_mode = performative`, `storage_kind = memode`, `source_kind = memode`, plus a non-empty `cluster_signature` on projectable behavior memodes.
+
+## [2026-03-19T14:26:39Z] PRE-FLIGHT
+Operator task:
+Diagnose why a fresh Gephi import shows the expected domain counts in Data Laboratory but the Graph view seems to hide or visually suppress most behavior-domain nodes.
+Task checksum:
+Gephi Graph-view / Data-view mismatch on `/Users/brianray/Downloads/eden-graph (7).graphml`.
+Repo situation:
+Working tree is still dirty from prior observatory/runtime/docs work and checked-in frontend bundle output. No rollback requested. This turn starts as artifact diagnosis; code changes are not yet justified.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+Natural-language contracts in force:
+`Assemblies` exports the current browser-visible graph slice. Behavior memes and behavior memodes are valid graph objects in that slice, while knowledge information nodes can dominate raw counts. Semantic clustering remains meme-only. Browser/export facts must stay inspectable rather than relying on Gephi-side display assumptions.
+Files/modules likely in scope:
+`/Users/brianray/Downloads/eden-graph (7).graphml`
+Potentially `web/observatory/src/workbench/graphUtils.ts` or related export surfaces if the artifact shows a repeat export defect.
+Status register:
+- Implemented:
+  - The observatory export path now preserves memode ontology fields and excludes `assemblies` summary rows from graph-node export.
+- Instrumented:
+  - The new question is about Gephi rendering behavior, not yet a proved export regression.
+- Conceptual:
+  - A layout or visualization-side skew could still make behavior nodes hard to perceive even when the ontology export is correct.
+- Unknown:
+  - Whether `/Users/brianray/Downloads/eden-graph (7).graphml` still contains a structural export defect or whether Gephi is simply drawing the low-count behavior nodes inside a dense knowledge-majority layout.
+Risks / invariants:
+Do not assume Gephi Graph view reflects ontology categories without checking node coordinates, connectedness, and any imported visualization attributes. Do not claim another export regression without artifact evidence.
+Evidence plan:
+Parse the GraphML directly, measure node/edge domain composition, inspect connected components and coordinate import fields if present, and compare behavior-node visibility conditions against what Gephi would render.
+Shortest proof path:
+Extract counts and connectivity statistics from `eden-graph (7).graphml`, identify where behavior nodes sit structurally relative to knowledge nodes, and determine whether the issue is export semantics or Graph-view rendering/selection behavior.
+
+## [2026-03-19T14:29:29Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. This turn stayed at artifact diagnosis.
+Natural-language contracts added/revised/preserved:
+Preserved the observatory contract that exported ontology lives in node/edge attributes, while Gephi graph appearance is not guaranteed unless the export explicitly carries visualization metadata. Preserved the domain split contract: knowledge and behavior are distinct graph surfaces and may be disconnected in the export.
+Behavior implemented or modified:
+None. No code change was justified from the artifact evidence collected in this turn.
+Evidence produced (tests / traces / commands / exports):
+- Parsed `/Users/brianray/Downloads/eden-graph (7).graphml` directly:
+  - `8486` nodes, `27459` edges
+  - domains: `7263 knowledge`, `1223 behavior`
+  - kinds: `7263 information`, `1023 meme`, `200 memode`
+  - isolates: `6 knowledge`, `1 behavior`
+  - edge domain pairs: `23716 knowledge-knowledge`, `3743 behavior-behavior`, `0` cross-domain
+- Connected-component analysis on the same GraphML:
+  - largest knowledge component: `4779`
+  - largest behavior component: `635`
+  - total components: `427`
+- Serializer inspection in `/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts` showed current GraphML/GEXF exports carry ontology attributes but no Gephi visualization metadata (no imported colors / sizes / positions).
+Status register changes:
+- Implemented:
+  - Nothing new implemented in this turn.
+- Instrumented:
+  - The GraphML artifact is now measured enough to distinguish structural export truth from Gephi rendering behavior.
+- Conceptual:
+  - A future Gephi-oriented export enhancement could add explicit visualization defaults so domain ontology is visible on import without manual styling.
+- Unknown:
+  - I did not inspect the user’s exact Gephi workspace settings, so the Graph-view suppression mechanism inside Gephi remains inferred from the artifact rather than reproduced interactively.
+Truth-table / limitations updates:
+None. Capability status did not change.
+Remaining uncertainties:
+- Because the export has zero cross-domain edges, Gephi will lay out knowledge and behavior as separate islands; without domain-specific styling they can still be hard to perceive in Graph view even though the data table is correct.
+- The current GraphML does not carry imported visualization hints, so Gephi Graph view has to invent appearance locally.
+Next shortest proof path:
+Either inspect the same file in Gephi with `Appearance -> Partition -> domain` applied, or patch the Gephi-facing export formats to include explicit domain/kind styling defaults so behavior is visible immediately on import.
+
+## [2026-03-19T14:33:21Z] PRE-FLIGHT
+Operator task:
+Add explicit export slices so the operator can export the full ontology graph (knowledge + behavior together), behavior-only, and information-only, while preserving the current export path.
+Task checksum:
+Observatory export-scope expansion for Gephi/operator ontology inspection.
+Repo situation:
+Working tree remains dirty from prior observatory/runtime/docs changes and the checked-in frontend bundle. This turn is expected to touch frontend export controls plus matching observatory contract docs. No unrelated rollback requested.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+Natural-language contracts in force:
+`Assemblies` is the second-order ontology-projected plane spanning constative information plus performative behavior. Export surfaces must stay explicit about what slice is being exported and must not silently collapse behavior, knowledge, or memodes. The current export path remains valid and must be preserved.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.test.ts`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+Status register:
+- Implemented:
+  - Browser export can serialize the current browser-visible graph slice into Gephi-friendly formats.
+  - `Assemblies` already carries both projected information nodes and behavior memes/memodes.
+- Instrumented:
+  - Gephi diagnosis from the last turn shows the current full-slice export is structurally correct but visually dense.
+- Conceptual:
+  - Explicit export-scope variants for `full`, `behavior`, and `information` do not yet exist.
+- Unknown:
+  - Whether the cleanest UX is new export formats, a new export-scope control, or both.
+Risks / invariants:
+Do not remove the existing export workflow. Keep selection export semantics intact. Keep scope labels honest: `full` must mean knowledge + behavior together, `behavior` must include performative memes and memodes, and `information` must isolate constative knowledge nodes/relations.
+Evidence plan:
+Inspect the current export action path, add bounded scope selection plus tests proving node/edge filtering for each scope, update observatory docs, and run targeted frontend tests plus the full backend suite if shared contracts changed.
+Shortest proof path:
+Patch the browser export pipeline so it can derive `full`, `behavior`, and `information` graph slices from the authoritative payload planes, expose that choice in the export controls, add Vitest coverage for the slice filter, and rebuild the observatory bundle.

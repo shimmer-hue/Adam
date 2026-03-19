@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from inspect import signature
 
 from .base import (
@@ -29,6 +30,7 @@ class MLXModelAdapter(BaseModelAdapter):
         self._mlx_lm = mlx_lm
         self._make_sampler = make_sampler
         self._make_logits_processors = make_logits_processors
+        self._generation_lock = threading.RLock()
         self.model, self.tokenizer = self._load_model()
 
     def _load_model(self):  # pragma: no cover - depends on local install
@@ -163,51 +165,52 @@ class MLXModelAdapter(BaseModelAdapter):
         repetition_penalty: float = 0.0,
         progress_callback: GenerationProgressCallback | None = None,
     ) -> ModelResult:  # pragma: no cover - depends on local install
-        prompt = self._build_prompt(system_prompt, conversation_prompt, enable_thinking=True)
-        text = self._generate_text(
-            prompt=prompt,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            repetition_penalty=repetition_penalty,
-            progress_callback=progress_callback,
-            phase="reasoning",
-        )
-        reasoning_text, answer_text = split_model_output(text)
-        used_answer_fallback = False
-        if reasoning_text and answer_text.strip() == text.strip():
-            answer_prompt = self._build_prompt(
-                system_prompt
-                + "\nThis is the final answer pass. Do not emit reasoning. Return one clean operator-facing response with no headings or scaffolding.",
-                conversation_prompt,
-                enable_thinking=False,
-            )
-            answer_text = self._generate_text(
-                prompt=answer_prompt,
+        with self._generation_lock:
+            prompt = self._build_prompt(system_prompt, conversation_prompt, enable_thinking=True)
+            text = self._generate_text(
+                prompt=prompt,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
-                progress_callback=(
-                    (lambda payload: progress_callback({**payload, "phase": "answer_fallback", "reasoning_text": reasoning_text.strip()}))
-                    if progress_callback is not None
-                    else None
-                ),
-                phase="answer",
-            ).strip()
-            used_answer_fallback = True
-        return ModelResult(
-            backend=self.backend_name,
-            text=text.strip(),
-            tokens_estimate=min(max_tokens, max(64, len(text.split()))),
-            metadata={
-                "model_path": self.model_path,
-                "temperature": temperature,
-                "top_p": top_p,
-                "repetition_penalty": repetition_penalty,
-                "answer_completion_fallback": used_answer_fallback,
-            },
-            answer_text=answer_text.strip() or text.strip(),
-            reasoning_text=reasoning_text.strip(),
-            raw_text=text.strip(),
-        )
+                progress_callback=progress_callback,
+                phase="reasoning",
+            )
+            reasoning_text, answer_text = split_model_output(text)
+            used_answer_fallback = False
+            if reasoning_text and answer_text.strip() == text.strip():
+                answer_prompt = self._build_prompt(
+                    system_prompt
+                    + "\nThis is the final answer pass. Do not emit reasoning. Return one clean operator-facing response with no headings or scaffolding.",
+                    conversation_prompt,
+                    enable_thinking=False,
+                )
+                answer_text = self._generate_text(
+                    prompt=answer_prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    repetition_penalty=repetition_penalty,
+                    progress_callback=(
+                        (lambda payload: progress_callback({**payload, "phase": "answer_fallback", "reasoning_text": reasoning_text.strip()}))
+                        if progress_callback is not None
+                        else None
+                    ),
+                    phase="answer",
+                ).strip()
+                used_answer_fallback = True
+            return ModelResult(
+                backend=self.backend_name,
+                text=text.strip(),
+                tokens_estimate=min(max_tokens, max(64, len(text.split()))),
+                metadata={
+                    "model_path": self.model_path,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "repetition_penalty": repetition_penalty,
+                    "answer_completion_fallback": used_answer_fallback,
+                },
+                answer_text=answer_text.strip() or text.strip(),
+                reasoning_text=reasoning_text.strip(),
+                raw_text=text.strip(),
+            )

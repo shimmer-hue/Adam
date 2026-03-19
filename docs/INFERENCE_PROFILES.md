@@ -83,11 +83,12 @@ Left-side controls:
 - session start may run a separate wake-up audit before Brian's first turn
 - knowledge phase:
   - the deterministic path upgrades missing author/work information nodes and typed informational edges into the persistent graph when they can be grounded from existing text
-  - on the real MLX path, EDEN can ask Adam in a bounded JSON-only review pass to confirm or refine those legacy knowledge relations before persistence
+  - the Adam-identity MLX review path is now explicit opt-in only via `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1`; otherwise session start stays on deterministic repair even when the live backend is MLX
+  - when that opt-in is enabled on the real MLX path, EDEN can ask Adam in a bounded JSON-only review pass to confirm or refine those legacy knowledge relations before persistence
 - behavior phase:
   - EDEN audits bounded turn-attached behavior bundles from Adam responses and explicit feedback
   - the deterministic fallback can strengthen first-order behavior memes and materialize bounded behavior memodes from existing support edges
-  - on the real MLX path, Adam can review the candidate behavior bundle in a bounded JSON-only taxonomy pass and choose a tighter memode label/member set
+  - when `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1` is set on the real MLX path, Adam can review the candidate behavior bundle in a bounded JSON-only taxonomy pass and choose a tighter memode label/member set
   - any `memeplex` hint is report-only in this build
 - this audit is explicit and visible:
   - session metadata stores `session_graph_normalization`

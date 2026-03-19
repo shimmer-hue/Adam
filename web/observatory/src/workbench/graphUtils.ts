@@ -104,14 +104,26 @@ export function hashText(value: string): string {
   return (hash >>> 0).toString(16);
 }
 
+function assemblyGraphNodes(payload: any): GraphNode[] {
+  const semanticNodes = (payload?.semantic_nodes ?? []) as GraphNode[];
+  return dedupeNodes([
+    ...((payload?.assembly_nodes ?? []) as GraphNode[]),
+    ...semanticNodes,
+  ]);
+}
+
+export function lookupNodesForPayload(payload: any): GraphNode[] {
+  return dedupeNodes([
+    ...((payload?.assembly_nodes ?? []) as GraphNode[]),
+    ...((payload?.semantic_nodes ?? []) as GraphNode[]),
+    ...((payload?.runtime_nodes ?? []) as GraphNode[]),
+  ]);
+}
+
 export function visibleGraphForMode(payload: any, mode: GraphMode): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const semanticNodes = (payload?.semantic_nodes ?? []) as GraphNode[];
   const semanticEdges = (payload?.semantic_edges ?? []) as GraphEdge[];
-  const assemblyNodes = dedupeNodes([
-    ...((payload?.assembly_nodes ?? []) as GraphNode[]),
-    ...semanticNodes,
-    ...((payload?.assemblies ?? []) as GraphNode[]),
-  ]);
+  const assemblyNodes = assemblyGraphNodes(payload);
   const assemblyEdges = ((payload?.assembly_edges ?? payload?.semantic_edges ?? []) as GraphEdge[]);
   const runtimeNodes = (payload?.runtime_nodes ?? []) as GraphNode[];
   const runtimeEdges = (payload?.runtime_edges ?? []) as GraphEdge[];

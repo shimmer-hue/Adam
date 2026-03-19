@@ -43,6 +43,7 @@ Session-start modal:
   - free typing remains allowed
   - adjacent recent-title selector is populated from persisted session titles
   - `Tune Session` reuses the same title field and recent-title selector so the active session can be renamed in-place
+  - after `Apply Profile`, the chat surface refreshes the current-profile and budget panels immediately from a fresh preview rather than waiting for the delayed idle refresh cycle
 - inference mode:
   - `manual`: operator-specified bounded values are clamped and used directly
   - `runtime_auto`: EDEN chooses a bounded preset per turn from visible runtime heuristics

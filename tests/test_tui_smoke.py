@@ -888,6 +888,13 @@ async def test_tune_session_modal_restores_title_edit_and_recent_titles(runtime)
         assert "history_turns=64" in app.ui_state.last_feedback
         assert "max_output_tokens=2400" in app.ui_state.last_feedback
         assert "response_char_cap=7200" in app.ui_state.last_feedback
+        assert app.ui_state.current_profile is not None
+        assert app.ui_state.current_profile["history_turns"] == 64
+        assert app.ui_state.current_profile["max_output_tokens"] == 2400
+        assert app.ui_state.current_profile["response_char_cap"] == 7200
+        assert app.ui_state.current_profile["profile_name"] == "manual:balanced"
+        assert app.ui_state.current_budget is not None
+        assert app.ui_state.current_budget["prompt_budget_tokens"] == app.ui_state.current_profile["prompt_budget_tokens"]
 
         app.screen.begin_edit_profile_flow()
         await pilot.pause(0.5)

@@ -4840,7 +4840,24 @@ class ChatScreen(Screen):
                 response_char_cap=payload["response_char_cap"],
             )
         )
+        user_text = self._composer_text().strip()
+        preview = await asyncio.to_thread(
+            partial(
+                app.runtime.preview_turn,
+                session_id=app.ui_state.session_id,
+                user_text=user_text,
+                previous_budget=app.ui_state.current_budget,
+            )
+        )
         app.ui_state.session_title = updated["title"]
+        app.ui_state.current_profile = preview.profile
+        app.ui_state.current_budget = preview.budget
+        if user_text:
+            app.ui_state.preview_active_set = preview.active_set
+            app.ui_state.preview_trace = preview.trace
+        else:
+            app.ui_state.preview_active_set = app.ui_state.last_active_set
+            app.ui_state.preview_trace = app.ui_state.last_trace
         app.ui_state.last_feedback = (
             "Updated session profile: "
             f"{updated['title']} / {updated['mode']} / {updated['budget_mode']} / "

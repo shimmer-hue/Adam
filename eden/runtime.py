@@ -57,6 +57,7 @@ GRAPH_TAXONOMY_MEMBER_LIMIT = 4
 GRAPH_TAXONOMY_BEHAVIOR_ACTORS = {"adam", "feedback"}
 SESSION_START_BEHAVIOR_TAXONOMY = "session_start_behavior_taxonomy_v1"
 SESSION_START_GRAPH_WAKEUP = "session_start_graph_wakeup_v1"
+SESSION_START_MLX_REVIEW_ENV = "EDEN_ENABLE_MLX_WAKEUP_REVIEW"
 
 
 def _normalize_archive_folder(folder: Any) -> str:
@@ -710,6 +711,16 @@ class EdenRuntime:
                 continue
         return None
 
+    def _session_start_mlx_review_status(self) -> tuple[bool, str]:
+        if self.settings.model_backend.lower() != "mlx":
+            return False, "backend_not_mlx"
+        if not bool(self.mlx_model_status().get("ready")):
+            return False, "model_not_ready"
+        raw = str(os.environ.get(SESSION_START_MLX_REVIEW_ENV, "") or "").strip().lower()
+        if raw not in {"1", "true", "yes", "on"}:
+            return False, "disabled_by_default"
+        return True, "enabled"
+
     def _sanitize_relation_review_payload(
         self,
         payload: Any,
@@ -979,6 +990,7 @@ class EdenRuntime:
                     unresolved_relations.append(relation)
             if unresolved_relations:
                 candidate_rows.append({"row": row, "metadata": metadata, "relations": unresolved_relations})
+        use_mlx_review, mlx_review_gate = self._session_start_mlx_review_status()
         report = {
             "status": "completed",
             "ran_at": now_utc(),
@@ -990,6 +1002,7 @@ class EdenRuntime:
             "edges_added": 0,
             "relations_materialized": 0,
             "mlx_review_attempted": False,
+            "mlx_review_gate": mlx_review_gate,
             "mlx_review_rows": 0,
             "mlx_review_applied_rows": 0,
             "mlx_review_error": "",
@@ -1005,7 +1018,6 @@ class EdenRuntime:
                 payload=report,
             )
             return report
-        use_mlx_review = self.settings.model_backend.lower() == "mlx" and bool(self.mlx_model_status().get("ready"))
         report["mlx_review_attempted"] = use_mlx_review
         if use_mlx_review:
             report["mode"] = "adam_identity_mlx"
@@ -1622,7 +1634,7 @@ class EdenRuntime:
             for memode in self.store.list_memodes(experiment_id)
             if str(memode.get("domain") or "").lower() == "behavior"
         }
-        use_mlx_review = self.settings.model_backend.lower() == "mlx" and bool(self.mlx_model_status().get("ready"))
+        use_mlx_review, mlx_review_gate = self._session_start_mlx_review_status()
         report = {
             "status": "completed",
             "ran_at": now_utc(),
@@ -1634,6 +1646,7 @@ class EdenRuntime:
             "memodes_materialized": 0,
             "memodes_touched": 0,
             "mlx_review_attempted": use_mlx_review,
+            "mlx_review_gate": mlx_review_gate,
             "mlx_review_bundles": 0,
             "mlx_review_applied_bundles": 0,
             "mlx_review_error": "",
@@ -1888,6 +1901,7 @@ class EdenRuntime:
     def session_state_snapshot(self, session_id: str) -> dict[str, Any]:
         session = self.store.get_session(session_id)
         experiment = self.store.get_experiment(session["experiment_id"])
+        preview = self.preview_turn(session_id=session_id, user_text="")
         snapshot = {
             "experiment_id": experiment["id"],
             "experiment_name": experiment["name"],
@@ -1902,8 +1916,8 @@ class EdenRuntime:
             "last_reasoning": "",
             "last_active_set": [],
             "last_trace": [],
-            "current_budget": None,
-            "current_profile": None,
+            "current_budget": preview.budget,
+            "current_profile": preview.profile,
         }
         turns = self.store.list_turns(session_id, limit=1)
         if not turns:
