@@ -49,6 +49,7 @@ export type AppearanceState = {
   edgeOpacityBy: string;
   labelMode: "selection" | "cluster" | "importance" | "all" | "none";
   showEdgeLabels: boolean;
+  edgeOpacityScale?: number;
 };
 
 export type VisibleGraph = {
@@ -745,6 +746,7 @@ export function defaultAppearanceState(): AppearanceState {
     edgeOpacityBy: "weight",
     labelMode: "selection",
     showEdgeLabels: false,
+    edgeOpacityScale: 1,
   };
 }
 

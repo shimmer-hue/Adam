@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import BasinPanel from "./components/BasinPanel";
 import GraphPanel from "./components/GraphPanel";
@@ -52,6 +52,7 @@ import {
 } from "./workbench/layoutTerrain";
 
 type Surface = "overview" | "graph" | "basin" | "geometry" | "tanakh" | "measurements";
+type Workspace = "overview" | "data_laboratory" | "preview";
 type AssemblyRenderMode = "hulls" | "collapsed-meta-node" | "hidden";
 type LiftMode = "flat" | "time_lift" | "density_lift" | "session_offset";
 type InspectorTab = "cards" | "json";
@@ -59,6 +60,46 @@ type ReasoningLens = "reasoning" | "chain_like" | "hum_live";
 type InteractionMode = "INSPECT" | "MEASURE" | "EDIT" | "ABLATE" | "COMPARE";
 type PayloadKey = "overview" | "measurements" | "basin" | "graph" | "geometry" | "tanakh" | "transcript" | "trace" | "runtimeStatus" | "runtimeModel";
 type PayloadStatusKind = "idle" | "loading" | "ready" | "error" | "deferred";
+type RightDockTab =
+  | "statistics"
+  | "filters"
+  | "context"
+  | "inspector"
+  | "queries"
+  | "memode_audit"
+  | "actions"
+  | "ledger"
+  | "runtime"
+  | "basin"
+  | "geometry"
+  | "tanakh"
+  | "payloads";
+type DataLabTab = "nodes" | "edges";
+type GraphTool = "select" | "pan" | "box_select" | "pin" | "neighbors";
+type SortDirection = "asc" | "desc";
+type DockState = {
+  leftWidth: number;
+  rightWidth: number;
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+  renderTrayOpen: boolean;
+};
+type PreviewSettings = {
+  labelMode: AppearanceState["labelMode"];
+  showEdgeLabels: boolean;
+  edgeOpacityScale: number;
+  edgeCurvature: number;
+  background: "ember" | "linen" | "graphite";
+  showLegend: boolean;
+  showCaption: boolean;
+  caption: string;
+  dirty: boolean;
+  refreshedAt: string | null;
+};
+type SortState = {
+  key: string;
+  direction: SortDirection;
+};
 
 type Bootstrap = {
   mode?: string;
@@ -326,13 +367,51 @@ type ActionForm = {
 };
 
 const SURFACES: Surface[] = ["overview", "graph", "basin", "geometry", "tanakh", "measurements"];
+const WORKSPACES: Workspace[] = ["overview", "data_laboratory", "preview"];
 const DEFAULT_GRAPH_MODE: GraphMode = "Assemblies";
 const DEFAULT_ASSEMBLY_RENDER_MODE: AssemblyRenderMode = "hulls";
 const DEFAULT_LIFT_MODE: LiftMode = "flat";
 const DEFAULT_INTERACTION_MODE: InteractionMode = "INSPECT";
+const DEFAULT_RIGHT_DOCK_TAB: RightDockTab = "filters";
+const DEFAULT_DOCK_STATE: DockState = {
+  leftWidth: 288,
+  rightWidth: 236,
+  leftCollapsed: false,
+  rightCollapsed: false,
+  renderTrayOpen: false,
+};
+const DEFAULT_PREVIEW_SETTINGS: PreviewSettings = {
+  labelMode: "selection",
+  showEdgeLabels: false,
+  edgeOpacityScale: 0.7,
+  edgeCurvature: 0.35,
+  background: "ember",
+  showLegend: true,
+  showCaption: true,
+  caption: "",
+  dirty: false,
+  refreshedAt: null,
+};
+const DEFAULT_NODE_SORT: SortState = { key: "label", direction: "asc" };
+const DEFAULT_EDGE_SORT: SortState = { key: "type", direction: "asc" };
 const TEXT_ACCESS_LIMIT = 12;
 const ESSENTIAL_PAYLOADS: PayloadKey[] = ["overview", "measurements", "basin"];
 const PAYLOAD_ORDER: PayloadKey[] = ["overview", "measurements", "basin", "graph", "geometry", "tanakh", "transcript", "trace", "runtimeStatus", "runtimeModel"];
+const RIGHT_DOCK_TABS: Array<[RightDockTab, string]> = [
+  ["statistics", "Statistics"],
+  ["filters", "Filters"],
+  ["context", "Context"],
+  ["inspector", "Inspector"],
+  ["queries", "Queries"],
+  ["memode_audit", "Memode Audit"],
+  ["actions", "Actions"],
+  ["ledger", "Ledger"],
+  ["runtime", "Runtime"],
+  ["basin", "Basin"],
+  ["geometry", "Geometry"],
+  ["tanakh", "Tanakh"],
+  ["payloads", "Payloads"],
+];
 
 const EMPTY_DATA: DataBundle = {
   graph: null,
@@ -398,6 +477,28 @@ function labelForSurface(surface: Surface): string {
   return "Measurements";
 }
 
+function labelForWorkspace(workspace: Workspace): string {
+  if (workspace === "overview") return "Overview";
+  if (workspace === "data_laboratory") return "Data Laboratory";
+  return "Preview";
+}
+
+function workspaceForSurface(surface: Surface): Workspace {
+  if (surface === "graph" || surface === "overview" || surface === "basin" || surface === "geometry" || surface === "tanakh" || surface === "measurements") {
+    return "overview";
+  }
+  return "overview";
+}
+
+function rightDockTabForSurface(surface: Surface): RightDockTab {
+  if (surface === "basin") return "basin";
+  if (surface === "geometry") return "geometry";
+  if (surface === "tanakh") return "tanakh";
+  if (surface === "measurements") return "ledger";
+  if (surface === "overview") return "context";
+  return DEFAULT_RIGHT_DOCK_TAB;
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "same-origin" });
   if (!response.ok) {
@@ -426,7 +527,7 @@ function storageKey({
 }: {
   bootstrap: Bootstrap;
   graph: GraphPayload | null;
-  surface: Surface;
+  surface: string;
 }): string {
   const experimentId = bootstrap.experiment_id ?? "unknown";
   const manifestish =
@@ -550,8 +651,46 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const initialSurface = SURFACES.includes((bootstrap.initial_surface as Surface) ?? "overview")
     ? (bootstrap.initial_surface as Surface)
     : "overview";
-
+  const [workspace, setWorkspace] = useState<Workspace>(workspaceForSurface(initialSurface));
   const [surface, setSurface] = useState<Surface>(initialSurface);
+  const [rightDockTab, setRightDockTab] = useState<RightDockTab>(rightDockTabForSurface(initialSurface));
+  const [dockState, setDockState] = useState<DockState>(DEFAULT_DOCK_STATE);
+  const [graphTool, setGraphTool] = useState<GraphTool>("select");
+  const [dataLabTab, setDataLabTab] = useState<DataLabTab>("nodes");
+  const [dataLabSearch, setDataLabSearch] = useState("");
+  const [nodeSort, setNodeSort] = useState<SortState>(DEFAULT_NODE_SORT);
+  const [edgeSort, setEdgeSort] = useState<SortState>(DEFAULT_EDGE_SORT);
+  const [nodeColumnVisibility, setNodeColumnVisibility] = useState<Record<string, boolean>>({
+    label: true,
+    id: true,
+    kind: true,
+    domain: true,
+    cluster: true,
+    memodes: true,
+    provenance: true,
+    evidence: true,
+    confidence: true,
+    measurement_history: true,
+    degree: true,
+    weighted_degree: true,
+    clustering: true,
+  });
+  const [edgeColumnVisibility, setEdgeColumnVisibility] = useState<Record<string, boolean>>({
+    relation: true,
+    id: true,
+    type: true,
+    source: true,
+    target: true,
+    weight: true,
+    evidence: true,
+    provenance: true,
+    confidence: true,
+    measurement_history: true,
+  });
+  const [previewSettings, setPreviewSettings] = useState<PreviewSettings>(DEFAULT_PREVIEW_SETTINGS);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [cameraResetToken, setCameraResetToken] = useState(0);
+  const [draggingDock, setDraggingDock] = useState<"left" | "right" | null>(null);
   const [graphMode, setGraphMode] = useState<GraphMode>(DEFAULT_GRAPH_MODE);
   const [assemblyRenderMode, setAssemblyRenderMode] = useState<AssemblyRenderMode>(DEFAULT_ASSEMBLY_RENDER_MODE);
   const [liftMode, setLiftMode] = useState<LiftMode>(DEFAULT_LIFT_MODE);
@@ -588,7 +727,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const statsWorkerRef = useRef<Worker | null>(null);
   const layoutSettingsRef = useRef<Record<string, Record<string, any>>>({});
 
-  const presetStorageKey = useMemo(() => storageKey({ bootstrap, graph: data.graph, surface }), [bootstrap, data.graph, surface]);
+  const presetStorageKey = useMemo(() => storageKey({ bootstrap, graph: data.graph, surface: workspace }), [bootstrap, data.graph, workspace]);
   const snapshotsStorageKey = useMemo(() => snapshotStorageKey(bootstrap, data.graph), [bootstrap, data.graph]);
 
   const selectedNodeId = selectedNodeIds[0] ?? null;
@@ -610,6 +749,15 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     () => currentTurnNodeIds(data.graph, data.transcript, selectedTurn?.turn_id ?? null),
     [data.graph, data.transcript, selectedTurn],
   );
+  const effectiveHighlightedNodeIds = useMemo(() => {
+    if (graphTool !== "neighbors" || !selectedNodeId) return highlightedNodeIds;
+    const neighborIds = new Set<string>([selectedNodeId, ...highlightedNodeIds]);
+    for (const edge of baseGraph.edges) {
+      if (edge.source === selectedNodeId) neighborIds.add(edge.target);
+      if (edge.target === selectedNodeId) neighborIds.add(edge.source);
+    }
+    return [...neighborIds];
+  }, [baseGraph.edges, graphTool, highlightedNodeIds, selectedNodeId]);
   const hum = data.transcript?.hum ?? data.overview?.hum ?? null;
   const layoutFamilies = useMemo(() => resolveLayoutFamilies(data.graph?.layout_families ?? null), [data.graph?.layout_families]);
   const layoutCatalog = useMemo(() => resolveLayoutCatalog(data.graph?.layout_catalog ?? null), [data.graph?.layout_catalog]);
@@ -635,6 +783,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
 
   const baselineCoordinateMap = useMemo(() => buildCoordinateMap(filteredBaseline.nodes, coordinateMode, layoutSnapshots), [filteredBaseline.nodes, coordinateMode, layoutSnapshots]);
   const modifiedCoordinateMap = useMemo(() => buildCoordinateMap(filteredModified.nodes, coordinateMode, layoutSnapshots), [filteredModified.nodes, coordinateMode, layoutSnapshots]);
+  const previewCoordinateMap = useMemo(() => buildCoordinateMap(exportGraph.nodes, coordinateMode, layoutSnapshots), [coordinateMode, exportGraph.nodes, layoutSnapshots]);
   const visibleGraphNodes = useMemo(() => cappedItems(filteredBaseline.nodes), [filteredBaseline.nodes]);
   const visibleGraphEdges = useMemo(() => cappedItems(filteredBaseline.edges), [filteredBaseline.edges]);
   const visibleBasinTurns = useMemo(() => cappedItems(data.basin?.turns ?? []), [data.basin]);
@@ -660,6 +809,46 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     if (coordinateMode) options.add(coordinateMode);
     return [...options];
   }, [coordinateMode, data.graph?.view_modes, layoutDefaults.coordinate_mode, layoutSnapshots]);
+
+  const previewAppearance = useMemo<AppearanceState>(
+    () => ({
+      ...appearance,
+      labelMode: previewSettings.labelMode,
+      showEdgeLabels: previewSettings.showEdgeLabels,
+      edgeOpacityScale: previewSettings.edgeOpacityScale,
+    }),
+    [appearance, previewSettings.edgeOpacityScale, previewSettings.labelMode, previewSettings.showEdgeLabels],
+  );
+  const activeFilterTags = useMemo(() => {
+    const tags: string[] = [];
+    if (filters.search) tags.push(`search:${filters.search}`);
+    if (filters.kind) tags.push(`kind:${filters.kind}`);
+    if (filters.domain) tags.push(`domain:${filters.domain}`);
+    if (filters.session) tags.push(`session:${filters.session}`);
+    if (filters.source) tags.push(`source:${filters.source}`);
+    if (filters.evidence) tags.push(`evidence:${filters.evidence}`);
+    if (filters.componentMode !== "all") tags.push(`component:${filters.componentMode}`);
+    if (filters.hideIsolated) tags.push("hide isolated");
+    if (filters.egoRadius > 0) tags.push(`ego:${filters.egoRadius}`);
+    return tags;
+  }, [filters]);
+  const domainCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const node of filteredBaseline.nodes) {
+      const key = String(node.domain ?? "unknown");
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((left, right) => right[1] - left[1]);
+  }, [filteredBaseline.nodes]);
+  const activeDocumentCount = useMemo(() => {
+    const latestActive = data.graph?.active_set_slices?.at?.(-1);
+    return Number(latestActive?.document_count ?? latestActive?.documents ?? 0);
+  }, [data.graph]);
+  const workspaceArtifactLabel = useMemo(() => {
+    const baseLabel = bootstrap.experiment_id || bootstrap.session_id || "eden-graph";
+    const nodeCount = data.graph?.nodes?.length ?? data.graph?.semantic_nodes?.length ?? data.graph?.counts?.memes ?? 0;
+    return `${baseLabel}${nodeCount ? ` (${nodeCount})` : ""}`;
+  }, [bootstrap.experiment_id, bootstrap.session_id, data.graph]);
 
   const canMutate = Boolean(data.liveEnabled && bootstrap.live_api?.preview && bootstrap.live_api?.commit);
   const interactionModes = (data.graph?.interaction_modes ?? ["INSPECT", "MEASURE", "EDIT", "ABLATE", "COMPARE"]) as InteractionMode[];
@@ -777,6 +966,15 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           coordinateMode: string;
           filters: FilterState;
           appearance: AppearanceState;
+          rightDockTab: RightDockTab;
+          dockState: DockState;
+          graphTool: GraphTool;
+          dataLabTab: DataLabTab;
+          nodeSort: SortState;
+          edgeSort: SortState;
+          nodeColumnVisibility: Record<string, boolean>;
+          edgeColumnVisibility: Record<string, boolean>;
+          previewSettings: PreviewSettings;
         }>;
         nextGraphMode = preset.graphMode ?? nextGraphMode;
         nextAssemblyRenderMode = preset.assemblyRenderMode ?? nextAssemblyRenderMode;
@@ -796,8 +994,49 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     setCoordinateMode(nextCoordinateMode);
     setFilters(nextFilters);
     setAppearance(nextAppearance);
+    try {
+      const raw = window.localStorage.getItem(presetStorageKey);
+      if (raw) {
+        const preset = JSON.parse(raw) as Partial<{
+          rightDockTab: RightDockTab;
+          dockState: DockState;
+          graphTool: GraphTool;
+          dataLabTab: DataLabTab;
+          nodeSort: SortState;
+          edgeSort: SortState;
+          nodeColumnVisibility: Record<string, boolean>;
+          edgeColumnVisibility: Record<string, boolean>;
+          previewSettings: PreviewSettings;
+        }>;
+        setRightDockTab(preset.rightDockTab ?? rightDockTabForSurface(initialSurface));
+        setDockState({ ...DEFAULT_DOCK_STATE, ...(preset.dockState ?? {}) });
+        setGraphTool(preset.graphTool ?? "select");
+        setDataLabTab(preset.dataLabTab ?? "nodes");
+        setNodeSort(preset.nodeSort ?? DEFAULT_NODE_SORT);
+        setEdgeSort(preset.edgeSort ?? DEFAULT_EDGE_SORT);
+        setNodeColumnVisibility((current) => ({ ...current, ...(preset.nodeColumnVisibility ?? {}) }));
+        setEdgeColumnVisibility((current) => ({ ...current, ...(preset.edgeColumnVisibility ?? {}) }));
+        setPreviewSettings({ ...DEFAULT_PREVIEW_SETTINGS, ...(preset.previewSettings ?? {}) });
+      } else {
+        setRightDockTab(rightDockTabForSurface(initialSurface));
+        setDockState(DEFAULT_DOCK_STATE);
+        setGraphTool("select");
+        setDataLabTab("nodes");
+        setNodeSort(DEFAULT_NODE_SORT);
+        setEdgeSort(DEFAULT_EDGE_SORT);
+        setPreviewSettings(DEFAULT_PREVIEW_SETTINGS);
+      }
+    } catch {
+      setRightDockTab(rightDockTabForSurface(initialSurface));
+      setDockState(DEFAULT_DOCK_STATE);
+      setGraphTool("select");
+      setDataLabTab("nodes");
+      setNodeSort(DEFAULT_NODE_SORT);
+      setEdgeSort(DEFAULT_EDGE_SORT);
+      setPreviewSettings(DEFAULT_PREVIEW_SETTINGS);
+    }
     setLoadedPresetKey(presetStorageKey);
-  }, [layoutDefaults.coordinate_mode, presetStorageKey]);
+  }, [initialSurface, layoutDefaults.coordinate_mode, presetStorageKey]);
 
   useEffect(() => {
     if (loadedPresetKey !== presetStorageKey) return;
@@ -809,9 +1048,37 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
       coordinateMode,
       filters,
       appearance,
+      rightDockTab,
+      dockState,
+      graphTool,
+      dataLabTab,
+      nodeSort,
+      edgeSort,
+      nodeColumnVisibility,
+      edgeColumnVisibility,
+      previewSettings,
     });
     window.localStorage.setItem(presetStorageKey, payload);
-  }, [appearance, assemblyRenderMode, coordinateMode, filters, graphMode, interactionMode, liftMode, loadedPresetKey, presetStorageKey]);
+  }, [
+    appearance,
+    assemblyRenderMode,
+    coordinateMode,
+    dataLabTab,
+    dockState,
+    edgeColumnVisibility,
+    edgeSort,
+    filters,
+    graphMode,
+    graphTool,
+    interactionMode,
+    liftMode,
+    loadedPresetKey,
+    nodeColumnVisibility,
+    nodeSort,
+    presetStorageKey,
+    previewSettings,
+    rightDockTab,
+  ]);
 
   useEffect(() => {
     try {
@@ -1039,7 +1306,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }, [bootstrap.live_api, bootstrap.session_id, data.liveEnabled]);
 
   useEffect(() => {
-    if (surface !== "geometry" || data.geometry || !resolvedSources?.geometry) return;
+    if (rightDockTab !== "geometry" || data.geometry || !resolvedSources?.geometry) return;
     let cancelled = false;
     setPayloadStatuses((current) => ({
       ...current,
@@ -1065,10 +1332,10 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     return () => {
       cancelled = true;
     };
-  }, [data.geometry, resolvedSources, surface]);
+  }, [data.geometry, resolvedSources, rightDockTab]);
 
   useEffect(() => {
-    if (surface !== "tanakh" || data.tanakh || !resolvedSources?.tanakh) return;
+    if (rightDockTab !== "tanakh" || data.tanakh || !resolvedSources?.tanakh) return;
     let cancelled = false;
     setPayloadStatuses((current) => ({
       ...current,
@@ -1094,7 +1361,73 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     return () => {
       cancelled = true;
     };
-  }, [data.tanakh, resolvedSources, surface]);
+  }, [data.tanakh, resolvedSources, rightDockTab]);
+
+  useEffect(() => {
+    if (!draggingDock) return undefined;
+    function onMove(event: MouseEvent) {
+      if (draggingDock === "left") {
+        setDockState((current) => ({
+          ...current,
+          leftWidth: Math.min(520, Math.max(248, event.clientX - 24)),
+          leftCollapsed: false,
+        }));
+      } else {
+        setDockState((current) => ({
+          ...current,
+          rightWidth: Math.min(620, Math.max(300, window.innerWidth - event.clientX - 24)),
+          rightCollapsed: false,
+        }));
+      }
+    }
+    function onUp() {
+      setDraggingDock(null);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [draggingDock]);
+
+  const handleResetWorkbenchLayout = useCallback(() => {
+    setDockState(DEFAULT_DOCK_STATE);
+    setRightDockTab(DEFAULT_RIGHT_DOCK_TAB);
+    setGraphTool("select");
+    setShowKeyboardHelp(false);
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
+        event.preventDefault();
+        setShowKeyboardHelp((current) => !current);
+        return;
+      }
+      if (event.key === "Escape") {
+        setShowKeyboardHelp(false);
+        return;
+      }
+      if (event.key === "1") {
+        setWorkspace("overview");
+        return;
+      }
+      if (event.key === "2") {
+        setWorkspace("data_laboratory");
+        return;
+      }
+      if (event.key === "3") {
+        setWorkspace("preview");
+        return;
+      }
+      if (event.key.toLowerCase() === "r" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        handleResetWorkbenchLayout();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleResetWorkbenchLayout]);
 
   function handleSelectNode(nodeId: string, additive: boolean) {
     setSelectedEdgeId(null);
@@ -1182,8 +1515,42 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     setAppearance((current) => ({ ...current, [key]: value }));
   }
 
+  function updatePreviewSetting<K extends keyof PreviewSettings>(key: K, value: PreviewSettings[K]) {
+    setPreviewSettings((current) => ({ ...current, [key]: value, dirty: key === "dirty" ? Boolean(value) : true }));
+  }
+
   function updateAction<K extends keyof ActionForm>(key: K, value: ActionForm[K]) {
     setActionForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleNodeColumn(column: string) {
+    setNodeColumnVisibility((current) => ({ ...current, [column]: !current[column] }));
+  }
+
+  function toggleEdgeColumn(column: string) {
+    setEdgeColumnVisibility((current) => ({ ...current, [column]: !current[column] }));
+  }
+
+  function toggleNodeSort(key: string) {
+    setNodeSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+  }
+
+  function toggleEdgeSort(key: string) {
+    setEdgeSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+  }
+
+  function refreshPreviewWorkspace() {
+    setPreviewSettings((current) => ({
+      ...current,
+      dirty: false,
+      refreshedAt: nowStamp(),
+    }));
   }
 
   function updateLayoutSetting(layoutId: string, key: string, value: any) {
@@ -1504,6 +1871,1222 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     );
   }
 
+  function renderStatusStrip() {
+    const visibleReasoning = latestTranscriptTurn?.reasoning_text ?? "";
+    const humSurface = hum?.text_surface ?? "";
+    const reasoningBody =
+      reasoningLens === "hum_live"
+        ? excerptText(humSurface, 160)
+        : reasoningLens === "chain_like"
+          ? chainLikeSteps(visibleReasoning || humSurface, 2).join(" ")
+          : excerptText(visibleReasoning, 160);
+    return (
+      <section className="workbench-status-strip">
+        <div className="status-strip-cell">
+          <strong>Continuity</strong>
+          <span>{hum?.present ? excerptText(hum?.text_surface, 140) || "Hum present." : "No bounded hum artifact yet."}</span>
+        </div>
+        <div className="status-strip-cell status-strip-lens">
+          <strong>Reasoning Lens</strong>
+          <div aria-label="Reasoning lens" className="toolbar-group" role="radiogroup">
+            {([
+              ["reasoning", "Reasoning"],
+              ["chain_like", "Chain-Like"],
+              ["hum_live", "Hum Live"],
+            ] as Array<[ReasoningLens, string]>).map(([mode, label]) => (
+              <button
+                aria-checked={mode === reasoningLens}
+                key={mode}
+                className={mode === reasoningLens ? "toolbar-button is-active" : "toolbar-button"}
+                onClick={() => setReasoningLens(mode)}
+                role="radio"
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <span>
+            {reasoningBody ||
+              (reasoningLens === "hum_live"
+                ? "Hum Live becomes legible here once the bounded continuity artifact is generated."
+                : "No operator-visible reasoning artifact loaded yet.")}
+          </span>
+        </div>
+        <div className="status-strip-cell">
+          <strong>Payloads</strong>
+          <span>
+            {data.liveEnabled
+              ? "Live mode prefers API payloads and refresh invalidations."
+              : "Static export mode reads adjacent JSON artifacts."}
+          </span>
+        </div>
+        <div className="status-strip-cell">
+          <strong>Selection</strong>
+          <span>
+            {selectedEdgeId
+              ? `edge:${selectedEdgeId}`
+              : selectedNodeIds.length
+                ? `${selectedNodeIds.length} node${selectedNodeIds.length === 1 ? "" : "s"}`
+                : "none"}
+          </span>
+        </div>
+      </section>
+    );
+  }
+
+  function renderAppearancePanel() {
+    return (
+      <DockPanel title="Appearance" accent="browser-local">
+        <div className="module-tab-strip">
+          <button className="toolbar-button is-active" type="button">
+            Nodes
+          </button>
+          <button className="toolbar-button" type="button">
+            Edges
+          </button>
+        </div>
+        <div className="module-tab-strip module-tab-strip-secondary">
+          <button className="toolbar-button" type="button">
+            Unique
+          </button>
+          <button className="toolbar-button is-active" type="button">
+            Partition
+          </button>
+          <button className="toolbar-button" type="button">
+            Ranking
+          </button>
+        </div>
+        <div className="form-grid">
+          <label>
+            <span>Node color</span>
+            <select aria-label="Node color by" value={appearance.nodeColorBy} onChange={(event) => updateAppearance("nodeColorBy", event.target.value)}>
+              {(data.graph?.appearance_dimensions?.node_color ?? ["kind", "domain", "cluster", "evidence_label"]).map((value: string) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Node size</span>
+            <select aria-label="Node size by" value={appearance.nodeSizeBy} onChange={(event) => updateAppearance("nodeSizeBy", event.target.value)}>
+              {(data.graph?.appearance_dimensions?.node_size ?? ["uniform", "degree"]).map((value: string) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Edge color</span>
+            <select aria-label="Edge color by" value={appearance.edgeColorBy} onChange={(event) => updateAppearance("edgeColorBy", event.target.value)}>
+              {(data.graph?.appearance_dimensions?.edge_color ?? ["type", "evidence_label"]).map((value: string) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Edge opacity</span>
+            <select aria-label="Edge opacity by" value={appearance.edgeOpacityBy} onChange={(event) => updateAppearance("edgeOpacityBy", event.target.value)}>
+              {(data.graph?.appearance_dimensions?.edge_opacity ?? ["weight"]).map((value: string) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Label mode</span>
+            <select aria-label="Label mode" value={appearance.labelMode} onChange={(event) => updateAppearance("labelMode", event.target.value as AppearanceState["labelMode"])}>
+              {(data.graph?.appearance_dimensions?.label_modes ?? ["selection", "all", "none"]).map((value: string) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="toggle-line">
+            <input aria-label="Show edge labels" checked={appearance.showEdgeLabels} onChange={(event) => updateAppearance("showEdgeLabels", event.target.checked)} type="checkbox" />
+            <span>Show edge labels</span>
+          </label>
+        </div>
+        <p className="placeholder-copy gephi-panel-note">Visual mappings are browser-local. They can mirror EDEN attributes without mutating graph facts.</p>
+      </DockPanel>
+    );
+  }
+
+  function renderStatisticsPanel() {
+    return (
+      <DockPanel title="Statistics" accent={statsPending ? "running" : stats?.summary ? "derived columns available" : "on demand"}>
+        <p className="placeholder-copy">Statistics compute over the current visible graph slice and materialize as additional Data Laboratory columns when available.</p>
+        <div className="toolbar">
+          <button className="primary-button" disabled={statsPending} onClick={handleComputeStats} type="button">
+            Compute Statistics
+          </button>
+          <button className="toolbar-button" onClick={() => setWorkspace("data_laboratory")} type="button">
+            Open Data Laboratory
+          </button>
+        </div>
+        {stats?.error ? <p className="status-error">{stats.error}</p> : null}
+        {stats?.summary ? (
+          <>
+            <MetricList items={Object.entries(stats.summary)} />
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Ranking</th>
+                    <th>Top nodes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(stats.rankings ?? {}).map(([ranking, rows]) => (
+                    <tr key={ranking}>
+                      <td>{ranking}</td>
+                      <td>{rows.map((row) => `${row.label} (${row.score})`).join(", ")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="placeholder-copy">Degree, weighted degree, clustering, communities, PageRank, and betweenness remain browser-local statistics surfaces.</p>
+        )}
+      </DockPanel>
+    );
+  }
+
+  function renderContextPanel() {
+    return (
+      <DockPanel title="Context" accent={`${filteredBaseline.nodes.length} nodes visible`}>
+        <MetricList
+          items={[
+            ["Visible nodes", filteredBaseline.nodes.length],
+            ["Visible edges", filteredBaseline.edges.length],
+            ["Graph mode", graphMode],
+            ["Export scope", humanExportScopeLabel(exportScope)],
+            ["Assemblies", data.graph?.assemblies?.length ?? 0],
+            ["Memodes", memodeAudit.summary?.memodes ?? 0],
+            ["Active-set documents", activeDocumentCount],
+            ["Filters", activeFilterTags.length ? activeFilterTags.join(", ") : "none"],
+          ]}
+        />
+        <div className="context-stat-grid">
+          {domainCounts.map(([domain, count]) => (
+            <div key={domain} className="metric-callout">
+              <strong>{domain}</strong>
+              <span>{count}</span>
+            </div>
+          ))}
+        </div>
+        <p className="placeholder-copy">
+          Aperture / active-set summary lives here as a bounded context window. Drill-down remains available through Queries, Inspector, Runtime, and the measurement ledger.
+        </p>
+      </DockPanel>
+    );
+  }
+
+  function renderInspectorDockPanel() {
+    const rawTarget = selectedEdge ?? selectedNode ?? selectedAssembly ?? selectedTurn ?? data.overview ?? {};
+    return (
+      <DockPanel title="Inspector" accent={selectedEdge ? "edge" : selectedNode ? "node" : selectedAssembly ? "memode" : "session"}>
+        <div className="toolbar">
+          <button
+            className="toolbar-button"
+            onClick={() => {
+              setWorkspace("data_laboratory");
+              setDataLabTab(selectedEdge ? "edges" : "nodes");
+            }}
+            type="button"
+          >
+            Select in Data Laboratory
+          </button>
+          <button className="toolbar-button" onClick={() => setRightDockTab("actions")} type="button">
+            Open Actions
+          </button>
+        </div>
+        <div aria-label="Inspector view" className="inspector-tabs" role="tablist">
+          <button
+            aria-controls="observatory-inspector-panel"
+            aria-selected={inspectorTab === "cards"}
+            className={inspectorTab === "cards" ? "toolbar-button is-active" : "toolbar-button"}
+            id="observatory-inspector-tab-cards"
+            onClick={() => setInspectorTab("cards")}
+            role="tab"
+            type="button"
+          >
+            Cards
+          </button>
+          <button
+            aria-controls="observatory-inspector-panel"
+            aria-selected={inspectorTab === "json"}
+            className={inspectorTab === "json" ? "toolbar-button is-active" : "toolbar-button"}
+            id="observatory-inspector-tab-json"
+            onClick={() => setInspectorTab("json")}
+            role="tab"
+            type="button"
+          >
+            Raw JSON
+          </button>
+        </div>
+        <div aria-labelledby={inspectorTab === "json" ? "observatory-inspector-tab-json" : "observatory-inspector-tab-cards"} id="observatory-inspector-panel" role="tabpanel">
+          {inspectorTab === "json" ? <pre className="debug-json">{JSON.stringify(rawTarget, null, 2)}</pre> : renderInspectorCards()}
+        </div>
+      </DockPanel>
+    );
+  }
+
+  function renderQueriesPanel() {
+    return (
+      <DockPanel title="Queries" accent="selection + drill-down">
+        <div className="query-grid">
+          <Card title="Assemblies">
+            {data.graph ? (
+              <div className="chip-list">
+                {visibleAssemblies.items.map((assembly: any) => (
+                  <button
+                    aria-label={`Assembly ${assembly.label}`}
+                    key={assembly.id}
+                    className={assembly.id === selectedAssemblyId ? "chip is-active" : "chip"}
+                    data-state={assembly.id === selectedAssemblyId ? "active" : "inactive"}
+                    onClick={() => handleSelectAssembly(assembly.id)}
+                    type="button"
+                  >
+                    {assembly.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="placeholder-copy">Assemblies appear after the graph payload is ready.</p>
+            )}
+          </Card>
+          <Card title="Graph Entities">
+            {data.graph ? (
+              <div className="chip-list">
+                {visibleGraphNodes.items.map((node) => (
+                  <button
+                    aria-label={`Graph entity ${nodeLabel(node)}`}
+                    key={node.id}
+                    className={node.id === selectedNodeId ? "chip is-active" : "chip"}
+                    data-state={node.id === selectedNodeId ? "active" : "inactive"}
+                    onClick={() => handleFocusNode(node.id)}
+                    type="button"
+                  >
+                    {nodeLabel(node)}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="placeholder-copy">Graph entities depend on the graph payload.</p>
+            )}
+          </Card>
+          <Card title="Relations">
+            {data.graph ? (
+              <div className="transcript-list">
+                {visibleGraphEdges.items.map((edge) => (
+                  <button
+                    aria-label={`Graph relation ${edgeLabel(edge, nodeLookup)}`}
+                    key={edge.id}
+                    className={edge.id === selectedEdgeId ? "transcript-turn is-active" : "transcript-turn"}
+                    data-state={edge.id === selectedEdgeId ? "active" : "inactive"}
+                    onClick={() => handleSelectEdge(edge.id)}
+                    type="button"
+                  >
+                    <span>{edge.type}</span>
+                    <span>{edgeLabel(edge, nodeLookup)}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="placeholder-copy">Relations appear after the graph payload is ready.</p>
+            )}
+          </Card>
+          <Card title="Basin Turns">
+            {data.basin?.turns?.length ? (
+              <div className="transcript-list">
+                {visibleBasinTurns.items.map((turn: any) => (
+                  <button
+                    aria-label={`Basin turn T${turn.turn_index ?? "?"} ${turn.turn_id} ${turn.display_attractor_label ?? turn.dominant_label ?? turn.turn_id}`}
+                    key={turn.turn_id}
+                    className={turn.turn_id === selectedTurn?.turn_id ? "transcript-turn is-active" : "transcript-turn"}
+                    data-state={turn.turn_id === selectedTurn?.turn_id ? "active" : "inactive"}
+                    onClick={() => handleSelectTurn(turn.turn_id)}
+                    type="button"
+                  >
+                    <span>T{turn.turn_index ?? "?"}</span>
+                    <span>{turn.display_attractor_label ?? turn.dominant_label ?? turn.turn_id}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="placeholder-copy">Basin turns become selectable when filtered trajectory data is available.</p>
+            )}
+          </Card>
+          <Card title="Transcript">
+            {data.transcript ? (
+              <div className="transcript-list">
+                {(data.transcript.turns ?? []).slice(0, 10).map((turn: any) => (
+                  <button
+                    aria-label={`Transcript turn T${turn.turn_index} ${turn.turn_id}`}
+                    key={turn.turn_id}
+                    className={turn.turn_id === selectedTurn?.turn_id ? "transcript-turn is-active" : "transcript-turn"}
+                    data-state={turn.turn_id === selectedTurn?.turn_id ? "active" : "inactive"}
+                    onClick={() => handleSelectTurn(turn.turn_id)}
+                    type="button"
+                  >
+                    <span>T{turn.turn_index}</span>
+                    <span>{turn.user_text}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="placeholder-copy">{data.liveEnabled ? `Transcript payload ${payloadStatuses.transcript.status}.` : "Transcript is live-only in v1."}</p>
+            )}
+          </Card>
+        </div>
+      </DockPanel>
+    );
+  }
+
+  function renderActionsDockPanel() {
+    return (
+      <DockPanel title="Actions" accent={interactionMode}>
+        <p className="placeholder-copy">Preview/commit/revert remains the only mutation path. View state and layout state never enter the measurement ledger.</p>
+        <div className="toolbar">
+          <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handlePreview()} type="button">
+            Preview
+          </button>
+          <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handleCommit()} type="button">
+            Commit
+          </button>
+          <button className="toolbar-button" onClick={handleClearSelection} type="button">
+            Clear Selection
+          </button>
+        </div>
+        {!canMutate ? <p className="placeholder-copy">Static export mode keeps the action chrome visible but disabled. Mutation remains live-only.</p> : null}
+        <div className="form-grid">
+          <label>
+            <span>Edit action</span>
+            <select aria-label="Edit action" value={actionForm.editAction} onChange={(event) => updateAction("editAction", event.target.value)}>
+              {["edge_add", "edge_update", "edge_remove", "memode_assert", "memode_update_membership", "geometry_measurement_run", "motif_annotation"].map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Edge type</span>
+            <input aria-label="Edge type" value={actionForm.edgeType} onChange={(event) => updateAction("edgeType", event.target.value)} />
+          </label>
+          <label>
+            <span>Weight</span>
+            <input aria-label="Edge weight" type="number" step="0.1" value={actionForm.weight} onChange={(event) => updateAction("weight", Number(event.target.value || 1))} />
+          </label>
+          <label>
+            <span>Confidence</span>
+            <input aria-label="Confidence" type="number" step="0.01" value={actionForm.confidence} onChange={(event) => updateAction("confidence", Number(event.target.value || 0.7))} />
+          </label>
+          <label>
+            <span>Evidence label</span>
+            <select aria-label="Evidence label" value={actionForm.evidenceLabel} onChange={(event) => updateAction("evidenceLabel", event.target.value)}>
+              {(data.graph?.evidence_legend ? Object.keys(data.graph.evidence_legend) : ["OPERATOR_ASSERTED", "OPERATOR_REFINED", "DERIVED"]).map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Operator label</span>
+            <input aria-label="Operator label" value={actionForm.operatorLabel} onChange={(event) => updateAction("operatorLabel", event.target.value)} />
+          </label>
+          <label className="field-span">
+            <span>Rationale</span>
+            <textarea aria-label="Rationale" rows={3} value={actionForm.rationale} onChange={(event) => updateAction("rationale", event.target.value)} />
+          </label>
+          <label>
+            <span>Memode id</span>
+            <input aria-label="Memode id" value={actionForm.memodeId} onChange={(event) => updateAction("memodeId", event.target.value)} />
+          </label>
+          <label>
+            <span>Known memode label</span>
+            <input aria-label="Known memode label" value={actionForm.memodeLabel} onChange={(event) => updateAction("memodeLabel", event.target.value)} />
+          </label>
+          <label className="field-span">
+            <span>Known memode summary</span>
+            <textarea aria-label="Known memode summary" rows={3} value={actionForm.memodeSummary} onChange={(event) => updateAction("memodeSummary", event.target.value)} />
+          </label>
+        </div>
+        <Card title="Preview Diff" accent={preview?.action_type ?? "none"}>
+          {preview?.error ? (
+            <p className="status-error">{preview.error}</p>
+          ) : preview ? (
+            <pre className="debug-json">{JSON.stringify(preview, null, 2)}</pre>
+          ) : (
+            <p className="placeholder-copy">No preview yet. Run preview before commit to keep topology and measurement deltas explicit.</p>
+          )}
+        </Card>
+      </DockPanel>
+    );
+  }
+
+  function renderLedgerDockPanel() {
+    return (
+      <DockPanel title="Measurement Ledger" accent={String(data.measurements?.counts?.events ?? 0)}>
+        <div className="history-list">
+          {(data.measurements?.events ?? []).slice(0, 12).map((row: any) => (
+            <div className="history-item" key={row.id}>
+              <div>
+                <strong>{row.action_type}</strong> <span className="tiny">{row.evidence_label} · {row.created_at}</span>
+              </div>
+              <div className="tiny">{row.summary || row.rationale || ""}</div>
+              <div className="toolbar">
+                <button className="toolbar-button" disabled={!canMutate || mutationPending} onClick={() => void handleRevert(row.id)} type="button">
+                  Revert
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DockPanel>
+    );
+  }
+
+  function renderRuntimeDockPanel() {
+    return (
+      <DockPanel title="Runtime Trace" accent={String(data.trace?.trace_events?.length ?? 0)}>
+        {data.trace ? (
+          <>
+            <p className="placeholder-copy">Trace and membrane causality remain read-only. Observatory commits still route through preview / commit / revert only.</p>
+            <div className="history-list">
+              {(data.trace.trace_events ?? []).slice(0, 8).map((event: any) => (
+                <div className="history-item" key={event.id}>
+                  <div>
+                    <strong>{event.event_type}</strong> <span className="tiny">{event.created_at}</span>
+                  </div>
+                  <div className="tiny">{event.message}</div>
+                </div>
+              ))}
+            </div>
+            {data.trace.latest_turn_trace?.length ? <pre className="debug-json">{JSON.stringify(data.trace.latest_turn_trace.slice(0, 6), null, 2)}</pre> : null}
+          </>
+        ) : (
+          <p className="placeholder-copy">{data.liveEnabled ? `Runtime trace payload ${payloadStatuses.trace.status}.` : "Runtime trace is live-only."}</p>
+        )}
+      </DockPanel>
+    );
+  }
+
+  function renderBasinDockPanel() {
+    if (!data.basin) {
+      return (
+        <DockPanel title="Basin" accent={payloadStatuses.basin.status}>
+          <p className="placeholder-copy">Basin payload {payloadStatuses.basin.status}.</p>
+        </DockPanel>
+      );
+    }
+    return (
+      <DockPanel title="Basin" accent={data.basin.projection_method ?? bootstrap.projection_method ?? "derived"}>
+        {(data.basin.filtered_turn_count ?? 0) < 2 ? (
+          <div className="empty-state">
+            <h2>Sparse basin data</h2>
+            <p>{data.basin.diagnostics?.reason ?? "Not enough turns with non-empty active sets for basin playback."}</p>
+          </div>
+        ) : (
+          <BasinPanel payload={data.basin} currentTurnId={selectedTurn?.turn_id ?? null} liftMode={liftMode} onSelectTurn={handleSelectTurn} />
+        )}
+      </DockPanel>
+    );
+  }
+
+  function renderGeometryDockPanel() {
+    return (
+      <DockPanel title="Geometry" accent={payloadStatuses.geometry.status}>
+        {!data.geometry ? (
+          <div className="empty-state">
+            <h2>Geometry payload {payloadStatuses.geometry.status}</h2>
+            <p>
+              {payloadStatuses.geometry.status === "error"
+                ? "Geometry diagnostics are unavailable for this surface."
+                : "The geometry bundle is intentionally deferred until you open this panel because it can be very large."}
+            </p>
+            {payloadStatuses.geometry.error ? <p>{payloadStatuses.geometry.error}</p> : null}
+          </div>
+        ) : (
+          <pre className="debug-json">{JSON.stringify(data.geometry ?? {}, null, 2)}</pre>
+        )}
+      </DockPanel>
+    );
+  }
+
+  function renderTanakhDockPanel() {
+    return (
+      <DockPanel title="Tanakh" accent={payloadStatuses.tanakh.status}>
+        {!data.tanakh ? (
+          <div className="empty-state">
+            <h2>Tanakh payload {payloadStatuses.tanakh.status}</h2>
+            <p>
+              {payloadStatuses.tanakh.status === "error"
+                ? "Tanakh artifacts are unavailable for this panel."
+                : "The Tanakh bundle is deferred until you open this panel because it includes canonical text plus derived sidecars."}
+            </p>
+            {payloadStatuses.tanakh.error ? <p>{payloadStatuses.tanakh.error}</p> : null}
+          </div>
+        ) : (
+          <TanakhPanel
+            payload={data.tanakh}
+            liveEnabled={data.liveEnabled}
+            canRun={Boolean(data.liveEnabled && bootstrap.live_api?.tanakh_run)}
+            running={tanakhRunPending}
+            onRun={handleRunTanakh}
+          />
+        )}
+      </DockPanel>
+    );
+  }
+
+  function renderPayloadDockPanel() {
+    return (
+      <div className="dock-stack">
+        {renderPayloadStatus()}
+        {renderOverview()}
+      </div>
+    );
+  }
+
+  function renderOverviewRightRail() {
+    const dockTabs = RIGHT_DOCK_TABS.filter(([tabId]) => tabId !== "context");
+    return (
+      <div className="dock-stack dock-stack-overview-right">
+        <div className="dock-toolbar dock-toolbar-right">
+          <div className="dock-toolbar-caption">Utilities</div>
+          <button className="toolbar-button" onClick={() => setDockState((current) => ({ ...current, rightCollapsed: true }))} type="button">
+            Collapse Right Dock
+          </button>
+        </div>
+        {renderContextPanel()}
+        <div className="dock-tabbed-surface">
+          <div className="dock-tab-strip" role="tablist" aria-label="Overview side panels">
+            {dockTabs.map(([tabId, label]) => (
+              <button
+                aria-selected={rightDockTab === tabId}
+                className={rightDockTab === tabId ? "toolbar-button is-active" : "toolbar-button"}
+                key={tabId}
+                onClick={() => setRightDockTab(tabId)}
+                role="tab"
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="dock-tabbed-body">{rightDockTab === "context" ? renderStatisticsPanel() : renderRightDockContent()}</div>
+        </div>
+        <DockPanel title="Queries" accent="drag filter here">
+          <p className="placeholder-copy gephi-panel-note">Keep the full queries workbench docked without replacing the graph.</p>
+          <div className="toolbar">
+            <button className="toolbar-button" onClick={() => setRightDockTab("queries")} type="button">
+              Open Queries
+            </button>
+            <button className="toolbar-button" onClick={() => setWorkspace("data_laboratory")} type="button">
+              Open Data Laboratory
+            </button>
+          </div>
+        </DockPanel>
+      </div>
+    );
+  }
+
+  function renderRightDockContent() {
+    if (rightDockTab === "statistics") return renderStatisticsPanel();
+    if (rightDockTab === "filters") return renderFilterRail();
+    if (rightDockTab === "context") return renderContextPanel();
+    if (rightDockTab === "queries") return renderQueriesPanel();
+    if (rightDockTab === "memode_audit") return renderMemodeAuditPanel();
+    if (rightDockTab === "actions") return renderActionsDockPanel();
+    if (rightDockTab === "ledger") return renderLedgerDockPanel();
+    if (rightDockTab === "runtime") return renderRuntimeDockPanel();
+    if (rightDockTab === "basin") return renderBasinDockPanel();
+    if (rightDockTab === "geometry") return renderGeometryDockPanel();
+    if (rightDockTab === "tanakh") return renderTanakhDockPanel();
+    if (rightDockTab === "payloads") return renderPayloadDockPanel();
+    return renderInspectorDockPanel();
+  }
+
+  function renderGraphWorkbenchCenter() {
+    if (!data.graph) {
+      return (
+        <div className="empty-state">
+          <h2>Graph payload not ready</h2>
+          <p>Current status: {payloadStatuses.graph.status}. This semantic bundle loads separately from the summary payloads.</p>
+        </div>
+      );
+    }
+
+    const graphCanvas = (
+      <GraphPanel
+        nodes={filteredBaseline.nodes}
+        edges={filteredBaseline.edges}
+        coordinateMap={baselineCoordinateMap}
+        appearance={appearance}
+        highlightedNodeIds={effectiveHighlightedNodeIds}
+        selectedNodeIds={selectedNodeIds}
+        selectedEdgeId={selectedEdgeId}
+        selectedAssembly={assemblyRenderMode === "hidden" ? null : selectedAssembly}
+        onSelectNode={handleSelectNode}
+        onSelectEdge={handleSelectEdge}
+        onClearSelection={graphTool === "pin" ? () => undefined : handleClearSelection}
+        cameraVersion={cameraResetToken}
+      />
+    );
+
+    const modifiedCanvas = (
+      <GraphPanel
+        nodes={filteredModified.nodes}
+        edges={filteredModified.edges}
+        coordinateMap={modifiedCoordinateMap}
+        appearance={appearance}
+        highlightedNodeIds={preview?.compare_selection?.modified_node_ids ?? effectiveHighlightedNodeIds}
+        selectedNodeIds={preview?.compare_selection?.modified_node_ids ?? selectedNodeIds}
+        selectedEdgeId={selectedEdgeId}
+        selectedAssembly={assemblyRenderMode === "hidden" ? null : selectedAssembly}
+        addedNodeIds={(preview?.preview_graph_patch?.added_nodes ?? []).map((node: any) => node.id)}
+        addedEdgeIds={(preview?.preview_graph_patch?.added_edges ?? []).map((edge: any) => edge.id || edgeKey(edge))}
+        onSelectNode={handleSelectNode}
+        onSelectEdge={handleSelectEdge}
+        onClearSelection={graphTool === "pin" ? () => undefined : handleClearSelection}
+        ariaLabel="Modified graph canvas"
+        cameraVersion={cameraResetToken}
+      />
+    );
+
+    return (
+      <div className="graph-workbench">
+        <div className="graph-window-tabs">
+          <button className="graph-window-tab graph-window-tab-active" type="button">
+            Graph
+          </button>
+          <div className="graph-window-toolbar">
+            <span>Dragging</span>
+            <button className="toolbar-button" onClick={() => setRightDockTab("actions")} type="button">
+              Configure
+            </button>
+          </div>
+        </div>
+        <div className="graph-workbench-toolbar">
+          <div aria-label="Overview graph mode" className="toolbar-group toolbar-group-compact" role="radiogroup">
+            {graphModes.map((mode) => (
+              <button
+                aria-checked={mode === graphMode}
+                key={mode}
+                className={mode === graphMode ? "toolbar-button is-active" : "toolbar-button"}
+                onClick={() => setGraphMode(mode)}
+                role="radio"
+                type="button"
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+          <div aria-label="Interaction mode" className="toolbar-group toolbar-group-compact" role="radiogroup">
+            {interactionModes.map((mode) => (
+              <button
+                aria-checked={mode === interactionMode}
+                key={mode}
+                className={mode === interactionMode ? "toolbar-button is-active" : "toolbar-button"}
+                onClick={() => setInteractionMode(mode)}
+                role="radio"
+                type="button"
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+          <div className="toolbar-group">
+            <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handlePreview()} type="button">
+              Preview
+            </button>
+            <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handleCommit()} type="button">
+              Commit
+            </button>
+            <button className="toolbar-button" onClick={() => setWorkspace("data_laboratory")} type="button">
+              Select in Data Laboratory
+            </button>
+          </div>
+        </div>
+        <div className="graph-stage-shell">
+          <GraphToolRail
+            activeTool={graphTool}
+            onSelectTool={setGraphTool}
+            onFitGraph={() => setCameraResetToken((current) => current + 1)}
+            onResetCamera={() => setCameraResetToken((current) => current + 1)}
+            onOpenDataLab={() => setWorkspace("data_laboratory")}
+          />
+          <div className={`graph-stage graph-stage-${graphMode === "Compare" ? "compare" : "single"}`}>
+            {graphMode === "Compare" ? (
+              <div className="compare-grid">
+                <section className="compare-panel">
+                  <div className="compare-header">
+                    <h2>Baseline</h2>
+                    <span className={badgeClass("derived")}>{coordinateModeLabel(coordinateMode, layoutSnapshots, layoutCatalog)}</span>
+                  </div>
+                  {graphCanvas}
+                </section>
+                <section className="compare-panel">
+                  <div className="compare-header">
+                    <h2>Modified</h2>
+                    <span className={badgeClass("observed")}>{preview?.preview_graph_patch?.graph_changed ? "preview patch" : "view compare"}</span>
+                  </div>
+                  {modifiedCanvas}
+                </section>
+              </div>
+            ) : (
+              graphCanvas
+            )}
+            <div className="graph-stage-footer">
+              <div className="graph-bottom-toolbar">
+                <span className="graph-bottom-tool">◫</span>
+                <span className="graph-bottom-tool">T</span>
+                <span className="graph-bottom-tool">⟂</span>
+                <span className="graph-bottom-tool">A</span>
+                <span className="graph-bottom-tool">{filteredBaseline.nodes.length} nodes</span>
+                <span className="graph-bottom-tool">{filteredBaseline.edges.length} edges</span>
+                <span className="graph-bottom-tool">{graphTool === "neighbors" ? "neighbors" : graphTool.replace("_", " ")}</span>
+              </div>
+              <button className="toolbar-button" onClick={() => setDockState((current) => ({ ...current, renderTrayOpen: !current.renderTrayOpen }))} type="button">
+                {dockState.renderTrayOpen ? "Hide render options" : "Render options"}
+              </button>
+            </div>
+            <RenderOptionsTray
+              open={dockState.renderTrayOpen}
+              appearance={appearance}
+              assemblyRenderMode={assemblyRenderMode}
+              coordinateLabel={coordinateModeLabel(coordinateMode, layoutSnapshots, layoutCatalog)}
+              onAppearanceChange={updateAppearance}
+              onAssemblyRenderModeChange={setAssemblyRenderMode}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderOverviewWorkspace() {
+    return (
+      <DockLayout
+        leftCollapsed={dockState.leftCollapsed}
+        leftWidth={dockState.leftWidth}
+        rightCollapsed={dockState.rightCollapsed}
+        rightWidth={dockState.rightWidth}
+        onResizeStart={setDraggingDock}
+        leftCollapsedLabel="Appearance / Layout"
+        onToggleLeft={() => setDockState((current) => ({ ...current, leftCollapsed: !current.leftCollapsed }))}
+        rightCollapsedLabel="Context / Inspector"
+        onToggleRight={() => setDockState((current) => ({ ...current, rightCollapsed: !current.rightCollapsed }))}
+        left={
+          <div className="dock-stack">
+            <div className="dock-toolbar">
+              <button className="toolbar-button" onClick={() => setDockState((current) => ({ ...current, leftCollapsed: true }))} type="button">
+                Collapse Left Dock
+              </button>
+              <button className="toolbar-button" onClick={handleResetWorkbenchLayout} type="button">
+                Reset layout
+              </button>
+            </div>
+            {renderAppearancePanel()}
+            {renderLayoutWorkbench()}
+          </div>
+        }
+        center={renderGraphWorkbenchCenter()}
+        right={renderOverviewRightRail()}
+      />
+    );
+  }
+
+  function renderDataLaboratoryWorkspace() {
+    const normalizedSearch = dataLabSearch.trim().toLowerCase();
+    const nodeRows = [...filteredBaseline.nodes]
+      .filter((node) => {
+        if (!normalizedSearch) return true;
+        return [
+          node.id,
+          node.label,
+          node.export_label,
+          node.kind,
+          node.domain,
+          node.cluster_label,
+          node.cluster_signature,
+          ...(node.memode_membership ?? []),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedSearch);
+      })
+      .sort((left, right) =>
+        compareValues(
+          nodeColumnValue(left, nodeSort.key, stats),
+          nodeColumnValue(right, nodeSort.key, stats),
+          nodeSort.direction,
+        ),
+      );
+    const edgeRows = [...filteredBaseline.edges]
+      .filter((edge) => {
+        if (!normalizedSearch) return true;
+        return [edge.id, edge.type, edgeLabel(edge, nodeLookup), edge.evidence_label, edge.assertion_origin].filter(Boolean).join(" ").toLowerCase().includes(normalizedSearch);
+      })
+      .sort((left, right) =>
+        compareValues(
+          edgeColumnValue(left, edgeSort.key, nodeLookup),
+          edgeColumnValue(right, edgeSort.key, nodeLookup),
+          edgeSort.direction,
+        ),
+      );
+
+    const nodeColumns: Array<[string, string]> = [
+      ["label", "Label"],
+      ["id", "ID"],
+      ["kind", "Type"],
+      ["domain", "Domain"],
+      ["cluster", "Cluster"],
+      ["memodes", "Memode membership"],
+      ["provenance", "Provenance"],
+      ["evidence", "Evidence"],
+      ["confidence", "Confidence"],
+      ["measurement_history", "Measurement history"],
+      ["degree", "Degree"],
+      ["weighted_degree", "Weighted degree"],
+      ["clustering", "Clustering"],
+    ];
+    const edgeColumns: Array<[string, string]> = [
+      ["relation", "Relation"],
+      ["id", "ID"],
+      ["type", "Type"],
+      ["source", "Source"],
+      ["target", "Target"],
+      ["weight", "Weight"],
+      ["evidence", "Evidence"],
+      ["provenance", "Provenance"],
+      ["confidence", "Confidence"],
+      ["measurement_history", "Measurement history"],
+    ];
+
+    return (
+      <div className="workspace-shell data-lab-workspace">
+        <div className="workspace-toolbar">
+          <div>
+            <p className="eyebrow">Data Laboratory</p>
+            <h2>Spreadsheet audit for nodes, relations, provenance, and export scope</h2>
+          </div>
+          <div className="toolbar-group">
+            <button className={dataLabTab === "nodes" ? "toolbar-button is-active" : "toolbar-button"} onClick={() => setDataLabTab("nodes")} type="button">
+              Nodes
+            </button>
+            <button className={dataLabTab === "edges" ? "toolbar-button is-active" : "toolbar-button"} onClick={() => setDataLabTab("edges")} type="button">
+              Edges
+            </button>
+          </div>
+          <label className="toolbar-select">
+            <span>Export scope</span>
+            <select aria-label="Export scope" onChange={(event) => setExportScope(event.target.value as ExportScope)} value={exportScope}>
+              <option value="current">Current view</option>
+              <option value="full">Full ontology</option>
+              <option value="behavior">Behavior only</option>
+              <option value="information">Information only</option>
+            </select>
+          </label>
+          <input
+            aria-label="Data Laboratory search"
+            className="data-lab-search"
+            onChange={(event) => setDataLabSearch(event.target.value)}
+            placeholder="Search rows, ids, labels, provenance"
+            value={dataLabSearch}
+          />
+          <button className="toolbar-button" onClick={() => setWorkspace("overview")} type="button">
+            Select in Graph
+          </button>
+          <button className="toolbar-button" onClick={() => setWorkspace("preview")} type="button">
+            Open Preview
+          </button>
+        </div>
+        <div className="data-lab-meta">
+          <div className="metric-callout">
+            <strong>Visible graph slice</strong>
+            <span>{filteredBaseline.nodes.length} nodes · {filteredBaseline.edges.length} edges</span>
+          </div>
+          <div className="metric-callout">
+            <strong>Export slice</strong>
+            <span>{humanExportScopeLabel(exportScope)} · {exportGraph.nodes.length} nodes · {exportGraph.edges.length} edges</span>
+          </div>
+          <div className="metric-callout">
+            <strong>Selection sync</strong>
+            <span>{selectedEdgeId ? "relation selected" : `${selectedNodeIds.length} node${selectedNodeIds.length === 1 ? "" : "s"} selected`}</span>
+          </div>
+        </div>
+        <div className="data-lab-layout">
+          <aside className="data-lab-controls">
+            <DockPanel title="Columns" accent={dataLabTab === "nodes" ? `${Object.values(nodeColumnVisibility).filter(Boolean).length} shown` : `${Object.values(edgeColumnVisibility).filter(Boolean).length} shown`}>
+              <div className="column-toggle-list">
+                {(dataLabTab === "nodes" ? nodeColumns : edgeColumns).map(([column, label]) => (
+                  <label className="toggle-line" key={column}>
+                    <input
+                      checked={dataLabTab === "nodes" ? Boolean(nodeColumnVisibility[column]) : Boolean(edgeColumnVisibility[column])}
+                      onChange={() => (dataLabTab === "nodes" ? toggleNodeColumn(column) : toggleEdgeColumn(column))}
+                      type="checkbox"
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </DockPanel>
+            <DockPanel title="Bulk Operations" accent="safe only">
+              {dataLabTab === "nodes" ? (
+                <div className="toolbar toolbar-vertical">
+                  <button className="toolbar-button" onClick={() => setSelectedNodeIds(nodeRows.slice(0, 25).map((node) => node.id))} type="button">
+                    Select visible nodes
+                  </button>
+                  <button className="toolbar-button" onClick={handleClearSelection} type="button">
+                    Clear selection
+                  </button>
+                  <button className="toolbar-button" onClick={() => handleExport("selection_json")} type="button">
+                    Export selection JSON
+                  </button>
+                </div>
+              ) : (
+                <div className="toolbar toolbar-vertical">
+                  <button className="toolbar-button" disabled={!edgeRows.length} onClick={() => edgeRows[0] && handleSelectEdge(edgeRows[0].id)} type="button">
+                    Focus first visible relation
+                  </button>
+                  <button className="toolbar-button" onClick={handleClearSelection} type="button">
+                    Clear selection
+                  </button>
+                  <button className="toolbar-button" onClick={() => handleExport("selection_json")} type="button">
+                    Export selection JSON
+                  </button>
+                </div>
+              )}
+            </DockPanel>
+            <DockPanel title="Export Actions" accent={lastExportMessage || "Preview retains final styling"}>
+              <div className="toolbar toolbar-vertical">
+                {(data.graph?.export_formats ?? DEFAULT_EXPORT_FORMATS).map((format: string) => (
+                  <button key={format} className="toolbar-button" onClick={() => handleExport(format)} type="button">
+                    {humanExportLabel(format)}
+                  </button>
+                ))}
+              </div>
+            </DockPanel>
+          </aside>
+          <section className="data-lab-table-panel">
+            <div className="table-scroll">
+              {dataLabTab === "nodes" ? (
+                <table className="data-table data-lab-table">
+                  <thead>
+                    <tr>
+                      {nodeColumns
+                        .filter(([column]) => nodeColumnVisibility[column])
+                        .map(([column, label]) => (
+                          <th key={column}>
+                            <button className="table-sort-button" onClick={() => toggleNodeSort(column)} type="button">
+                              {label}
+                            </button>
+                          </th>
+                        ))}
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {nodeRows.map((node) => (
+                      <tr className={selectedNodeIds.includes(node.id) ? "is-selected" : ""} key={node.id}>
+                        {nodeColumns.filter(([column]) => nodeColumnVisibility[column]).map(([column]) => (
+                          <td key={`${node.id}-${column}`}>{formatValue(nodeColumnValue(node, column, stats))}</td>
+                        ))}
+                        <td>
+                          <button className="table-button" onClick={() => handleFocusNode(node.id)} type="button">
+                            Select in Graph
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="data-table data-lab-table">
+                  <thead>
+                    <tr>
+                      {edgeColumns
+                        .filter(([column]) => edgeColumnVisibility[column])
+                        .map(([column, label]) => (
+                          <th key={column}>
+                            <button className="table-sort-button" onClick={() => toggleEdgeSort(column)} type="button">
+                              {label}
+                            </button>
+                          </th>
+                        ))}
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {edgeRows.map((edge) => (
+                      <tr className={selectedEdgeId === edge.id ? "is-selected" : ""} key={edge.id}>
+                        {edgeColumns.filter(([column]) => edgeColumnVisibility[column]).map(([column]) => (
+                          <td key={`${edge.id}-${column}`}>{formatValue(edgeColumnValue(edge, column, nodeLookup))}</td>
+                        ))}
+                        <td>
+                          <button className="table-button" onClick={() => handleSelectEdge(edge.id)} type="button">
+                            Select in Graph
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPreviewWorkspace() {
+    return (
+      <div className="workspace-shell preview-workspace">
+        <div className="workspace-toolbar">
+          <div>
+            <p className="eyebrow">Preview</p>
+            <h2>Final render and export styling remain separate from graph mutation</h2>
+          </div>
+          <div className="toolbar-group">
+            <button className="primary-button" onClick={refreshPreviewWorkspace} type="button">
+              Refresh preview
+            </button>
+            <button className="toolbar-button" onClick={() => setWorkspace("overview")} type="button">
+              Back to Overview
+            </button>
+          </div>
+        </div>
+        <div className="preview-layout">
+          <aside className="preview-settings-panel">
+            <DockPanel title="Preview Settings" accent={previewSettings.dirty ? "staged changes" : previewSettings.refreshedAt ?? "current"}>
+              <p className="placeholder-copy">Preview settings affect the final rendered/export surface, not graph topology, measurement events, or semantic state.</p>
+              <div className="form-grid">
+                <label>
+                  <span>Label mode</span>
+                  <select aria-label="Preview label mode" value={previewSettings.labelMode} onChange={(event) => updatePreviewSetting("labelMode", event.target.value as AppearanceState["labelMode"])}>
+                    {(data.graph?.appearance_dimensions?.label_modes ?? ["selection", "all", "none"]).map((value: string) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="toggle-line">
+                  <input checked={previewSettings.showEdgeLabels} onChange={(event) => updatePreviewSetting("showEdgeLabels", event.target.checked)} type="checkbox" />
+                  <span>Show edge labels</span>
+                </label>
+                <label>
+                  <span>Edge opacity</span>
+                  <input aria-label="Preview edge opacity" max="1" min="0.1" onChange={(event) => updatePreviewSetting("edgeOpacityScale", Number(event.target.value))} step="0.05" type="range" value={previewSettings.edgeOpacityScale} />
+                </label>
+                <label>
+                  <span>Edge curvature</span>
+                  <input aria-label="Preview edge curvature" max="1" min="0" onChange={(event) => updatePreviewSetting("edgeCurvature", Number(event.target.value))} step="0.05" type="range" value={previewSettings.edgeCurvature} />
+                </label>
+                <label>
+                  <span>Background</span>
+                  <select aria-label="Preview background" value={previewSettings.background} onChange={(event) => updatePreviewSetting("background", event.target.value as PreviewSettings["background"])}>
+                    <option value="ember">Ember</option>
+                    <option value="linen">Linen</option>
+                    <option value="graphite">Graphite</option>
+                  </select>
+                </label>
+                <label className="toggle-line">
+                  <input checked={previewSettings.showLegend} onChange={(event) => updatePreviewSetting("showLegend", event.target.checked)} type="checkbox" />
+                  <span>Show legend</span>
+                </label>
+                <label className="toggle-line">
+                  <input checked={previewSettings.showCaption} onChange={(event) => updatePreviewSetting("showCaption", event.target.checked)} type="checkbox" />
+                  <span>Show caption</span>
+                </label>
+                <label className="field-span">
+                  <span>Caption</span>
+                  <textarea aria-label="Preview caption" rows={3} value={previewSettings.caption} onChange={(event) => updatePreviewSetting("caption", event.target.value)} />
+                </label>
+              </div>
+            </DockPanel>
+            <DockPanel title="Export Actions" accent={humanExportScopeLabel(exportScope)}>
+              <label className="toolbar-select">
+                <span>Export scope</span>
+                <select aria-label="Preview export scope" onChange={(event) => setExportScope(event.target.value as ExportScope)} value={exportScope}>
+                  <option value="current">Current view</option>
+                  <option value="full">Full ontology</option>
+                  <option value="behavior">Behavior only</option>
+                  <option value="information">Information only</option>
+                </select>
+              </label>
+              <div className="toolbar toolbar-vertical">
+                {(data.graph?.export_formats ?? DEFAULT_EXPORT_FORMATS).map((format: string) => (
+                  <button key={format} className="toolbar-button" onClick={() => handleExport(format)} type="button">
+                    {humanExportLabel(format)}
+                  </button>
+                ))}
+              </div>
+            </DockPanel>
+          </aside>
+          <section className={`preview-viewport preview-background-${previewSettings.background}`}>
+            <header className="preview-viewport-header">
+              <div>
+                <p className="eyebrow">Final Render</p>
+                <h2>Preview</h2>
+              </div>
+              <div className="header-badges">
+                <span className={badgeClass("derived")}>{humanExportScopeLabel(exportScope)}</span>
+                <span className={badgeClass(previewSettings.dirty ? "warning" : "observed")}>
+                  {previewSettings.dirty ? "Refresh pending" : "Preview current"}
+                </span>
+              </div>
+            </header>
+            <div className="preview-stage">
+              <GraphPanel
+                nodes={exportGraph.nodes}
+                edges={exportGraph.edges}
+                coordinateMap={previewCoordinateMap}
+                appearance={previewAppearance}
+                highlightedNodeIds={selectedNodeIds}
+                selectedNodeIds={selectedNodeIds}
+                selectedEdgeId={selectedEdgeId}
+                selectedAssembly={assemblyRenderMode === "hidden" ? null : selectedAssembly}
+                onSelectNode={handleSelectNode}
+                onSelectEdge={handleSelectEdge}
+                onClearSelection={handleClearSelection}
+                ariaLabel="Preview viewport"
+                cameraVersion={cameraResetToken}
+              />
+            </div>
+            {previewSettings.showCaption ? (
+              <div className="preview-caption">
+                <strong>Caption</strong>
+                <p>{previewSettings.caption || "No preview caption set."}</p>
+              </div>
+            ) : null}
+            {previewSettings.showLegend ? (
+              <div className="preview-legend">
+                <span>{`Labels: ${previewSettings.labelMode}`}</span>
+                <span>{`Edge opacity: ${previewSettings.edgeOpacityScale.toFixed(2)}`}</span>
+                <span>{`Curvature intent: ${previewSettings.edgeCurvature.toFixed(2)}`}</span>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   function renderOverview() {
     const graphCounts = data.overview?.graph_counts ?? data.graph?.counts ?? {};
     const measurementCounts = data.measurements?.counts ?? {};
@@ -1712,7 +3295,15 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     if (!data.graph) return null;
     const filterSource = data.graph.filters ?? {};
     return (
-      <Card title="Left Rail Filters" accent="browser-local">
+      <Card title="Filters" accent="browser-local">
+        <div className="filter-library">
+          {["Attributes", "Dynamic", "Edges", "Topology", "Operator", "Saved queries"].map((group) => (
+            <div className="filter-library-row" key={group}>
+              <span className="filter-library-toggle">▸</span>
+              <span>{group}</span>
+            </div>
+          ))}
+        </div>
         <div className="form-grid">
           <label>
             <span>Search</span>
@@ -2376,78 +3967,39 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     const selectedFamily = layoutFamilies.find((family) => family.id === selectedLayoutMeta?.familyId) ?? null;
     return (
       <Card title="Layout Workbench" accent={layoutRunState.lastMessage || humanLayoutLabel(layoutTarget, layoutCatalog)}>
-        <div className="layout-terrain">
-          {layoutFamilies.map((family) => {
-            const subgroupMap = new Map<string, LayoutAlgorithmMeta[]>();
-            Object.values(layoutCatalog)
-              .filter((meta) => meta.familyId === family.id && meta.kind !== "exported_coordinate")
-              .forEach((meta) => {
-                const subgroup = meta.subgroupLabel ?? "Algorithms";
-                const bucket = subgroupMap.get(subgroup) ?? [];
-                bucket.push(meta);
-                subgroupMap.set(subgroup, bucket);
-              });
-            if (!subgroupMap.size) return null;
-            return (
-              <section className="layout-family-card" key={family.id}>
-                <header>
-                  <h3>{family.label}</h3>
-                  <p>{family.description}</p>
-                </header>
-                <div className="chip-list">
-                  {family.bestFor.map((item) => (
-                    <span className="badge badge-derived" key={item}>
-                      {item}
-                    </span>
-                  ))}
-                </div>
-                {[...subgroupMap.entries()].map(([subgroup, entries]) => (
-                  <div className="layout-subgroup" key={`${family.id}-${subgroup}`}>
-                    <h4>{subgroup}</h4>
-                    <div className="layout-algorithm-grid">
-                      {entries.map((meta) => (
-                        <button
-                          aria-pressed={meta.id === layoutTarget}
-                          className={meta.id === layoutTarget ? "layout-algorithm-button is-active" : "layout-algorithm-button"}
-                          key={meta.id}
-                          onClick={() => setLayoutTarget(meta.id)}
-                          type="button"
-                        >
-                          <strong>{meta.label}</strong>
-                          <span>{meta.status === "runnable" ? "Runnable" : "Reference"}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+        <div className="layout-compact-toolbar">
+          <label className="layout-inline-field">
+            <span>Algorithm</span>
+            <select aria-label="Layout algorithm" value={layoutTarget} onChange={(event) => setLayoutTarget(event.target.value)}>
+              {Object.values(layoutCatalog)
+                .filter((meta) => meta.kind !== "exported_coordinate")
+                .map((meta) => (
+                  <option key={meta.id} value={meta.id}>
+                    {meta.label}
+                  </option>
                 ))}
-              </section>
-            );
-          })}
+            </select>
+          </label>
+          <button className="primary-button" disabled={layoutRunState.running || selectedLayoutMeta?.status !== "runnable"} onClick={handleRunLayout} type="button">
+            Run
+          </button>
         </div>
-        <div className="layout-detail-card">
+        <div className="layout-detail-card layout-detail-card-compact">
           <div className="layout-detail-header">
             <div>
               <p className="eyebrow">Selected Algorithm</p>
               <h3>{humanLayoutLabel(layoutTarget, layoutCatalog)}</h3>
             </div>
             <span className={badgeClass(selectedLayoutMeta?.status === "runnable" ? "observed" : "derived")}>
-              {selectedLayoutMeta?.status === "runnable" ? "Runnable in browser worker" : "Reference / explanatory only"}
+              {selectedLayoutMeta?.status === "runnable" ? "Runnable" : "Reference"}
             </span>
           </div>
           <p className="placeholder-copy">{selectedLayoutMeta?.summary ?? "Select a layout terrain item to see how it is used."}</p>
-          <p className="placeholder-copy">{selectedLayoutMeta?.usedFor ?? "Layout explanations stay browser-local and do not alter graph evidence."}</p>
           {selectedFamily ? (
             <p className="placeholder-copy">
               Family: <strong>{selectedFamily.label}</strong>
             </p>
           ) : null}
-          <div className="chip-list">
-            {(selectedLayoutMeta?.bestFor ?? []).map((item) => (
-              <span className="badge" key={item}>
-                {item}
-              </span>
-            ))}
-          </div>
         </div>
         {selectedLayoutMeta?.status === "runnable" ? <div className="form-grid">{renderLayoutSettingsFields(selectedLayoutMeta, settings, updateLayoutSetting)}</div> : null}
         {selectedLayoutMeta?.status !== "runnable" ? (
@@ -2464,7 +4016,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             Cancel
           </button>
           <button className="toolbar-button" onClick={handleResetLayout} type="button">
-            Reset
+            Reset Coordinates
           </button>
           <button className="toolbar-button" onClick={handleSaveLayoutSnapshot} type="button">
             Save Local Snapshot
@@ -2475,7 +4027,37 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           <progress max={1} value={layoutRunState.progress} />
           <span>{(layoutRunState.progress * 100).toFixed(0)}%</span>
         </div>
-        <p className="placeholder-copy">Layouts run in a browser worker when marked runnable, remain local view state, and never enter the measurement ledger.</p>
+        <details className="layout-library">
+          <summary>Algorithm library</summary>
+          <div className="layout-terrain">
+            {layoutFamilies.map((family) => {
+              const entries = Object.values(layoutCatalog).filter((meta) => meta.familyId === family.id && meta.kind !== "exported_coordinate");
+              if (!entries.length) return null;
+              return (
+                <section className="layout-family-card" key={family.id}>
+                  <header>
+                    <h3>{family.label}</h3>
+                    <p>{family.description}</p>
+                  </header>
+                  <div className="layout-algorithm-grid">
+                    {entries.map((meta) => (
+                      <button
+                        aria-pressed={meta.id === layoutTarget}
+                        className={meta.id === layoutTarget ? "layout-algorithm-button is-active" : "layout-algorithm-button"}
+                        key={meta.id}
+                        onClick={() => setLayoutTarget(meta.id)}
+                        type="button"
+                      >
+                        <strong>{meta.label}</strong>
+                        <span>{meta.status === "runnable" ? "Runnable" : "Reference"}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </details>
       </Card>
     );
   }
@@ -3022,49 +4604,296 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">EDEN Observatory</p>
-          <h1>Live-first semantic graph and basin instrument</h1>
+    <div className="app-shell workbench-shell">
+      <header className="app-header workbench-header">
+        <div className="workbench-title-block">
+          <span className="workbench-title">EDEN Observatory</span>
+          <span className="workbench-subtitle">Gephi desktop replication with EDEN provenance discipline</span>
         </div>
         <div className="header-badges">
           <span className={badgeClass("observed")}>{data.liveEnabled ? "Live API" : "Static export"}</span>
-          <span className={badgeClass("derived")}>Layout != evidence</span>
+          <span className={badgeClass("derived")}>View state != evidence</span>
           {data.staleBuildWarning ? <span className={badgeClass("warning")}>Build warning: {data.staleBuildWarning}</span> : null}
         </div>
       </header>
 
-      <nav aria-label="Observatory surface" className="surface-tabs" role="tablist">
-        {SURFACES.map((item) => (
-          <button
-            aria-controls="observatory-surface-panel"
-            aria-selected={item === surface}
-            className={item === surface ? "toolbar-button is-active" : "toolbar-button"}
-            id={`observatory-surface-tab-${item}`}
-            key={item}
-            onClick={() => setSurface(item)}
-            role="tab"
-            type="button"
-          >
-            {labelForSurface(item)}
+      <div className="workspace-toolbar">
+        <div className="workspace-toolbar-primary">
+          <WorkspaceTabs activeWorkspace={workspace} onSelectWorkspace={setWorkspace} />
+          <div className="workspace-instance-tabs" aria-label="Workspace documents">
+            <button className="workspace-instance-tab workspace-instance-tab-active" type="button">
+              Workspace 1
+            </button>
+            <button className="workspace-instance-tab" type="button">
+              {workspaceArtifactLabel}
+            </button>
+          </div>
+        </div>
+        <div className="toolbar-group">
+          <button className="toolbar-button" onClick={handleResetWorkbenchLayout} type="button">
+            Reset layout
           </button>
-        ))}
-      </nav>
-
-      {renderPayloadStatus()}
-      {renderContinuityStrip()}
+          <button className="toolbar-button" onClick={() => setShowKeyboardHelp(true)} type="button">
+            Keyboard help
+          </button>
+        </div>
+      </div>
       {error ? <div className="status-banner status-error">{error}</div> : null}
 
-      <main className="layout">
-        {renderSidebar()}
-        <section aria-labelledby={`observatory-surface-tab-${surface}`} className="surface-panel" id="observatory-surface-panel" role="tabpanel">
-          {renderMainSurface()}
-        </section>
-        {renderInspector()}
+      <main className="workbench-main">
+        {workspace === "overview" ? renderOverviewWorkspace() : null}
+        {workspace === "data_laboratory" ? renderDataLaboratoryWorkspace() : null}
+        {workspace === "preview" ? renderPreviewWorkspace() : null}
       </main>
+      {renderStatusStrip()}
+      <KeyboardHelpOverlay open={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
     </div>
   );
+}
+
+function WorkspaceTabs({ activeWorkspace, onSelectWorkspace }: { activeWorkspace: Workspace; onSelectWorkspace: (workspace: Workspace) => void }) {
+  return (
+    <nav aria-label="Observatory workspace" className="workspace-tabs" role="tablist">
+      {WORKSPACES.map((item) => (
+        <button
+          aria-selected={item === activeWorkspace}
+          className={item === activeWorkspace ? "toolbar-button is-active" : "toolbar-button"}
+          key={item}
+          onClick={() => onSelectWorkspace(item)}
+          role="tab"
+          type="button"
+        >
+          {labelForWorkspace(item)}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function DockPanel({ title, children, accent }: { title: string; children: ReactNode; accent?: string }) {
+  return (
+    <section className="dock-panel">
+      <div className="card-header">
+        <h3>{title}</h3>
+        {accent ? <span className="card-accent">{accent}</span> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function DockLayout({
+  left,
+  center,
+  right,
+  leftWidth,
+  rightWidth,
+  leftCollapsed,
+  rightCollapsed,
+  onResizeStart,
+  onToggleLeft,
+  onToggleRight,
+  leftCollapsedLabel,
+  rightCollapsedLabel,
+}: {
+  left: ReactNode;
+  center: ReactNode;
+  right: ReactNode;
+  leftWidth: number;
+  rightWidth: number;
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+  onResizeStart: (side: "left" | "right") => void;
+  onToggleLeft: () => void;
+  onToggleRight: () => void;
+  leftCollapsedLabel: string;
+  rightCollapsedLabel: string;
+}) {
+  return (
+    <div
+      className="dock-layout"
+      style={{
+        gridTemplateColumns: `${leftCollapsed ? 44 : `${leftWidth}px`} 12px minmax(0, 1fr) 12px ${rightCollapsed ? 44 : `${rightWidth}px`}`,
+      }}
+    >
+      {leftCollapsed ? (
+        <button className="dock-collapsed-toggle" onClick={onToggleLeft} type="button">
+          {leftCollapsedLabel}
+        </button>
+      ) : (
+        <div className="dock-column">{left}</div>
+      )}
+      <div aria-hidden="true" className="dock-resizer" onMouseDown={() => onResizeStart("left")} />
+      <div className="dock-center">{center}</div>
+      <div aria-hidden="true" className="dock-resizer" onMouseDown={() => onResizeStart("right")} />
+      {rightCollapsed ? (
+        <button className="dock-collapsed-toggle dock-collapsed-toggle-right" onClick={onToggleRight} type="button">
+          {rightCollapsedLabel}
+        </button>
+      ) : (
+        <div className="dock-column">{right}</div>
+      )}
+    </div>
+  );
+}
+
+function GraphToolRail({
+  activeTool,
+  onSelectTool,
+  onFitGraph,
+  onResetCamera,
+  onOpenDataLab,
+}: {
+  activeTool: GraphTool;
+  onSelectTool: (tool: GraphTool) => void;
+  onFitGraph: () => void;
+  onResetCamera: () => void;
+  onOpenDataLab: () => void;
+}) {
+  return (
+    <div className="graph-tool-rail" aria-label="Graph tools">
+      {([
+        ["select", "Select", "↖"],
+        ["pan", "Pan", "✥"],
+        ["box_select", "Box Select", "⬚"],
+        ["pin", "Pin", "⌖"],
+        ["neighbors", "Neighbors", "◎"],
+      ] as Array<[GraphTool, string, string]>).map(([tool, label, icon]) => (
+        <button
+          aria-label={label}
+          aria-pressed={activeTool === tool}
+          className={activeTool === tool ? "toolbar-button is-active graph-tool-button" : "toolbar-button graph-tool-button"}
+          key={tool}
+          onClick={() => onSelectTool(tool)}
+          type="button"
+        >
+          <span aria-hidden="true">{icon}</span>
+        </button>
+      ))}
+      <button aria-label="Fit Graph" className="toolbar-button graph-tool-button" onClick={onFitGraph} type="button">
+        <span aria-hidden="true">⤢</span>
+      </button>
+      <button aria-label="Reset Camera" className="toolbar-button graph-tool-button" onClick={onResetCamera} type="button">
+        <span aria-hidden="true">↺</span>
+      </button>
+      <button aria-label="Open Data Laboratory" className="toolbar-button graph-tool-button" onClick={onOpenDataLab} type="button">
+        <span aria-hidden="true">▤</span>
+      </button>
+    </div>
+  );
+}
+
+function RenderOptionsTray({
+  open,
+  appearance,
+  assemblyRenderMode,
+  coordinateLabel,
+  onAppearanceChange,
+  onAssemblyRenderModeChange,
+}: {
+  open: boolean;
+  appearance: AppearanceState;
+  assemblyRenderMode: AssemblyRenderMode;
+  coordinateLabel: string;
+  onAppearanceChange: <K extends keyof AppearanceState>(key: K, value: AppearanceState[K]) => void;
+  onAssemblyRenderModeChange: (mode: AssemblyRenderMode) => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="render-options-tray">
+      <div className="render-options-group">
+        <label>
+          <span>Label mode</span>
+          <select aria-label="Render tray label mode" value={appearance.labelMode} onChange={(event) => onAppearanceChange("labelMode", event.target.value as AppearanceState["labelMode"])}>
+            {["selection", "cluster", "importance", "all", "none"].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="toggle-line">
+          <input checked={appearance.showEdgeLabels} onChange={(event) => onAppearanceChange("showEdgeLabels", event.target.checked)} type="checkbox" />
+          <span>Edge labels</span>
+        </label>
+      </div>
+      <div className="render-options-group">
+        <span className="eyebrow">Memode overlay</span>
+        <div className="toolbar-group">
+          {(["hulls", "collapsed-meta-node", "hidden"] as AssemblyRenderMode[]).map((mode) => (
+            <button
+              className={mode === assemblyRenderMode ? "toolbar-button is-active" : "toolbar-button"}
+              key={mode}
+              onClick={() => onAssemblyRenderModeChange(mode)}
+              type="button"
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="render-options-group">
+        <span className="eyebrow">Coordinates</span>
+        <span>{coordinateLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+function KeyboardHelpOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="help-overlay" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div className="help-panel">
+        <div className="card-header">
+          <h3>Keyboard shortcuts</h3>
+          <button className="toolbar-button" onClick={onClose} type="button">
+            Close
+          </button>
+        </div>
+        <ul className="shortcut-list">
+          <li><strong>1</strong> Overview workspace</li>
+          <li><strong>2</strong> Data Laboratory workspace</li>
+          <li><strong>3</strong> Preview workspace</li>
+          <li><strong>R</strong> Reset dock layout</li>
+          <li><strong>?</strong> Toggle this help overlay</li>
+          <li><strong>Tab</strong> Move through dock, graph, and table controls</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function compareValues(left: unknown, right: unknown, direction: SortDirection): number {
+  const multiplier = direction === "asc" ? 1 : -1;
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) return (leftNumber - rightNumber) * multiplier;
+  return String(left ?? "").localeCompare(String(right ?? "")) * multiplier;
+}
+
+function nodeColumnValue(node: GraphNode, column: string, stats: StatsPayload | null): unknown {
+  if (column === "label") return node.export_label ?? node.label ?? node.id;
+  if (column === "cluster") return node.cluster_label ?? node.cluster_signature ?? "—";
+  if (column === "memodes") return (node.memode_membership ?? []).join(", ");
+  if (column === "provenance") return node.provenance ?? node.operator_label ?? node.source_kind ?? "—";
+  if (column === "evidence") return node.evidence_label ?? "—";
+  if (column === "confidence") return node.confidence ?? "—";
+  if (column === "measurement_history") return node.measurement_history?.length ?? 0;
+  if (column === "weighted_degree") return stats?.weightedDegree?.[node.id] ?? "—";
+  if (column === "clustering") return stats?.clustering?.[node.id] ?? "—";
+  return node[column] ?? "—";
+}
+
+function edgeColumnValue(edge: GraphEdge, column: string, nodeLookup: Map<string, GraphNode>): unknown {
+  if (column === "relation") return edgeLabel(edge, nodeLookup);
+  if (column === "source") return nodeLabel(nodeLookup.get(edge.source));
+  if (column === "target") return nodeLabel(nodeLookup.get(edge.target));
+  if (column === "evidence") return edge.evidence_label ?? "—";
+  if (column === "provenance") return edge.assertion_origin ?? edge.operator_label ?? "—";
+  if (column === "confidence") return edge.confidence ?? "—";
+  if (column === "measurement_history") return edge.measurement_history?.length ?? 0;
+  return edge[column] ?? "—";
 }
 
 function buildCoordinateMap(nodes: GraphNode[], coordinateMode: string, snapshots: LayoutSnapshot[]): CoordinateMap {

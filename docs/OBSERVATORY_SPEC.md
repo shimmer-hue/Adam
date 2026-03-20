@@ -1,6 +1,6 @@
 # Observatory Spec
 
-EDEN v1.2 keeps Python authoritative for exports, clustering, basin projection, and measurement provenance while replacing the inline canvas artifacts with one checked-in React + TypeScript + Vite observatory bundle. The browser layer is now a live-first graph workbench: it exposes inspect, measure, edit, ablate, compare, layout, filtering, styling, ranking, tabular, and export surfaces while keeping authority boundaries explicit.
+EDEN v1.2 keeps Python authoritative for exports, clustering, basin projection, and measurement provenance while replacing the inline canvas artifacts with one checked-in React + TypeScript + Vite observatory bundle. The browser layer is now a live-first graph workbench in Gephi-style browser grammar: Overview, Data Laboratory, and Preview are distinct top-level workspaces while authority boundaries, preview-first mutation, and measurement provenance remain explicit.
 
 ## Artifact families
 
@@ -45,15 +45,32 @@ Generated per experiment under `exports/<experiment_id>/`:
 - `COMPARE`
   - compare slices, coordinate methods, or baseline vs modified states
 
-## Continuity strip
+## Workspace grammar
 
-- the browser shell keeps a continuity strip visible above the main three-column layout
-- the strip contains:
+- the browser shell opens into three top-level tabs:
+  - `Overview`
+  - `Data Laboratory`
+  - `Preview`
+- `Overview` is the default graph-exploration cockpit
+- `Data Laboratory` is the spreadsheet audit surface for nodes and edges
+- `Preview` is a separate final-render/export stage whose settings affect export appearance rather than graph semantics
+- the browser workbench uses a deterministic dock grammar rather than arbitrary drag docking:
+  - left dock for `Appearance` and `Layout`
+  - center graph canvas with the graph-mode strip, tool rail, and fold-out render tray
+  - right dock for `Statistics`, `Filters`, `Context`, `Inspector`, `Queries`, `Memode Audit`, action/ledger/runtime adjuncts, and payload diagnostics
+- the workbench exposes collapse/expand and `Reset layout`; dock proportions and collapse state are browser-local and resettable
+- selection synchronizes across graph, inspector, Data Laboratory rows, and preview-oriented compare surfaces without silently mutating the graph
+
+## Status row and continuity strip
+
+- the browser shell keeps a thin status row visible beneath the top workspace tabs instead of using the continuity strip as the dominant shell header
+- the row contains:
   - a persistent hum fact card grounded in the bounded hum artifact summary
   - an operator-visible reasoning card with a radio-group lens switcher:
     - `Reasoning`
     - `Chain-Like`
     - `Hum Live`
+- the row also carries source-mode/build-freshness honesty and lightweight aperture/runtime status so the operator can verify live/static state without losing graph-first focus
 - `Hum Live` reformats the bounded hum text surface as chain-like continuity beats; it does not claim hidden chain-of-thought
 - operator-visible reasoning in the browser is sourced from live session transcript payloads when available; static export alone may not provide a current reasoning artifact
 
@@ -103,8 +120,31 @@ Generated per experiment under `exports/<experiment_id>/`:
 
 ## Browser-local workbench surfaces
 
-- the graph tab exposes explicit mode controls for `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, and `COMPARE`
-- the shell keeps a search/filter rail, coordinate-mode selector, selection summary, precision drawer, measurement ledger actions, runtime trace panel, a dedicated `Memode Audit` workbench, and Data Lab tables visible as first-class workbench surfaces
+- `Overview` keeps the graph canvas as the dominant surface and embeds graph-reading modes as an in-canvas strip:
+  - `Semantic Map`
+  - `Assemblies`
+  - `Runtime`
+  - `Active Set`
+  - `Compare`
+- `Overview` exposes explicit interaction controls for `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, and `COMPARE`
+- the left dock organizes browser-local `Appearance` and `Layout` controls in Gephi-style operator grammar:
+  - appearance changes color, size, captions, and label behavior without mutating graph facts
+  - layout runs worker-backed browser layouts with run/pause/cancel/reset/snapshot controls while remaining non-evidentiary
+- the center graph canvas includes:
+  - a left tool rail for select, pan, box-select, pin, recenter/fit, and graph-to-table handoff
+  - a fold-out bottom render tray for label, overlay, and coordinate rendering controls
+  - reset-camera and fit-graph actions
+- the right dock hosts:
+  - `Statistics`
+  - `Filters`
+  - `Context`
+  - `Inspector`
+  - `Queries`
+  - `Memode Audit`
+  - action / precision-drawer controls
+  - measurement ledger
+  - runtime trace
+  - basin/geometry/tanakh/payload diagnostics when requested
 - compare mode renders baseline vs modified state from preview responses without committing mutation
 - local layout execution is browser-only:
   - layouts run through a worker-backed `LayoutRunner`
@@ -116,14 +156,26 @@ Generated per experiment under `exports/<experiment_id>/`:
   - layout, filter, appearance, and table state do not enter the measurement ledger
 - appearance controls can style node / edge color, size, label visibility, and opacity from EDEN attributes such as kind, domain, cluster, evidence label, active-set presence, degree, weight, and regard/reward/risk where present
 - node appearance/filter metadata now also carries `entity_type`, `speech_act_mode`, and `storage_kind` so browser/export surfaces can distinguish projected ontology from compatibility-table storage
-- filter controls can constrain text, attribute/range slices, connected components, isolated-node visibility, and ego neighborhoods without mutating graph facts
-- the Data Lab provides node/edge tables, sorting, bulk selection, CSV/JSON export of the current selection, and precision-drawer handoff
+- filter controls are organized around attribute/topology-style workbench filters and can constrain text, attribute/range slices, connected components, isolated-node visibility, and ego neighborhoods without mutating graph facts
+- the `Context` panel is the aperture/active-set summary surface: it reports visible node/edge counts, domain and memode counts, active document count, active filters, and current scope while deeper evidence drill-down remains separate
+- the Data Laboratory provides:
+  - `Nodes` and `Edges` sub-tabs
+  - sortable columns
+  - browser-local search/filtering
+  - show/hide columns
+  - safe bulk selection/export actions
+  - graph-to-table and table-to-graph selection synchronization
+  - explicit `export scope` controls alongside stable ids, `export_label`, ontology, provenance, evidence/confidence, memode membership, and measurement-history summaries where present
 - the Data Lab export surface preserves the existing `current view` workflow and also exposes explicit ontology export scopes:
   - `current view`
   - `full ontology`
   - `behavior only`
   - `information only`
 - `full ontology` is derived from the authoritative `Assemblies` plane so memodes remain exportable in context with both constative information and performative behavior
+- the `Preview` workspace is a separate final-render stage:
+  - preview settings alter label, edge-opacity, curvature, background, caption, legend, and export-scope presentation
+  - preview settings stay browser-local and require explicit `Refresh preview`
+  - preview styling never mutates topology, semantic state, or measurement events
 - the `Memode Audit` workbench provides:
   - per-memode admissibility status
   - member meme inspection

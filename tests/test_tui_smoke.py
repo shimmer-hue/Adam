@@ -350,17 +350,48 @@ async def test_ingest_modal_returns_cleanly_to_chat(runtime, sample_files) -> No
 
         assert isinstance(app.screen, IngestModal)
         modal = app.screen
+        prompt = modal.query_one("#ingest_prompt_input", TextArea)
+        assert prompt.text == ""
+        assert modal.query_one("#ingest_prompt_label", Static).render().plain == "Framing Prompt (Optional)"
+        assert "persistent document-conditioning material" in modal.query_one("#ingest_prompt_help", Static).render().plain
         modal.query_one("#ingest_path_input", Input).value = str(sample_files["pdf"])
-        modal.query_one("#ingest_prompt_input", TextArea).load_text(
-            "Treat this as a durable source for the current session and keep the framing prompt in recall."
-        )
+        await pilot.press("tab")
+        await pilot.pause(0.1)
+        assert getattr(app.focused, "id", None) == "ingest_prompt_input"
+        await pilot.press("N", "o", "t", "e")
+        await pilot.pause(0.1)
+        assert prompt.text == "Note"
+        prompt.load_text("Treat this as a durable source for the current session and keep the framing prompt in recall.")
         modal.handle_ingest_confirm()
         await pilot.pause(0.6)
 
         assert isinstance(app.screen, ChatScreen)
         assert app.ui_state.last_ingest_result is not None
         assert app.ui_state.last_ingest_result["title"] == sample_files["pdf"].name
+        assert app.ui_state.last_ingest_result["briefing"].startswith("Treat this as a durable source")
         assert getattr(app.focused, "id", None) == "composer_input"
+
+
+@pytest.mark.asyncio
+async def test_ingest_path_recovers_primary_experiment_when_ui_state_is_cold(runtime, sample_files) -> None:
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(200, 60)) as pilot:
+        await pilot.pause(1.0)
+        assert isinstance(app.screen, ChatScreen)
+
+        app.ui_state.experiment_id = None
+        app.ui_state.experiment_name = None
+
+        await app.screen.ingest_path(
+            str(sample_files["pdf"]),
+            briefing="Recover experiment context before ingest.",
+        )
+        await pilot.pause(0.2)
+
+        assert app.ui_state.experiment_id == runtime.primary_experiment()["id"]
+        assert app.ui_state.last_ingest_result is not None
+        assert app.ui_state.last_ingest_result["title"] == sample_files["pdf"].name
+        assert app.ui_state.last_ingest_result["briefing"] == "Recover experiment context before ingest."
 
 
 @pytest.mark.asyncio
@@ -832,6 +863,61 @@ async def test_session_config_modal_labels_history_and_clamped_summary(runtime) 
         await pilot.pause(0.5)
         assert isinstance(app.screen, ChatScreen)
         assert app.ui_state.session_title == "Fresh Session"
+
+
+@pytest.mark.asyncio
+async def test_new_session_flow_wins_over_inflight_bootstrap_resume(runtime, monkeypatch) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    resumed_session = runtime.start_session(
+        experiment["id"],
+        title="June Session",
+        profile_request={"mode": "manual", "budget_mode": "balanced", "history_turns": 3},
+    )
+    runtime.chat(session_id=resumed_session["id"], user_text="Keep this prior session distinct from any fresh one.")
+
+    snapshot_started = threading.Event()
+    release_snapshot = threading.Event()
+    original_snapshot = runtime.session_state_snapshot
+
+    def delayed_snapshot(session_id: str):
+        if session_id == resumed_session["id"]:
+            snapshot_started.set()
+            assert release_snapshot.wait(timeout=2.0)
+        return original_snapshot(session_id)
+
+    monkeypatch.setattr(runtime, "session_state_snapshot", delayed_snapshot)
+
+    app = EdenTuiApp(runtime)
+    async with app.run_test() as pilot:
+        await pilot.pause(0.1)
+        assert snapshot_started.wait(timeout=1.0)
+
+        await app.action_new_session()
+        await pilot.pause(0.5)
+        assert isinstance(app.screen, SessionConfigModal)
+        modal = app.screen
+
+        modal.query_one("#session_title_input", Input).value = "Fresh Session"
+        modal.query_one("#history_turns_input", Input).value = "64"
+        modal.query_one("#max_tokens_input", Input).value = "2400"
+        modal.query_one("#session_confirm_btn", Button).press()
+        await pilot.pause(0.4)
+
+        assert isinstance(app.screen, ChatScreen)
+        fresh_session_id = app.ui_state.session_id
+        assert fresh_session_id is not None
+        assert fresh_session_id != resumed_session["id"]
+        assert app.ui_state.session_title == "Fresh Session"
+        assert app.ui_state.last_turn_id is None
+        assert runtime.session_profile_request(fresh_session_id)["history_turns"] == 64
+        assert runtime.session_profile_request(fresh_session_id)["max_output_tokens"] == 2400
+
+        release_snapshot.set()
+        await pilot.pause(0.5)
+
+        assert app.ui_state.session_id == fresh_session_id
+        assert app.ui_state.session_title == "Fresh Session"
+        assert app.ui_state.last_turn_id is None
 
 
 @pytest.mark.asyncio

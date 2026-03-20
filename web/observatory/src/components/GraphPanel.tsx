@@ -15,6 +15,7 @@ type Props = {
   selectedAssembly: any | null;
   addedNodeIds?: string[];
   addedEdgeIds?: string[];
+  cameraVersion?: number;
   onSelectNode: (nodeId: string, additive: boolean) => void;
   onSelectEdge: (edgeId: string) => void;
   onClearSelection: () => void;
@@ -44,6 +45,7 @@ export default function GraphPanel({
   selectedAssembly,
   addedNodeIds = [],
   addedEdgeIds = [],
+  cameraVersion = 0,
   onSelectNode,
   onSelectEdge,
   onClearSelection,
@@ -58,6 +60,11 @@ export default function GraphPanel({
   const assemblyEdges = useMemo(() => new Set(selectedAssembly?.supporting_edge_ids ?? []), [selectedAssembly]);
   const addedNodes = useMemo(() => new Set(addedNodeIds), [addedNodeIds]);
   const addedEdges = useMemo(() => new Set(addedEdgeIds), [addedEdgeIds]);
+
+  useEffect(() => {
+    if (!sigmaRef.current) return;
+    sigmaRef.current.getCamera().animatedReset({ duration: 180 });
+  }, [cameraVersion]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -235,10 +242,11 @@ function computeEdgeColor(
 }
 
 function edgeOpacity(edge: GraphEdge, appearance: AppearanceState): number {
-  if (appearance.edgeOpacityBy === "uniform") return 0.48;
-  if (appearance.edgeOpacityBy === "measurement_history") return clamp(0.22 + Number(edge.measurement_history?.length ?? 0) * 0.12, 0.22, 0.9);
-  if (appearance.edgeOpacityBy === "assertion_origin") return String(edge.assertion_origin ?? "").startsWith("operator") ? 0.78 : 0.34;
-  return clamp(0.18 + Number(edge.weight ?? 1) * 0.22, 0.18, 0.86);
+  let base = 0.48;
+  if (appearance.edgeOpacityBy === "measurement_history") base = clamp(0.22 + Number(edge.measurement_history?.length ?? 0) * 0.12, 0.22, 0.9);
+  else if (appearance.edgeOpacityBy === "assertion_origin") base = String(edge.assertion_origin ?? "").startsWith("operator") ? 0.78 : 0.34;
+  else if (appearance.edgeOpacityBy !== "uniform") base = clamp(0.18 + Number(edge.weight ?? 1) * 0.22, 0.18, 0.86);
+  return clamp(base * Number(appearance.edgeOpacityScale ?? 1), 0.08, 0.92);
 }
 
 function withOpacity(color: string, opacity: number): string {

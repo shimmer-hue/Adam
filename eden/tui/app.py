@@ -22,6 +22,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
+from textual.worker import Worker
 from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, Select, Static, TextArea
 
 from ..browser import open_browser_url
@@ -1639,13 +1640,23 @@ class IngestModal(ModalScreen[dict[str, str] | None]):
         yield Static(Panel(summary, title="Ingest Bay", border_style=AMBER), id="ingest_summary")
         with Horizontal(id="ingest_shell"):
             with Vertical(classes="ingest_column"):
-                yield Input(id="ingest_path_input", placeholder="/absolute/path/to/document.pdf")
-                yield TextArea(
-                    id="ingest_prompt_input",
-                    soft_wrap=True,
-                    show_line_numbers=False,
-                    text="",
-                )
+                with Vertical(classes="field_stack", id="ingest_path_field"):
+                    yield Static("Document Path", classes="field_label", id="ingest_path_label")
+                    yield Input(id="ingest_path_input", placeholder="/absolute/path/to/document.pdf")
+                with Vertical(classes="field_stack", id="ingest_prompt_field"):
+                    yield Static("Framing Prompt (Optional)", classes="field_label", id="ingest_prompt_label")
+                    yield TextArea(
+                        id="ingest_prompt_input",
+                        soft_wrap=True,
+                        show_line_numbers=False,
+                        text="",
+                        placeholder="Brief Adam before ingest: what is this document, how should it be read, and what should persist in recall?",
+                    )
+                    yield Static(
+                        "Optional operator framing that EDEN indexes as persistent document-conditioning material.",
+                        classes="field_help",
+                        id="ingest_prompt_help",
+                    )
                 with Horizontal():
                     yield Button("Ingest Into Memgraph", id="ingest_confirm_btn", variant="primary")
                     yield Button("Cancel", id="ingest_cancel_btn")
@@ -1654,10 +1665,6 @@ class IngestModal(ModalScreen[dict[str, str] | None]):
 
     def on_mount(self) -> None:
         _sync_node_look(self)
-        prompt = self.query_one("#ingest_prompt_input", TextArea)
-        prompt.load_text(
-            "Brief Adam before ingest: what is this document, how should it be read, and what should persist in recall?"
-        )
         self.call_after_refresh(lambda: self.query_one("#ingest_path_input", Input).focus())
 
     @on(Button.Pressed, "#ingest_confirm_btn")
@@ -2407,6 +2414,8 @@ class StartupScreen(Screen):
 class ChatScreen(Screen):
     def __init__(self) -> None:
         super().__init__()
+        self._bootstrap_epoch = 0
+        self._bootstrap_worker: Worker[None] | None = None
         self._seen_log_count = 0
         self._preview_task: asyncio.Task[None] | None = None
         self._preview_generation = 0
@@ -2489,8 +2498,14 @@ class ChatScreen(Screen):
         _sync_node_look(self)
         self.set_interval(0.6, self._poll_logs)
         self.refresh_panels()
-        self.run_worker(self._bootstrap_live_surface(), exclusive=True, group="bootstrap")
+        self._bootstrap_worker = self.run_worker(self._bootstrap_live_surface(), exclusive=True, group="bootstrap")
         self.call_after_refresh(self.focus_composer)
+
+    def _invalidate_bootstrap_resume(self) -> None:
+        self._bootstrap_epoch += 1
+        worker = self._bootstrap_worker
+        if worker is not None and not worker.is_finished:
+            worker.cancel()
 
     def refresh_panels(self) -> None:
         if not self.is_mounted:
@@ -2700,6 +2715,7 @@ class ChatScreen(Screen):
     async def _bootstrap_live_surface(self) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
+        bootstrap_epoch = self._bootstrap_epoch
         app.ui_state.model_status = await asyncio.to_thread(self._load_model_status_snapshot)
         model_status = self._model_status()
         self._write_forensic(
@@ -2709,8 +2725,12 @@ class ChatScreen(Screen):
             app.ui_state.last_feedback = "Local MLX cache is not ready. Choose Prepare Local Model or send once to fetch it."
         experiment = await asyncio.to_thread(app.runtime.primary_experiment)
         latest_session = await asyncio.to_thread(partial(app.runtime.store.get_latest_session, experiment["id"]))
+        if bootstrap_epoch != self._bootstrap_epoch:
+            return
         if latest_session is not None:
             snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, latest_session["id"]))
+            if bootstrap_epoch != self._bootstrap_epoch:
+                return
             app.apply_session_snapshot(snapshot)
             self._mark_graph_dirty()
             app.ui_state.last_feedback = f"Resumed {snapshot['session_title']}."
@@ -2730,7 +2750,11 @@ class ChatScreen(Screen):
                 profile_request=defaults,
             )
         )
+        if bootstrap_epoch != self._bootstrap_epoch:
+            return
         snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, session["id"]))
+        if bootstrap_epoch != self._bootstrap_epoch:
+            return
         app.apply_session_snapshot(snapshot)
         self._mark_graph_dirty()
         app.ui_state.last_feedback = "Live dialogue surface armed. Ask a question with Enter (or Ctrl+S) or ingest a document with F9."
@@ -4463,10 +4487,12 @@ class ChatScreen(Screen):
     async def ingest_path(self, path: str, *, briefing: str = "") -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
-        if not app.ui_state.experiment_id:
-            return
         if not path:
             return
+        if not app.ui_state.experiment_id:
+            experiment = await asyncio.to_thread(app.runtime.primary_experiment)
+            app.ui_state.experiment_id = str(experiment["id"])
+            app.ui_state.experiment_name = experiment.get("name")
         try:
             result = await asyncio.to_thread(
                 partial(
@@ -4679,6 +4705,7 @@ class ChatScreen(Screen):
         payload = await self.app.push_screen_wait(ConversationAtlasModal(preferred_session_id=app.ui_state.session_id))
         if not payload or payload.get("action") != "resume" or not payload.get("session_id"):
             return
+        self._invalidate_bootstrap_resume()
         snapshot = await asyncio.to_thread(partial(app.runtime.session_state_snapshot, payload["session_id"]))
         app.apply_session_snapshot(snapshot)
         self._mark_graph_dirty()
@@ -4765,8 +4792,12 @@ class ChatScreen(Screen):
     async def _new_session_worker(self) -> None:
         app = self.app
         assert isinstance(app, EdenTuiApp)
-        if not app.ui_state.experiment_id:
-            return
+        experiment_id = app.ui_state.experiment_id
+        if not experiment_id:
+            experiment = await asyncio.to_thread(app.runtime.primary_experiment)
+            experiment_id = str(experiment["id"])
+            app.ui_state.experiment_id = experiment_id
+            app.ui_state.experiment_name = experiment.get("name")
         defaults = app.runtime.default_session_profile_request().to_dict()
         if app.ui_state.session_id:
             defaults.update(await asyncio.to_thread(partial(app.runtime.session_profile_request, app.ui_state.session_id)))
@@ -4784,7 +4815,7 @@ class ChatScreen(Screen):
         session = await asyncio.to_thread(
             partial(
                 app.runtime.start_session,
-                app.ui_state.experiment_id,
+                experiment_id,
                 title=payload["title"],
                 profile_request=payload,
             )
@@ -4801,6 +4832,7 @@ class ChatScreen(Screen):
         self._schedule_preview_refresh()
 
     def begin_new_session_flow(self) -> None:
+        self._invalidate_bootstrap_resume()
         self.run_worker(self._new_session_worker(), exclusive=True, group="session")
 
     async def _edit_profile_worker(self) -> None:
@@ -4925,6 +4957,7 @@ class ChatScreen(Screen):
         self._schedule_preview_refresh()
 
     def begin_surface_launch(self, action: str) -> None:
+        self._invalidate_bootstrap_resume()
         self.run_worker(self._launch_surface_worker(action), exclusive=True, group=f"surface_{action}")
 
     def current_ui_look(self) -> str:

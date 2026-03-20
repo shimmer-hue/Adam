@@ -6825,3 +6825,398 @@ Remaining uncertainties:
 - Graph view styling in Gephi is still separate from ontology export; this patch improves export slicing, not imported visual appearance.
 Next shortest proof path:
 Open the observatory, choose `Full ontology`, `Behavior only`, and `Information only` in Data Lab, export fresh GraphML or GEXF files for each, and confirm in Gephi that the new files isolate the intended ontology slices while preserving memodes in the mixed-domain export.
+
+## [2026-03-19T15:38:51Z] PRE-FLIGHT
+Operator task:
+Refactor the EDEN browser observatory into a Gephi-style browser workbench with `Overview`, `Data Laboratory`, and `Preview` top-level workspaces while preserving preview-first measurement semantics, memode audit/admissibility, export scopes, semantic `export_label`, stale-build honesty, payload-status diagnostics, and browser-local non-evidentiary layout/appearance/filter state.
+Task checksum:
+Observatory shell/workspace refactor from surface-tab layout into docked Gephi-style workbench grammar.
+Repo situation:
+Working tree is already dirty in unrelated archive artifacts (`.DS_Store`, `docs.zip`, deleted `docs 2.zip`). Current observatory frontend is still a single large `web/observatory/src/App.tsx` with a strip-plus-three-column shell and non-Gephi top-level surfaces (`Overview`, `Graph`, `Basin`, `Geometry`, `Tanakh`, `Measurements`). No unrelated rollback requested.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/docs/MEASUREMENT_EVENT_MODEL.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+Natural-language contracts in force:
+Python stays authoritative for payload generation/export/provenance. Observation does not silently mutate graph facts. Preview/commit/revert stays attributable and ledger-backed. Memodes remain second-order structures rather than default peer dots. Browser-local appearance/layout/filter/preview state stays non-evidentiary. `Semantic Map`, `Assemblies`, `Runtime`, `Active Set`, and `Compare` remain graph-reading modes inside the graph workspace rather than becoming separate payload shells. Continuity/hum/runtime surfaces must remain visible but demoted from shell dominance.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/web/observatory/src/styles.css`
+`/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/web/observatory/tests/e2e/observatory.spec.ts`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/docs/MEASUREMENT_EVENT_MODEL.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/docs/SOURCE_MANIFEST.md`
+Status register:
+- Implemented:
+  - Live/static source-mode honesty, stale-build warning, payload-status diagnostics, preview/commit/revert, measurement ledger, runtime trace, Memode Audit, export scopes, semantic `export_label`, and worker-backed layout/statistics already exist in the browser observatory.
+  - `Semantic Map`, `Assemblies`, `Runtime`, `Active Set`, and `Compare` graph-reading modes already exist in the graph payload/workbench path.
+- Instrumented:
+  - Current Vitest/Playwright coverage proves non-regression surfaces around honesty, payload loading, compare/layout controls, exports, and memode audit in the old shell.
+- Conceptual:
+  - Gephi-style three-workspace shell (`Overview`, `Data Laboratory`, `Preview`), deterministic dock grammar, resettable dock state, graph tool rail, bottom render tray, graph/table selection sync, and final-render preview separation are not yet implemented.
+- Unknown:
+  - How much of the current `App.tsx` can be surgically reorganized versus needing extraction into new workspace/panel components without destabilizing the checked-in bundle.
+Risks / invariants:
+Do not regress measurement-first mutation discipline, export serializers, or live/static honesty. Keep keyboard access legible. Keep continuity/aperture/runtime linkage explicit but visually demoted. Preserve authoritative payload planes and ontology vocabulary. Any new workspace state must remain browser-local unless it already maps to persisted measurement events.
+Evidence plan:
+Refactor the shell/state layer, preserve existing payload/edit/export logic, add workspace/dock/selection/preview tests, update observatory/source/truth docs, rebuild the checked-in bundle, verify build freshness, run targeted observatory/runtime/TUI pytest, then run full pytest.
+Shortest proof path:
+Land the new workbench shell in React first, map existing controls into Overview/Data Laboratory/Preview without backend changes, prove the new workspace grammar and selection/export semantics in Vitest/Playwright, then rebuild and run the required Python/frontend verification commands.
+## [2026-03-19T16:10:34Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx`
+`/Users/brianray/Adam/web/observatory/src/styles.css`
+`/Users/brianray/Adam/web/observatory/src/workbench/graphUtils.ts`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/style.css`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/docs/SOURCE_MANIFEST.md`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/docs/SOURCE_MANIFEST.md`
+Natural-language contracts added/revised/preserved:
+- Revised browser observatory contract to a Gephi-style three-workspace shell: `Overview`, `Data Laboratory`, `Preview`.
+- Revised continuity/aperture contract so hum/reasoning/runtime/build honesty lives in a thin status row instead of the dominant shell header.
+- Preserved measurement-first mutation, preview/commit/revert attribution, browser-local non-evidentiary layout/appearance/filter/preview state, semantic `export_label`, export scopes, and memode second-order ontology.
+Behavior implemented or modified:
+- Replaced the old surface shell with a top-tab workbench and deterministic dock layout.
+- Mapped left dock to `Appearance` + `Layout`, center to graph canvas/tool rail/render tray, and right dock to `Statistics` / `Filters` / `Context` / `Inspector` / `Queries` / `Memode Audit` plus action/ledger/runtime/payload adjuncts.
+- Added dedicated `Data Laboratory` and `Preview` workspaces with graph↔table selection sync, explicit export scope in table/export flows, and preview-only styling controls separated from mutation preview.
+- Added resettable dock state, keyboard overlay/shortcuts, graph camera reset hook, and preview edge-opacity scaling.
+Evidence produced (tests / traces / commands / exports):
+- `npm --prefix /Users/brianray/Adam/web/observatory run test -- --run src/App.test.tsx src/workbench/graphUtils.test.ts` -> `12 passed`
+- `npm --prefix /Users/brianray/Adam/web/observatory run test` -> `12 passed`
+- `npm --prefix /Users/brianray/Adam/web/observatory run build` -> bundle rebuilt into `/Users/brianray/Adam/eden/observatory/static/observatory_app`
+- `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `ok: true`, source/built hash `95cdbed3c5edac95`
+- `./.venv/bin/pytest -q tests/test_observatory_server.py tests/test_observatory_measurements.py tests/test_runtime_e2e.py tests/test_tui_smoke.py` -> `56 passed`
+- `./.venv/bin/pytest -q` -> `116 passed`
+Status register changes:
+- Implemented:
+  - Gephi-style browser workspace grammar with resettable docks and top-level `Overview` / `Data Laboratory` / `Preview`.
+  - Graph tool rail, render tray, graph↔table selection sync, preview-stage export styling separation, and demoted continuity/status row in the React observatory.
+- Instrumented:
+  - New Vitest coverage for workspace tabs, dock reset, geometry deferred-load path, selection sync, Preview separation, Memode Audit presence, and honesty/status-row non-regression.
+- Conceptual:
+  - Arbitrary drag-dock window choreography remains deferred; only deterministic dock layout is implemented.
+- Unknown:
+  - No additional unknown surfaced in this turn beyond future drag-dock/panel extraction work.
+Truth-table / limitations updates:
+- Updated truth table rows for the new workspace grammar, Data Laboratory sync/export behavior, view controls, and Preview separation.
+- Added limitations for deterministic docking only, bounded Data Laboratory schema operations, and Preview reusing the same renderer under the hood.
+Remaining uncertainties:
+- `App.tsx` still carries both legacy helper surfaces and new workbench renderers in one large file; structural extraction into dedicated components remains a maintainability follow-up, not a correctness blocker.
+- Working tree still contains unrelated pre-existing archive noise: `.DS_Store`, modified `docs.zip`, deleted `docs 2.zip`.
+Next shortest proof path:
+Extract `App.tsx` workspace/dock/panel renderers into the named workbench components (`WorkbenchShell`, `OverviewWorkspace`, `DataLaboratoryWorkspace`, `PreviewWorkspace`, dock/panel modules) without changing the validated runtime contract.
+## [2026-03-19T16:27:43Z] PRE-FLIGHT
+Operator task:
+Tighten the browser observatory from a Gephi-inspired workbench into a visibly closer replication of Gephi Desktop chrome/layout, using the operator-provided screenshot as the primary visual target while preserving EDEN provenance and measurement semantics.
+Task checksum:
+Gephi replication pass after operator rejection of the prior amber-card workbench styling.
+Repo situation:
+Working tree remains dirty from the prior observatory refactor plus unrelated archive artifacts (`.DS_Store`, `docs.zip`, deleted `docs 2.zip`). Current observatory shell is functionally partitioned into `Overview` / `Data Laboratory` / `Preview`, but still presents large amber EDEN cards, oversized status bars, and a right-dock tab stack that does not visually match Gephi’s desktop GUI.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/docs/SOURCE_MANIFEST.md`
+Natural-language contracts in force:
+Preserve Python authority, graph payload planes, preview/commit/revert attribution, browser-local non-evidentiary layout/appearance/filter/preview state, memode second-order ontology, semantic `export_label`, export scopes, and source/build honesty. Shift visual/layout replication closer to Gephi Desktop: light chrome, compact tab bars, left Appearance/Layout stack, black graph stage, narrow right context/filter/query panes, desktop-like module headers.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/web/observatory/src/styles.css`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+`/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+`/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+`/Users/brianray/Adam/docs/SOURCE_MANIFEST.md`
+Status register:
+- Implemented:
+  - Top-level workspace partitioning, resettable docks, graph/tool/render tray logic, Data Laboratory, Preview separation, selection sync, and checked-in bundle freshness.
+- Instrumented:
+  - Vitest and pytest evidence for current workbench behavior.
+- Conceptual:
+  - Closer pixel/chrome replication of Gephi Desktop, including stacked right subpanes and compact top chrome.
+- Unknown:
+  - How far CSS and light markup surgery can get the shell toward Gephi without requiring a fresh component extraction pass first.
+Risks / invariants:
+Do not regress graph/table selection sync, preview/commit/revert controls, or live/static honesty while reworking layout. Keep keyboard access. Avoid breaking the checked-in bundle while moving from dark amber EDEN styling to light Gephi-like chrome.
+Evidence plan:
+Refactor the shell chrome/layout in React/CSS, tighten Vitest coverage where needed for table-to-graph sync, rerun frontend tests/build, verify build meta, rerun targeted pytest and full pytest only if behavior shifts materially.
+Shortest proof path:
+Convert the current workbench shell to a compact Gephi-like frame first, restructure the right dock into stacked panes, theme the entire UI to desktop light-gray/black-canvas Gephi styling, rerun Vitest/build/meta, then rerun the Python proof path if markup/state behavior changed.
+## [2026-03-19T16:43:09Z] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`
+`/Users/brianray/Adam/web/observatory/src/styles.css`
+`/Users/brianray/Adam/web/observatory/src/App.test.tsx`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/style.css`
+`/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`
+`/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None in this pass. Existing observatory/spec truth surfaces already covered the Gephi-style shell contract; this pass tightened visual/chrome replication rather than changing the normative behavior contract again.
+Natural-language contracts added/revised/preserved:
+- Preserved preview/commit/revert, browser-local non-evidentiary state, memode second-order ontology, source/build honesty, export scopes, and semantic `export_label`.
+- Preserved three-workspace shell contract while revising the implementation closer to Gephi Desktop chrome: compact top tabs, light-gray module framing, black graph stage, stacked left/right utility panes, and a demoted bottom status strip.
+Behavior implemented or modified:
+- Re-themed the entire observatory from dark amber EDEN cards to Gephi-like desktop chrome.
+- Tightened Overview into a closer Gephi replica: compact graph window tab/header, icon-like left tool rail, lighter module headers, fixed Context pane above a tabbed right utility panel, and a small bottom queries block.
+- Collapsed the layout workbench into a Gephi-like algorithm selector + parameter pane, with the broader terrain library moved behind a disclosure rather than dominating the left dock.
+- Added table-to-graph sync assertion in Vitest while keeping graph-to-table sync and Preview separation intact.
+Evidence produced (tests / traces / commands / exports):
+- `npm --prefix /Users/brianray/Adam/web/observatory run test -- --run src/App.test.tsx src/workbench/graphUtils.test.ts` -> `12 passed`
+- `npm --prefix /Users/brianray/Adam/web/observatory run test` -> `12 passed`
+- `npm --prefix /Users/brianray/Adam/web/observatory run build` -> bundle rebuilt into `/Users/brianray/Adam/eden/observatory/static/observatory_app`
+- `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `ok: true`, source/built hash `e52bd4a6922d3d03`
+- `./.venv/bin/pytest -q tests/test_observatory_server.py tests/test_observatory_measurements.py tests/test_runtime_e2e.py tests/test_tui_smoke.py` -> `56 passed`
+- `./.venv/bin/pytest -q` -> `116 passed`
+Status register changes:
+- Implemented:
+  - Closer Gephi-like desktop chrome/layout replication on top of the already-working three-workspace observatory shell.
+- Instrumented:
+  - Vitest now explicitly asserts table-to-graph handoff in addition to graph-to-table selection sync.
+- Conceptual:
+  - Exact pixel-level replication of every Gephi desktop widget/icon/tab affordance remains partial; the browser shell is now materially closer, but still not a literal one-to-one clone of the Java desktop client.
+- Unknown:
+  - No new unknown beyond remaining fidelity gaps versus the operator screenshot.
+Truth-table / limitations updates:
+- No truth-table status change required in this pass; capability status remained `Implemented`.
+- Existing limitations about deterministic docking and bounded browser adaptation still apply.
+Remaining uncertainties:
+- The shell now visually tracks Gephi much more closely, but iconography, module micro-layout, and some desktop-specific affordances still differ from the screenshot.
+- Working tree still includes unrelated pre-existing archive noise: `.DS_Store`, modified `docs.zip`, deleted `docs 2.zip`.
+Next shortest proof path:
+Run a screenshot-by-screenshot parity pass against the Gephi reference: tighten iconography, tab spacing, preview module chrome, and right-pane proportions until the browser shell is acceptably close under direct visual comparison.
+
+## [2026-03-19 12:48:38 EDT] PRE-FLIGHT
+Operator task:
+Investigate TUI new-session bug where starting a new session leaves the current session loaded and requested settings do not persist.
+Task checksum:
+user-report-new-session-settings-not-holding-existing-session-remains
+Repo situation:
+Dirty worktree before this task: observatory refactor changes still present plus unrelated .DS_Store/docs.zip/docs 2.zip noise. New-session bug work has not started yet.
+Relevant spec surfaces read:
+- /Users/brianray/Adam/docs/TUI_SPEC.md
+- /Users/brianray/Adam/docs/INFERENCE_PROFILES.md
+Natural-language contracts in force:
+- New session is an explicit conversation boundary in the TUI.
+- Requested inference profile fields persist into session metadata.
+- Latest session may auto-resume on boot, but F5 / Start New Session must create a fresh session.
+Files/modules likely in scope:
+- /Users/brianray/Adam/eden/tui/app.py
+- /Users/brianray/Adam/eden/runtime.py
+- /Users/brianray/Adam/tests/test_tui_smoke.py
+- /Users/brianray/Adam/tests/test_inference_profiles.py
+Status register:
+- Implemented: TUI session modal and runtime start_session path exist; tests cover some profile persistence behavior.
+- Instrumented: None newly added for this task yet.
+- Conceptual: Exact root cause of session replacement vs fresh session not yet proved.
+- Unknown: Whether failure is in modal callback, runtime API, or client state refresh after creation.
+Risks / invariants:
+- Preserve auto-resume on boot while making explicit new-session path create a new session.
+- Preserve requested profile persistence contract.
+- Avoid disturbing unrelated observatory changes already in the worktree.
+Evidence plan:
+- Inspect TUI modal/start-session flow and runtime start_session implementation.
+- Add regression coverage for fresh-session creation and requested profile persistence.
+- Run targeted pytest, then full pytest if bounded.
+Shortest proof path:
+- Patch TUI/runtime session-start flow, add focused tests in test_tui_smoke.py or test_inference_profiles.py, run pytest.
+
+## [2026-03-19 12:58:38 EDT] POST-FLIGHT
+Files changed:
+- /Users/brianray/Adam/eden/tui/app.py
+- /Users/brianray/Adam/eden/storage/graph_store.py
+- /Users/brianray/Adam/tests/test_tui_smoke.py
+- /Users/brianray/Adam/tests/test_graph_store.py
+Specs changed:
+- None. Existing TUI and inference-profile contracts were preserved; this turn repaired implementation drift.
+Natural-language contracts added/revised/preserved:
+- Preserved: explicit new-session actions create a fresh session boundary and requested profile persists into that fresh session.
+- Preserved: auto-resume on boot remains available, but it must not overwrite a manual session selection started during bootstrap.
+Behavior implemented or modified:
+- Explicit new-session and manual session-selection actions now invalidate the in-flight bootstrap resume path before applying a session snapshot.
+- New-session flow now resolves the primary experiment directly when boot has not yet populated ui_state.experiment_id, so F5 cannot no-op during bootstrap.
+- Latest-session lookup now breaks same-second timestamp ties deterministically in favor of the newest session row.
+Evidence produced (tests / traces / commands / exports):
+- ./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py -k "session_config_modal or new_session_flow_wins_over_inflight_bootstrap_resume or tune_session_modal" -> 3 passed
+- ./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_graph_store.py -k "latest_session or serializes_read_queries" -> 2 passed
+- ./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py /Users/brianray/Adam/tests/test_inference_profiles.py /Users/brianray/Adam/tests/test_graph_store.py -> 34 passed, 1 warning
+- ./.venv/bin/pytest -q -> 118 passed, 1 warning
+Status register changes:
+- Implemented: guarded manual session switching against bootstrap overwrite; deterministic latest-session tie-breaking; regression coverage for both paths.
+- Instrumented: None added this turn.
+- Conceptual: None added this turn.
+- Unknown: Root cause of the pre-existing ConversationAtlasModal resource warning was not investigated in this turn.
+Truth-table / limitations updates:
+- None. Feature status did not change category; implementation was repaired to match the existing contract.
+Remaining uncertainties:
+- pytest still reports the pre-existing RuntimeWarning about ConversationAtlasModal._load_preview_worker never awaited. It did not fail the suite and was not caused by this patch.
+Next shortest proof path:
+- Reproduce the TUI manually with F5 during initial boot and confirm the new session title/profile remain active after bootstrap settles.
+
+## [2026-03-19 13:19:29 EDT] PRE-FLIGHT
+Operator task:
+Investigate TUI document-ingest modal bug where the file path can be entered but the briefing/comment field is not editable and ingest submit does not complete.
+Task checksum:
+user-report-ingest-modal-comment-not-editable-submit-not-working
+Repo situation:
+Dirty worktree before this task: observatory refactor changes still present; session/new-session bug fix changes also present and verified. Unrelated .DS_Store/docs.zip/docs 2.zip noise remains.
+Relevant spec surfaces read:
+- /Users/brianray/Adam/docs/TUI_SPEC.md
+- /Users/brianray/Adam/docs/DOCUMENT_INGEST.md
+Natural-language contracts in force:
+- TUI ingest flow must let Brian the operator provide a path and optional briefing/comment.
+- Ingest must preserve provenance and make the result visible in operator-facing status.
+Files/modules likely in scope:
+- /Users/brianray/Adam/eden/tui/app.py
+- /Users/brianray/Adam/tests/test_tui_smoke.py
+- possibly /Users/brianray/Adam/eden/runtime.py if submit path is broken downstream
+Status register:
+- Implemented: ingest modal and ingest_path flow exist with smoke coverage.
+- Instrumented: last_ingest_result and operator feedback surfaces exist.
+- Conceptual: Exact root cause of comment field/editability or submit failure not yet proved.
+- Unknown: Whether failure is in modal widget wiring, focus handling, or downstream ingest action.
+Risks / invariants:
+- Preserve document provenance/briefing semantics.
+- Avoid breaking keyboard flow in modal and chat focus recovery.
+- Do not disturb unrelated ongoing observatory/session changes.
+Evidence plan:
+- Inspect IngestModal compose/on_mount/handlers and related tests.
+- Reproduce with targeted pytest.
+- Patch modal interaction or submit path.
+- Add regression coverage if missing.
+Shortest proof path:
+- Fix modal field focus/editability and submit handler in app.py, then run targeted pytest and full pytest if bounded.
+
+## [2026-03-19 13:28:19 EDT] POST-FLIGHT
+Files changed:
+- /Users/brianray/Adam/eden/tui/app.py
+- /Users/brianray/Adam/tests/test_tui_smoke.py
+Specs changed:
+- None. Existing TUI ingest contract was preserved; this turn repaired implementation/UX drift.
+Natural-language contracts added/revised/preserved:
+- Preserved: ingest modal exposes an operator framing prompt that can be edited and indexed.
+- Preserved: ingest remains keyboard-first and returns to chat with operator-visible ingest status.
+- Preserved: ingest no longer silently no-ops when ui_state.experiment_id is cold during boot.
+Behavior implemented or modified:
+- Ingest modal briefing/comment field now starts blank with placeholder/help text instead of shipping instructional copy as live editable text.
+- ingest_path now resolves the primary experiment when the UI state is cold, so document ingest still executes during early boot.
+- TUI smoke coverage now exercises actual briefing-field focus/edit behavior and verifies experiment-context recovery.
+Evidence produced (tests / traces / commands / exports):
+- ./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py -k "ingest_modal_returns_cleanly_to_chat or ingest_path_recovers_primary_experiment_when_ui_state_is_cold" -> 2 passed
+- ./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_tui_smoke.py -> 25 passed, 1 warning
+- ./.venv/bin/pytest -q -> 119 passed, 1 warning
+Status register changes:
+- Implemented: ingest modal blank briefing field; ingest-path experiment recovery; regression coverage for both.
+- Instrumented: None added this turn.
+- Conceptual: None added this turn.
+- Unknown: The pre-existing ConversationAtlasModal coroutine warning remains outside this task.
+Truth-table / limitations updates:
+- None. Feature status category did not change.
+Remaining uncertainties:
+- Full pytest still reports the known RuntimeWarning about ConversationAtlasModal._load_preview_worker never awaited; unrelated to ingest and not caused by this patch.
+Next shortest proof path:
+- Manual TUI check: open F9 immediately after boot, enter a path, tab into the framing prompt, type a note, ingest, and confirm the result persists in the chat status line.
+
+## [2026-03-20 10:04:27 EDT] PRE-FLIGHT
+Operator task:
+- Produce an engineering-grade intelligence brief for the current Adam repository, governed by current repo evidence and fail-closed governance resolution.
+Task checksum:
+- `9bba5db0ba4800e6289e324904c2ce843b041cda2051e1ba9aef20b02bc19665`
+Repo situation:
+- Working tree already dirty before this run: docs, observatory frontend/assets, storage, TUI, tests, archive zip surfaces, and `.DS_Store` are modified; `assets/seed_canon/henrys_garden_draft.pdf` is untracked.
+- Governing file resolved at `/Users/brianray/Adam/AGENTS.md`; canonical notes surface is `/Users/brianray/Adam/codex_notes_garden.md`.
+- Canonical white-paper pipeline root exists, but `/Users/brianray/Adam/assets/white_paper_pipeline/intel_briefs`, `/Users/brianray/Adam/assets/white_paper_pipeline/writing_memos`, and `/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts` are currently missing.
+Relevant spec surfaces read:
+- `/Users/brianray/Adam/AGENTS.md`
+- `/Users/brianray/Adam/README.md`
+- `/Users/brianray/Adam/docs/PROJECT_CHARTER.md`
+- `/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`
+- `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`
+- `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`
+- `/Users/brianray/Adam/docs/REGARD_MECHANISM.md`
+- `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`
+- `/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`
+- `/Users/brianray/Adam/docs/TUI_SPEC.md`
+- `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`
+- `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`
+- `/Users/brianray/Adam/docs/OBSERVATORY_GEOMETRY_SPEC.md`
+- `/Users/brianray/Adam/docs/OBSERVATORY_E2E_AUDIT.md`
+- `/Users/brianray/Adam/docs/MEASUREMENT_EVENT_MODEL.md`
+- `/Users/brianray/Adam/docs/EXPERIMENT_PROTOCOLS.md`
+- `/Users/brianray/Adam/docs/SOURCE_MANIFEST.md`
+- `/Users/brianray/Adam/docs/MIGRATION_NOTES_V1_1.md`
+- `/Users/brianray/Adam/docs/PATCH_MANIFEST_V1_1.md`
+- `/Users/brianray/Adam/docs/PATCH_MANIFEST_V1_2.md`
+Natural-language contracts in force:
+- Adam naming discipline with EDEN treated as implementation-history shell/runtime vocabulary only where materially necessary.
+- TUI remains the primary runtime surface; browser observatory remains an observability / measurement instrument unless current evidence proves broader scope.
+- Primary registers are `Implemented`, `Instrumented`, `Conceptual`, and `Unknown`; strong claims require code plus current-run proof or opened unambiguous test/log/export traces.
+- Notes are append-only; no silent normalization of prior entries.
+Files/modules likely in scope:
+- `/Users/brianray/Adam/eden/runtime.py`
+- `/Users/brianray/Adam/eden/retrieval.py`
+- `/Users/brianray/Adam/eden/regard.py`
+- `/Users/brianray/Adam/eden/storage/graph_store.py`
+- `/Users/brianray/Adam/eden/storage/schema.py`
+- `/Users/brianray/Adam/eden/observatory/server.py`
+- `/Users/brianray/Adam/eden/observatory/service.py`
+- `/Users/brianray/Adam/eden/observatory/exporters.py`
+- `/Users/brianray/Adam/eden/observatory/geometry.py`
+- `/Users/brianray/Adam/eden/tui/app.py`
+- `/Users/brianray/Adam/eden/models/catalog.py`
+- `/Users/brianray/Adam/eden/models/mlx_backend.py`
+- `/Users/brianray/Adam/eden/hum.py`
+- `/Users/brianray/Adam/eden/tanakh/service.py`
+- `/Users/brianray/Adam/tests/`
+- `/Users/brianray/Adam/logs/runtime.jsonl`
+- `/Users/brianray/Adam/exports/context/`
+- `/Users/brianray/Adam/assets/white_paper_pipeline/`
+Status register:
+- Implemented:
+  - Governance resolved from `/Users/brianray/Adam/AGENTS.md`.
+  - Current repo advertises a v1.2 surface with single-graph runtime, MLX local backend intent, observatory measurement events, and browser workbench/API surfaces; implementation strength still needs code/test/artifact confirmation.
+- Instrumented:
+  - Existing observatory exports, measurement ledgers, runtime logs, and hum/Tanakh sidecars are present in the repo tree and can serve as evidence surfaces once inspected.
+- Conceptual:
+  - White-paper pipeline artifact family for this run is not written yet.
+  - Any comparative framing remains disabled unless current evidence or operator config explicitly requires it.
+- Unknown:
+  - Whether the current dirty tree preserves all README/spec claims.
+  - Whether full browser exposure matches server-side observatory capabilities in the current checked-in build.
+  - Whether MLX-local paths remain execution-ready on this machine without fallback or missing dependencies.
+Risks / invariants:
+- Do not let README or patch-manifest prose outrank current code/tests/artifacts.
+- Do not conflate server-side observatory capability with browser exposure.
+- Do not treat historical whitepaper or secondary sources as implementation proof.
+- Do not disturb unrelated in-progress repo changes; this run should add notes and new pipeline artifacts only.
+Evidence plan:
+- Inspect runtime, retrieval, regard, storage, observatory, TUI, MLX, hum, and Tanakh code paths directly.
+- Read targeted tests for the same surfaces and run bounded pytest probes against runtime, membrane, observatory, geometry, hum, Tanakh, and model-catalog families.
+- Inspect current logs/exports and, if bounded, generate fresh deterministic evidence through targeted commands.
+- Create the canonical pipeline directories if writeable, draft the intelligence brief plus support artifacts, and record deterministic write proof.
+Shortest proof path:
+- Verify governance and run-config/defaults, inspect the implementation surfaces named above, run targeted pytest families that exercise runtime/observatory/hum/Tanakh/MLX contracts, inspect one current observatory export + runtime log + current database schema, then write the brief and append POST-FLIGHT with exact artifact paths and commands.

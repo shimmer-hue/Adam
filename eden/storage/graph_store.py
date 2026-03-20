@@ -380,7 +380,7 @@ class GraphStore:
 
     def get_latest_session(self, experiment_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT * FROM sessions WHERE experiment_id = ? ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM sessions WHERE experiment_id = ? ORDER BY updated_at DESC, created_at DESC, rowid DESC LIMIT 1",
             (experiment_id,),
         )
         return _row_to_dict(row)

@@ -2,6 +2,19 @@
 
 EDEN v1.2 treats the observatory as a constructive measurement instrument. Observation can lead to a preview, a preview can lead to a committed mutation, and the mutation remains revertible and attributable.
 
+## Workspace grammar
+
+- the browser shell is partitioned into three top-level workspaces:
+  - `Overview` for graph-first exploration
+  - `Data Laboratory` for spreadsheet audit and slice operations
+  - `Preview` for final render/export styling
+- `Overview` uses a deterministic dock layout with:
+  - left dock for `Appearance` and `Layout`
+  - center graph canvas with graph-mode strip, tool rail, and render tray
+  - right dock for `Statistics`, `Filters`, `Context`, `Inspector`, `Queries`, `Memode Audit`, action controls, ledger, and runtime adjuncts
+- workspace layout, dock collapse state, appearance presets, filters, table sort state, and preview settings are browser-local view state only
+- `Reset layout` restores the default dock arrangement and does not touch graph authority or measurement history
+
 ## Interaction modes
 
 ### `INSPECT`
@@ -41,12 +54,14 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
 
 ## Precision drawer and side rails
 
-- the graph workbench keeps a search/filter rail, selection summary, coordinate-mode selector, measurement ledger panel, runtime trace panel, `Memode Audit`, and Data Lab available beside the main graph surface
-- the precision drawer is the single browser control surface for:
+- the graph workbench keeps graph-first focus while selection-sensitive controls live in the right dock
+- the action/precision area is the single browser control surface for:
   - `Preview`
   - `Commit`
   - `Revert`
   - action-specific fields such as rationale, evidence label, confidence, operator label, edge parameters, memode details, ablation relation masks, and motif annotation fields
+- `Statistics`, `Filters`, `Context`, `Inspector`, `Queries`, `Memode Audit`, the measurement ledger, and runtime trace remain switchable beside the graph instead of replacing it
+- the graph canvas itself exposes a tool rail for direct interaction plus a bottom render tray for labels/overlay/render settings
 - static exports retain the same visible controls but disable mutation actions with explicit copy instead of hiding them
 
 ## Preview / commit / revert flow
@@ -63,6 +78,8 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
 5. Commit if warranted.
 6. Observe refreshed graph, geometry, and ledger state.
 7. Revert explicitly if needed.
+
+`Preview` the workspace is distinct from `Preview` the mutation step. The workspace controls final render/export styling and requires explicit refresh, while mutation preview remains the attributable pre-commit evidence path.
 
 ## Known memode workflow
 
@@ -83,11 +100,21 @@ Known memodes are operator-facing structured claims about reusable motifs. They 
 
 ## Graph reading workflow
 
-- `Semantic Map` is the default reading mode
+- `Semantic Map` is the default reading mode and appears inside `Overview`
 - `Assemblies` highlights memode member memes and supporting edges
 - `Runtime` isolates turns, sessions, documents, feedback, and provenance relations
 - `Active Set` foregrounds turn-bounded retrieval participation
 - `Compare` keeps baseline vs modified state visible without hiding the measurement ledger
+
+## Data Laboratory workflow
+
+- switch between `Nodes` and `Edges` tables without leaving the browser workbench
+- sort/search/filter rows in a spreadsheet-style surface
+- show or hide audit columns while keeping stable ids and `export_label` available
+- row selection highlights the corresponding graph entity
+- graph selection highlights the corresponding row
+- `Select in Graph` and workspace-tab handoff keep graph/table navigation explicit
+- export-scope controls remain visible in Data Laboratory because operators often choose slices from the table view
 
 ## Memode audit workflow
 
@@ -103,6 +130,14 @@ Known memodes are operator-facing structured claims about reusable motifs. They 
   - unmaterialized support candidates
   - knowledge informational relations that remain non-memetic
 - use relation focus from the audit table to hand off into inspector / precision-drawer workflows without collapsing evidence families together
+
+## Preview workspace workflow
+
+- open `Preview` to stage final-render settings separately from graph mutation
+- adjust label mode, edge opacity, curvature, background, legend, caption, and export scope
+- run `Refresh preview` explicitly when preview settings change
+- export from this workspace after confirming appearance
+- preview settings remain browser-local and do not enter the measurement ledger
 
 Inspector workflow:
 
