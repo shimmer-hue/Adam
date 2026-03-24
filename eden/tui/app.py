@@ -1482,9 +1482,18 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
             return
         status = await asyncio.to_thread(partial(app.runtime.start_observatory, reuse_existing=True))
         app.ui_state.observatory_status = status
+        launch = None
         if target == "gui":
+            target_url = _observatory_target_url(
+                app.runtime,
+                status,
+                experiment_id,
+                session_id,
+                launch_token=str(time_ns()),
+            )
+            await asyncio.to_thread(partial(app.runtime.export_observatory_shell, experiment_id=experiment_id, session_id=session_id))
+            launch = await asyncio.to_thread(partial(open_browser_url, target_url))
             await asyncio.to_thread(partial(app.runtime.export_observability, experiment_id=experiment_id, session_id=session_id))
-            target_url = _observatory_target_url(app.runtime, status, experiment_id, session_id)
             label = "session observatory"
         elif target == "turns":
             target_url = f"{status['url']}api/sessions/{session_id}/turns"
@@ -1496,7 +1505,8 @@ class ConversationAtlasModal(ModalScreen[dict[str, str] | None]):
             self._status_message = f"Unknown observatory target: {target}"
             self._refresh_panels()
             return
-        launch = await asyncio.to_thread(partial(open_browser_url, target_url))
+        if launch is None:
+            launch = await asyncio.to_thread(partial(open_browser_url, target_url))
         if launch.ok:
             self._status_message = f"Opened {label} for {record['title']}."
         else:
@@ -2393,9 +2403,15 @@ class StartupScreen(Screen):
         status = await asyncio.to_thread(partial(app.runtime.start_observatory, reuse_existing=True))
         app.ui_state.observatory_status = status
         primary = app.runtime.primary_experiment()
-        await asyncio.to_thread(partial(app.runtime.export_observability, experiment_id=primary["id"], session_id=None))
-        target_url = _observatory_target_url(app.runtime, status, primary["id"])
+        await asyncio.to_thread(partial(app.runtime.export_observatory_shell, experiment_id=primary["id"], session_id=None))
+        target_url = _observatory_target_url(
+            app.runtime,
+            status,
+            primary["id"],
+            launch_token=str(time_ns()),
+        )
         launch = await asyncio.to_thread(partial(open_browser_url, target_url))
+        await asyncio.to_thread(partial(app.runtime.export_observability, experiment_id=primary["id"], session_id=None))
         if launch.ok:
             self.query_one("#startup_log", RichLog).write(
                 f"[INFO] Observatory {'reused' if status['reused_existing'] else 'started'} :: {target_url} via {launch.method}"
@@ -4606,6 +4622,22 @@ class ChatScreen(Screen):
             launch_token = str(time_ns())
             target_url = _observatory_target_url(app.runtime, status, experiment_id, session_id, launch_token=launch_token)
             shell_ready = _observatory_shell_ready(existing_export)
+
+            if experiment_id is not None and not shell_ready:
+                self._set_runtime_action_progress(
+                    action="observatory",
+                    label="Open Browser Observatory",
+                    phase="Refreshing observatory shell",
+                    step=2,
+                    total=4,
+                    detail="Writing a fresh React shell and asset bundle before the heavier payload export.",
+                    feedback="Observatory: refreshing the browser shell before exporting payloads.",
+                )
+                await asyncio.to_thread(
+                    partial(app.runtime.export_observatory_shell, experiment_id=experiment_id, session_id=session_id)
+                )
+                existing_export = _observatory_export_index_path(app.runtime, experiment_id)
+                shell_ready = _observatory_shell_ready(existing_export)
 
             if existing_export and existing_export.exists() and not shell_ready:
                 self._write_forensic(

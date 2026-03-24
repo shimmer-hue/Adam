@@ -8389,3 +8389,477 @@ Remaining uncertainties:
 No headed browser/manual validation was run against the operator's exact stale GUI tab in this turn; proof is code-path and regression-test level. Repo-wide `pytest -q` is still not fully green because of the unrelated missing memoir PDF fixture and the existing Textual coroutine warning.
 Next shortest proof path:
 Re-open Browser Observatory from the TUI on the operator machine and confirm the graph status leaves `idle` and materializes graph content under the new shell. Separately, restore or retire `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` so the full suite can go green.
+## [2026-03-24 13:08:27 EDT] PRE-FLIGHT
+Operator task:
+Fix the new regression where the observatory GUI no longer visibly launches from the TUI menu after the stale-shell/cache-busting patch.
+Task checksum:
+`aef1a0a9fb65577a`
+Repo situation:
+Worktree is already dirty from the prior observatory patch plus `.DS_Store`; leave unrelated changes untouched. The runtime observatory action-strip tests are green, but the startup menu observatory path still has no direct regression coverage.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+`Open Browser Observatory` should remain launchable from the TUI menu surfaces and should visibly open the browser with the current graph shell while preserving session/graph scope. Cache-busting must not regress the menu-launch contract. Claims need code plus test evidence from this turn.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; possibly `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`.
+Status register:
+- Implemented:
+  - Runtime action-strip observatory launch appends `shell_v` and rejects incompatible early-open shells.
+  - Startup menu has a separate observatory worker path.
+- Instrumented:
+  - TUI forensic logs record observatory launch outcomes.
+- Conceptual:
+  - Whether the startup-menu path is reusing a stale identical URL and therefore failing to surface a visible browser launch.
+- Unknown:
+  - Whether the operator is launching from the startup menu, runtime action strip, or both.
+Risks / invariants:
+Do not regress the working runtime action-strip path. Preserve immediate browser launch behavior and avoid introducing duplicate-launch spam from repeated menu focus changes.
+Evidence plan:
+Patch the startup-menu observatory worker to use the same cache-busting launch-token contract as the runtime path and add direct startup-menu regression coverage.
+Shortest proof path:
+Add a startup observatory smoke test that captures `open_browser_url`, patch `_startup_observatory_worker` to append `shell_v`, and run the startup/runtime observatory subset of `tests/test_tui_smoke.py`.
+## [2026-03-24 13:14:05 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+None. Existing `Open Browser Observatory` cache-busting contract in `/Users/brianray/Adam/docs/TUI_SPEC.md` was preserved; code was brought back into alignment for the remaining GUI launchers.
+Natural-language contracts added/revised/preserved:
+Preserved the contract that TUI menu-driven observatory launches should visibly open the browser with a fresh shell URL. Restored consistency so startup-menu and atlas-session GUI launches follow the same cache-busting launch-token rule as the runtime action strip.
+Behavior implemented or modified:
+Updated `/Users/brianray/Adam/eden/tui/app.py` so `_startup_observatory_worker(...)` and the atlas GUI branch in `_open_observatory_target_worker(...)` now append `shell_v` via `_observatory_target_url(...)` before calling `open_browser_url(...)`. This makes all observatory GUI launch workers emit a fresh URL per launch instead of reusing a stable URL that some browsers may ignore or leave hidden.
+Evidence produced (tests / traces / commands / exports):
+Ran `./.venv/bin/python -m py_compile eden/tui/app.py tests/test_tui_smoke.py` successfully. Ran `./.venv/bin/pytest -q tests/test_tui_smoke.py -k 'observatory and (startup_action_menu or atlas_observatory_btn or selection or digit or open_browser)'` and got `5 passed, 22 deselected` in `13.56s`. Added regression coverage proving `shell_v` is present for atlas GUI launches and for startup-menu observatory selection.
+Status register changes:
+- Implemented:
+  - Startup-menu observatory launches now use cache-busting shell URLs.
+  - Atlas/session observatory GUI launches now use cache-busting shell URLs.
+- Instrumented:
+  - None added in this turn beyond existing observatory forensic logging.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - Whether the operator's browser still has a pre-patch dormant tab that needs one manual refresh before the new launch behavior is obvious.
+Truth-table / limitations updates:
+No truth-table or limitation doc changes were required because this turn restored existing stated behavior rather than changing the contract.
+Remaining uncertainties:
+Did not rerun full repo `pytest -q` in this turn because the change was isolated to TUI observatory launch workers and the repo still has the known unrelated missing memoir PDF fixture failure outside this path.
+Next shortest proof path:
+Use the same TUI menu path the operator reported and confirm the browser now opens a fresh observatory URL. If a stale tab is already open, refresh it once and retry to validate the visible-launch behavior against the real browser instance.
+## [2026-03-24 13:24:42 EDT] PRE-FLIGHT
+Operator task:
+Fix the remaining observatory-launch regression where the menu action appears not to launch because the current export shell is stale/incompatible and the code waits on a heavy full export before opening the browser.
+Task checksum:
+`3208477aa62b4d9f`
+Repo situation:
+Worktree already contains the prior observatory launch patches plus `.DS_Store`; leave unrelated changes intact. Live evidence shows `observatory_start` events on 2026-03-24, but the exported `observatory_index.html` for the active graph still lacks `asset_version`, so `_observatory_shell_ready(...)` returns false and the action falls through to the slow export path.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+`Open Browser Observatory` should open the browser promptly from the TUI menu surfaces while payload refresh continues in the background. The React shell bootstrap contract requires graph source pointers and `asset_version`, but stale shells should not block operator-visible launch indefinitely.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/observatory/exporters.py`; `/Users/brianray/Adam/eden/runtime.py`; `/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`.
+Status register:
+- Implemented:
+  - Compatible observatory shells early-open with `shell_v`.
+  - Full `export_observability(...)` rewrites the shell at the end of the export pipeline.
+- Instrumented:
+  - Live runtime logs prove the server starts, while the export pipeline emits basin/graph events.
+- Conceptual:
+  - Quick shell regeneration as a separate lightweight step before the heavy payload export.
+- Unknown:
+  - Whether the operator-visible “not launching” is entirely caused by waiting on the slow export path or also by an existing stale browser tab.
+Risks / invariants:
+Do not break the new bootstrap contract or payload URLs. Preserve the ability to reuse a compatible shell, but stop penalizing stale-shell cases with a full-export wait. Keep doc/code alignment truthful.
+Evidence plan:
+Add a lightweight shell-export method, use it in TUI GUI launchers before the heavy export when needed, update the legacy-shell TUI test to prove immediate launch, and run targeted observatory tests.
+Shortest proof path:
+Teach the exporter/runtime to rewrite `observatory_index.html` plus frontend assets independently, patch the TUI launch workers to call that fast path when the on-disk shell is incompatible, then verify with the legacy-shell observatory smoke tests and shell-ready inspection.
+## [2026-03-24 13:22:03 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/observatory/exporters.py`; `/Users/brianray/Adam/eden/runtime.py`; `/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`.
+Natural-language contracts added/revised/preserved:
+Revised the observatory-launch contract so stale or legacy `observatory_index.html` files are upgraded immediately to the current React shell/asset bundle before the heavier JSON payload export completes. Preserved the existing compatible-shell early-open contract and the cache-busting `shell_v` launch-token rule.
+Behavior implemented or modified:
+Added `export_shell_bundle(...)` in `/Users/brianray/Adam/eden/observatory/exporters.py` and surfaced it through `EdenRuntime.export_observatory_shell(...)` in `/Users/brianray/Adam/eden/runtime.py`. Updated `/Users/brianray/Adam/eden/tui/app.py` so the runtime observatory action, the startup-menu observatory worker, and the atlas session-observatory GUI path all refresh a current shell bundle first, launch the browser from that shell, and then let the full export continue.
+Evidence produced (tests / traces / commands / exports):
+Ran `./.venv/bin/python -m py_compile eden/observatory/exporters.py eden/runtime.py eden/tui/app.py tests/test_tui_smoke.py` successfully. Ran `./.venv/bin/pytest -q tests/test_tui_smoke.py -k 'observatory and (startup_action_menu or atlas_observatory_btn or selection or digit or open_browser or legacy_shell)'` and got `5 passed, 22 deselected` in `13.37s`. Ran a live shell inspection script against the active graph export after `runtime.export_observatory_shell(...)`; `_observatory_shell_ready(...)` returned `True` for `/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/observatory_index.html`.
+Status register changes:
+- Implemented:
+  - Lightweight observatory shell regeneration independent of the heavy payload export.
+  - Immediate browser launch from regenerated shells in runtime, startup, and atlas GUI paths.
+- Instrumented:
+  - None added in this turn beyond the existing observatory forensic/runtime surfaces.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - Whether the operator's browser currently has an old hidden tab/window that may still make the first visible launch look ambiguous.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` to say the launch path now regenerates a fresh shell bundle when the on-disk shell is stale. Updated `/Users/brianray/Adam/docs/TUI_SPEC.md` and `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md` to align the lightweight shell-refresh contract with the code.
+Remaining uncertainties:
+Did not rerun full repo `pytest -q` in this turn; the repo still has the known unrelated missing memoir PDF fixture failure outside the observatory path.
+Next shortest proof path:
+Use the same TUI menu action on the operator machine and confirm the browser opens immediately against the regenerated shell. If the browser still appears inert, inspect whether it is focusing an existing hidden tab/window rather than refusing the launch request.
+## [2026-03-24 13:39:37 EDT] PRE-FLIGHT
+Operator task:
+Fix the observatory browser shell so the graph material actually starts loading instead of staying `idle` under the current hybrid shell.
+Task checksum:
+`6c6194cb8f4061a2`
+Repo situation:
+Worktree is already dirty from prior observatory launch fixes plus `.DS_Store`; leave unrelated changes untouched. Live probe against the real `data/eden.db` shows `/api/status` returns quickly, while `/api/experiments/.../overview` and `/api/experiments/.../measurement-events` time out at 30s and the graph loader in `web/observatory/src/App.tsx` currently waits behind them. Adjacent static JSON exports on disk are present and parse quickly, including `graph_knowledge_base.json` (~292 MB, ~1.1s local parse).
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/AGENTS.md`; `/Users/brianray/.codex/skills/playwright/SKILL.md`.
+Natural-language contracts in force:
+The exported shell advertises `mode: hybrid`; heavy observatory bundles should materialize truthfully without pretending the live API is fast enough for them, while live session/runtime surfaces and invalidation hooks remain available. Claims need code plus test/runtime evidence from this turn.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; possibly `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Status register:
+- Implemented:
+  - Hybrid shell bootstrap exports both `payload_urls` and `live_api`.
+  - React loader currently serializes `graph` behind `overview` / `measurements` / `basin`.
+- Instrumented:
+  - Live probe proved `api/status` is responsive while `overview`, `measurement-events`, and `graph` live API endpoints can block or fail against the real graph.
+- Conceptual:
+  - Hybrid-mode source selection that uses static export JSON for heavy initial payloads while preserving live runtime/session API surfaces.
+- Unknown:
+  - Whether any remaining live invalidation refreshes should also prefer static-export fallback for heavyweight bundles.
+Risks / invariants:
+Do not break mutation/session live APIs, SSE invalidation, or static-export-only mode. Preserve truthful source attribution in payload status surfaces and avoid overclaiming live API readiness for heavy bundles.
+Evidence plan:
+Patch the frontend source-selection/loading order, add a hybrid-mode regression test that proves the graph renders even when live overview stalls, run the observatory Vitest suite, and keep docs aligned with the actual hybrid contract.
+Shortest proof path:
+Teach `App.tsx` to resolve heavy payloads from `payload_urls` when `bootstrap.mode === "hybrid"` and those files exist, start `graph` immediately instead of after essential-settlement, add a focused `App.test.tsx` regression, and run `npm --prefix web/observatory test`.
+## [2026-03-24 13:41:12 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the hybrid-shell contract but made it explicit that heavyweight initial bundles should come from adjacent `payload_urls` in `mode: hybrid` while live runtime/session APIs and invalidation hooks remain live-only surfaces.
+Behavior implemented or modified:
+`web/observatory/src/App.tsx` now resolves per-payload sources for hybrid mode, marks heavyweight initial payloads truthfully, starts `graph` immediately instead of keeping it behind `overview` / `measurements` / `basin`, and updates operator-visible mode copy so hybrid shells stop claiming a pure live-payload path.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix web/observatory test` passed with `13 passed`; `npm --prefix web/observatory run build:app` completed successfully; local HTTP probe against a live observatory server showed adjacent static sidecars returning quickly (`graph_static` 200 in ~0.182s, `overview_static` 200 in ~0.001s, `measurements_static` 200 in ~0.0s) while the equivalent live heavy endpoints were previously timing out or failing.
+Status register changes:
+- Implemented:
+  - Hybrid observatory shells now source heavyweight initial bundles from adjacent static sidecars and no longer leave `graph` stuck at `idle` behind stalled live overview loads.
+  - Hybrid operator copy now distinguishes hybrid payload behavior from pure live mode.
+- Instrumented:
+  - Live-vs-static observatory probe evidence remains available from this turn and now directly explains the loader choice.
+- Conceptual:
+  - Whether future live invalidation refreshes for heavyweight bundles should also re-enter through static sidecars remains undecided.
+- Unknown:
+  - Full repo `./.venv/bin/pytest -q` was not rerun in this turn, so only the frontend observatory surface is freshly proved here.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md` to align the hybrid browser contract with the actual loader behavior. `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` was not changed in this turn.
+Remaining uncertainties:
+Need operator confirmation on the actual workstation that the refreshed shell now transitions away from `idle` into an active graph load against the same export.
+Next shortest proof path:
+Refresh or reopen the observatory shell from the TUI and confirm the graph payload leaves `idle`; if any heavy payload still stalls, inspect the specific payload status source/endpoint now shown by the hybrid loader rather than treating the whole shell as a launcher problem.
+## [2026-03-24 13:45:10 EDT] PRE-FLIGHT
+Operator task:
+Fix the observatory layout workbench so a layout run on the current browser graph does not look inert when the visible slice exceeds the local worker cap.
+Task checksum:
+`ed6a9f14d5d9730f`
+Repo situation:
+Worktree remains dirty from prior observatory launch/payload fixes plus `.DS_Store` and built frontend assets; leave unrelated changes untouched. The current exported graph for `bb298723-5fbf-4554-bf6b-ec5f4d336fbd` has 17,521 nodes / 77,589 edges while the browser layout guard in `web/observatory/src/App.tsx` is capped at 320 nodes, so `handleRunLayout` exits immediately on the operator's real slice.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/AGENTS.md`; `/Users/brianray/.codex/skills/playwright/SKILL.md`.
+Natural-language contracts in force:
+The observatory layout workbench is browser-local, worker-backed, non-evidentiary, and should provide truthful run/pause/cancel/reset/snapshot controls. Large graphs must not pretend to run if the worker budget is exceeded, but the operator should get an explicit bounded path rather than an opaque no-op.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Layout runs are worker-backed for runnable algorithms on bounded graph slices.
+  - Large graphs currently hit a hard 320-node guard and return without an operator-visible workbench path.
+- Instrumented:
+  - Real export evidence from this turn shows the current graph is far above the cap (`17,521` nodes vs `320`).
+- Conceptual:
+  - Selection-scoped large-graph layout fallback with explicit operator messaging.
+- Unknown:
+  - Whether the right bound is only selection-scoped fallback plus messaging, or whether any algorithms should safely run full-graph above the existing cap on this machine.
+Risks / invariants:
+Do not let the browser worker chew through the full 17k-node graph blindly. Preserve truthful non-evidentiary layout semantics, snapshot behavior, and existing runnable/reference layout distinctions.
+Evidence plan:
+Patch the layout run context in `App.tsx`, add focused Vitest coverage for large-graph messaging and bounded selection fallback, update the observatory contract docs if the behavior changes, and rerun the frontend test/build surface.
+Shortest proof path:
+Teach the workbench to compute an explicit run context, allow browser-local layout on a selected subgraph when the full slice exceeds the cap but the selection fits, surface a clear skip/helper message otherwise, add regression tests, and rerun `npm --prefix web/observatory test`.
+## [2026-03-24 13:54:20 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved browser-local, non-evidentiary layout semantics while revising the large-graph contract: if the filtered view exceeds the heavy-graph cap, the workbench must say so explicitly and may only run a bounded selected subgraph that fits inside the cap.
+Behavior implemented or modified:
+`web/observatory/src/App.tsx` now computes a layout run context instead of treating over-cap graphs as inert failures. Large filtered views show explicit cap guidance, `Run` becomes `Run Selected Layout` when a bounded selection is available, selected-subgraph runs post only the bounded node/edge slice to the worker, and the layout worker now surfaces initialization/message errors into the workbench state instead of failing silently.
+Evidence produced (tests / traces / commands / exports):
+Real export evidence from this turn showed the current graph at `17,521` nodes / `77,589` edges against a browser cap of `320`. `npm --prefix /Users/brianray/Adam/web/observatory test` passed with `15 passed`. `npm --prefix /Users/brianray/Adam/web/observatory run build:app` completed successfully.
+Status register changes:
+- Implemented:
+  - Large-graph layout messaging is now explicit in the workbench.
+  - Browser-local layout can run on a bounded selected subgraph when the full visible slice is above cap.
+  - Layout worker startup/message failures now surface to the operator-visible run state.
+- Instrumented:
+  - The current export/node-count evidence directly proves why the previous click path looked inert.
+- Conceptual:
+  - No new full-graph-above-cap browser layout path was added; the full slice still remains bounded by the worker cap.
+- Unknown:
+  - Full repo `./.venv/bin/pytest -q` was not rerun in this turn; only the frontend observatory proof path is fresh.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` so the documented browser-layout boundary matches the new selected-subgraph fallback.
+Remaining uncertainties:
+Need operator confirmation on the live workstation that the layout workbench copy is now clear enough and that running against a bounded selection produces the expected visible coordinate change.
+Next shortest proof path:
+Refresh/reopen the observatory, select a bounded node set on the large graph, and run a layout. If the workbench still appears inert, capture the exact layout status line and whether the button label says `Run Selected Layout` or `Run Layout`.
+## [2026-03-24 14:02:11 EDT] PRE-FLIGHT
+Operator task:
+Use the browser-agent report to fix the remaining observatory layout UX mismatch where the button looks clickable even though the large-graph cap is blocking execution.
+Task checksum:
+`2c5b1ee98eb73a6b`
+Repo situation:
+Worktree still contains the prior observatory launch/payload/layout edits and generated frontend assets. Browser-agent evidence from the operator machine says the workbench shows the cap warning text but still presents `Run Layout` as if it were actionable; the current CSS has no visible disabled styling for `primary-button` / `toolbar-button`.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+Browser-local layout remains bounded and non-evidentiary. When the cap blocks execution, the workbench should communicate that truthfully and visibly instead of reading like a broken control.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/styles.css`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Large-graph helper text and selection-scoped fallback are already in code.
+- Instrumented:
+  - Browser-agent report proves the button still looks runnable on the operator machine.
+- Conceptual:
+  - Blocked-state labeling/styling that makes the cap boundary obvious before the operator clicks.
+- Unknown:
+  - Whether the operator machine is still serving a shell with the separate `frontend assets missing` build warning.
+Risks / invariants:
+Do not change the worker cap or pretend the full 15k+ visible slice can run locally. Keep the fix at the UX/state-signaling layer unless fresh evidence proves an execution-path bug.
+Evidence plan:
+Patch the blocked-state button labels/styling, add a focused Vitest assertion for that visible state, rerun the frontend suite/build, and record the result.
+Shortest proof path:
+Change blocked layout buttons to explicit non-run labels, add visible disabled styles and titles, cover the state in `App.test.tsx`, then rerun `npm --prefix /Users/brianray/Adam/web/observatory test` and `npm --prefix /Users/brianray/Adam/web/observatory run build:app`.
+## [2026-03-24 14:03:41 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/styles.css`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+None in this turn. Existing observatory/layout contract text already covered explicit cap messaging; this patch aligned the visible UI with that contract.
+Natural-language contracts added/revised/preserved:
+Preserved the bounded browser-layout contract and made the blocked state visibly honest: the control no longer reads like a live run path when the heavy-graph cap prevents execution.
+Behavior implemented or modified:
+When layout execution is blocked by the browser cap, the workbench now changes the button label from `Run Layout` to an explicit non-run label such as `Select Nodes to Run`, attaches the helper text to the control, and renders disabled button styling for `primary-button` / `toolbar-button`. Selection-scoped runs remain unchanged when a bounded selection fits under the cap.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix /Users/brianray/Adam/web/observatory test` passed with `15 passed`. `npm --prefix /Users/brianray/Adam/web/observatory run build:app` completed successfully.
+Status register changes:
+- Implemented:
+  - Blocked layout controls now read as blocked instead of broken.
+  - Disabled action styling now exists for the relevant observatory button classes.
+- Instrumented:
+  - Browser-agent report from the operator machine remains the direct evidence source for the previous UX failure.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - Whether the separate `frontend assets missing` warning seen by the browser agent is still present after the next operator refresh.
+Truth-table / limitations updates:
+No additional spec/doc edits were needed in this turn beyond the prior large-graph layout contract updates.
+Remaining uncertainties:
+Need operator confirmation on the refreshed live shell that the blocked-state label/styling now reads clearly on the actual machine.
+Next shortest proof path:
+Refresh the observatory shell and verify the blocked control now reads `Select Nodes to Run` with obvious disabled styling. If the `frontend assets missing` warning still appears, capture it separately because that is a build-status path, not the layout worker path.
+## [2026-03-24 14:07:22 EDT] PRE-FLIGHT
+Operator task:
+Fix the remaining observatory selection-path regression so the bounded layout route is actually reachable from `Overview` on large graphs.
+Task checksum:
+`9d4dba1c453f5dd9`
+Repo situation:
+Worktree still contains prior observatory launch/payload/layout UX fixes and generated frontend assets. Browser-agent evidence now confirms the blocked-state copy is correct, but `Box Select` did not produce any selection and the current `GraphPanel` implementation only wires `clickNode`, `clickEdge`, and `clickStage`, despite the spec promising a tool rail with `box-select`.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+`Overview` exposes a graph tool rail with select/pan/box-select/pin semantics. Large-graph layout remains browser-bounded, so the operator needs a truthful, reachable path to create a bounded selection without mutating graph authority.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx`; `/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; possibly `/Users/brianray/Adam/web/observatory/src/styles.css`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Large-graph layout is explicitly blocked until a bounded selection exists.
+  - `GraphPanel` currently supports click selection only.
+- Instrumented:
+  - Browser-agent report proves `Box Select` does not create a selection in practice.
+- Conceptual:
+  - A reachable bounded-selection path from `Overview` that works on large graphs.
+- Unknown:
+  - Whether to implement true drag-box selection immediately or add an explicit bounded-selection helper path in the layout workbench/graph stage.
+Risks / invariants:
+Do not fake full-graph layout. Preserve non-authoritative browser-local selection/layout semantics and avoid introducing hidden graph mutation.
+Evidence plan:
+Choose the shortest operator-truthful bounded-selection path, add focused Vitest coverage, rerun the frontend suite/build, and report what remains unknown.
+Shortest proof path:
+Add a reachable bounded-selection affordance from `Overview` for over-cap graphs, verify it changes `Selection` and enables `Run Selected Layout`, then rerun `npm --prefix /Users/brianray/Adam/web/observatory test` and `npm --prefix /Users/brianray/Adam/web/observatory run build:app`.
+## [2026-03-24 14:11:22 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the browser-local large-graph cap contract while revising the `Overview` workbench contract: over-cap views must expose a reachable bounded-selection helper so the operator can promote a visible sample into `Run Selected Layout` without depending on an unproved canvas box-select path.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now offers `Select Visible Sample (25)` from the blocked over-cap layout state, applies that bounded visible-node sample to `selectedNodeIds`, shifts the workbench into the existing selection-scoped layout path, and surfaces the sample-selection action in the run-state copy. The workbench still preserves the prior blocked-state labels and disabled run controls for full over-cap views.
+Evidence produced (tests / traces / commands / exports):
+Ran `npm --prefix /Users/brianray/Adam/web/observatory test` and got `15 passed` across `src/workbench/graphUtils.test.ts` and `src/App.test.tsx`. Ran `npm --prefix /Users/brianray/Adam/web/observatory run build:app` successfully; Vite rebuilt the checked-in observatory bundle and emitted the usual chunk-size warning only. Added regression coverage proving the blocked state exposes `Select Visible Sample (25)` and that using it leads to `Run Selected Layout` with a 25-node worker payload.
+Status register changes:
+- Implemented:
+  - `Overview` now has a reachable bounded visible-sample helper for over-cap browser-local layout runs.
+  - The selection-scoped browser-local layout path is now directly reachable from the blocked large-graph state without leaving `Overview`.
+- Instrumented:
+  - None added beyond the existing layout run-state surfaces and test evidence.
+- Conceptual:
+  - Freeform drag-box selection on the Sigma canvas remains outside the proved path for this turn.
+- Unknown:
+  - No headed-browser/manual proof was produced in this turn for the exact operator gesture sequence on the live workstation.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md` to record the new `Overview` helper. Updated `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to state that the visible-sample helper is the truthful current route while freeform canvas box-select is still not a proved operator path.
+Remaining uncertainties:
+Did not rerun full repo `./.venv/bin/pytest -q` in this turn; proof is limited to the observatory frontend test/build surface. The separate Sigma canvas selection gesture on the live graph still needs manual validation if we want to claim it as implemented.
+Next shortest proof path:
+Refresh the live observatory, use `Select Visible Sample (25)` from `Overview`, then run `Run Selected Layout` and confirm progress moves above `0%`. If the operator still needs arbitrary box-select in the graph canvas, implement or prove that gesture path separately rather than relying on it implicitly.
+## [2026-03-24 14:35:30 EDT] PRE-FLIGHT
+Operator task:
+Fix the remaining browser-local layout visibility bug so a successful selection-scoped run is inspectable in the live `Overview` graph instead of completing invisibly inside the full-graph camera.
+Task checksum:
+`6be4abf2f2ffd0fd`
+Repo situation:
+Worktree still contains prior observatory launch/payload/layout fixes and rebuilt frontend assets. Browser-agent evidence now proves the `Select Visible Sample (25)` helper and `Run Selected Layout` path both execute, but the full 15.6k-node graph view shows no obvious visual effect after the run completes.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+Browser-local layout remains non-evidentiary and bounded. A successful selection-scoped run should be inspectable by the operator; EDEN should not present a truthful `ready` state while leaving the selected subgraph effectively invisible in the unchanged full-graph camera.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Large-graph layout now exposes a reachable visible-sample helper and selection-scoped run path.
+  - Worker completion already stores a browser-local coordinate snapshot and flips the workbench to `ready`.
+- Instrumented:
+  - Browser-agent evidence proves the run reaches `100%` and `ForceAtlas2 ready`.
+- Conceptual:
+  - Camera/view behavior that makes a successful selected-subgraph run visibly inspectable in the full browser workbench.
+- Unknown:
+  - Whether the right fix is explicit camera focus on the selected subgraph, a post-run compare/focus mode, or another visibility aid.
+Risks / invariants:
+Do not pretend the full graph was relaid out. Preserve the existing bounded selected-subgraph semantics and avoid silently mutating graph authority.
+Evidence plan:
+Patch the graph/workbench focus path for selection-scoped runs, add focused Vitest coverage, rerun the observatory frontend test/build surface, and update the observatory docs if the visibility contract changes.
+Shortest proof path:
+Make selection-scoped runs focus the selected subgraph in the graph panel and say so in the operator-visible status copy, cover that path in `App.test.tsx`, then rerun `npm --prefix /Users/brianray/Adam/web/observatory test` and `npm --prefix /Users/brianray/Adam/web/observatory run build:app`.
+## [2026-03-24 14:40:26 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/web/observatory/src/components/GraphPanel.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the bounded selected-subgraph layout contract while revising the inspectability clause: when `Overview` runs a browser-local layout on a selected subgraph, the browser view should refocus that subgraph so a truthful `ready` state is visibly inspectable rather than lost inside the unchanged full-graph camera.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now tracks selection-focus intent for the visible-sample helper and for selection-scoped layout runs. `GraphPanel` in `/Users/brianray/Adam/web/observatory/src/components/GraphPanel.tsx` now applies a focused Sigma bounding box and camera reset for that subgraph, while `Reset layout` clears the focus. Selection-scoped completion copy now says the selected subgraph was focused.
+Evidence produced (tests / traces / commands / exports):
+Ran `npm --prefix /Users/brianray/Adam/web/observatory test` and got `16 passed` across `src/workbench/graphUtils.test.ts`, `src/components/GraphPanel.test.tsx`, and `src/App.test.tsx`. Ran `npm --prefix /Users/brianray/Adam/web/observatory run build:app` successfully; Vite rebuilt the checked-in observatory bundle and emitted only the existing chunk-size warning. Added app-level regression coverage for the helper/focus copy and a direct `GraphPanel` proof that focus mode applies a bounded Sigma viewport to the selected nodes.
+Status register changes:
+- Implemented:
+  - Selection-scoped browser-local layout runs now refocus the selected subgraph in the graph panel.
+  - The workbench status copy now states that the selected subgraph was focused when the run completes.
+- Instrumented:
+  - Direct component-level focus proof now exists in `GraphPanel.test.tsx`.
+- Conceptual:
+  - Arbitrary drag-box selection on the live Sigma canvas remains outside the proved path for this turn.
+- Unknown:
+  - No headed-browser/manual proof was produced in this turn for the exact live workstation camera motion after the focus patch.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md` and `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` to record post-run selection focus. Updated `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to keep the helper/focus route explicit while drag-box selection remains unproved.
+Remaining uncertainties:
+Did not rerun full repo `./.venv/bin/pytest -q` in this turn; proof is limited to the observatory frontend test/build surface plus the new component test. The live Sigma box-select gesture still needs separate proof if we want to claim it.
+Next shortest proof path:
+Refresh the live observatory, run `Select Visible Sample (25)` and `Run Selected Layout`, and confirm the camera now refocuses the selected subgraph while the status line reports that focus. If the operator still needs freeform box-select, implement or prove that gesture path separately.
+## [2026-03-24 14:57:28 EDT] PRE-FLIGHT
+Operator task:
+Fix the remaining helper-selection bug so `Select Visible Sample (25)` picks a coherent bounded neighborhood rather than an arbitrary graph-wide slice that still looks like the full graph when focused.
+Task checksum:
+`bec1b7b299ca53c5`
+Repo situation:
+Worktree already contains the selection-focus patch and rebuilt observatory bundle. Browser-agent evidence now proves the helper and focus messages fire, but the visible graph still looks full-scale after both helper click and layout completion, which matches the current code path that simply takes the first 25 filtered node ids.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+The `Overview` helper should give the operator a reachable and inspectable bounded selection path for over-cap layout runs. A truthful "selected sample" should be spatially/topologically coherent enough that post-run focus is visibly narrower than the full graph.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Selection-scoped layout runs now refocus the selected subgraph and report that focus in the status copy.
+  - The helper currently selects the first 25 filtered node ids.
+- Instrumented:
+  - Browser-agent evidence proves the current helper sample still spans a visually full-graph view on the live dataset.
+- Conceptual:
+  - A coherent bounded-neighborhood helper selection for over-cap layout runs.
+- Unknown:
+  - Whether a topology-first BFS sample is sufficient on the live graph, or whether the helper needs an explicit coordinate-coherent heuristic beyond connectivity.
+Risks / invariants:
+Do not silently claim the helper isolates the full graph. Preserve the bounded selected-subgraph semantics and avoid making the helper depend on unproved canvas gestures.
+Evidence plan:
+Replace the raw first-N sample with a connected/local neighborhood sample, update the focused Vitest coverage, rerun the observatory frontend test/build surface, and keep the docs truthful about what the helper now does.
+Shortest proof path:
+Compute the helper selection from a bounded local neighborhood in the filtered graph, update `App.test.tsx` to assert the helper still yields a 25-node runnable slice with focus messaging, then rerun `npm --prefix /Users/brianray/Adam/web/observatory test` and `npm --prefix /Users/brianray/Adam/web/observatory run build:app`.
+## [2026-03-24 14:59:08 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the bounded helper/focus route while revising the helper semantics: `Select Visible Sample` now means a coherent local neighborhood sample within the current filtered graph, not an arbitrary first-N slice that can span the whole canvas.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now computes the helper selection through a bounded neighborhood sampler seeded from a high-degree visible node and expanded through local adjacency with coordinate-aware ordering. The helper label remains `Select Visible Sample (25)`, but the selected ids now form a more inspectable local subgraph before and after the browser-local layout run.
+Evidence produced (tests / traces / commands / exports):
+Ran `npm --prefix /Users/brianray/Adam/web/observatory test` and got `16 passed`. Ran `npm --prefix /Users/brianray/Adam/web/observatory run build:app` successfully; Vite rebuilt the checked-in observatory bundle and emitted only the existing chunk-size warning. Existing `App.test.tsx` and `GraphPanel.test.tsx` remained green after the neighborhood-sampler change.
+Status register changes:
+- Implemented:
+  - The over-cap helper now chooses a bounded local neighborhood sample instead of the first visible node ids.
+- Instrumented:
+  - The prior browser-agent report remains the evidence explaining why the raw first-N helper was inadequate on the live graph.
+- Conceptual:
+  - Freeform drag-box selection on the live Sigma canvas remains outside the proved path for this turn.
+- Unknown:
+  - No headed-browser/manual proof was produced in this turn for the live workstation after the neighborhood-sampler patch.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` so the helper is described as a coherent local-neighborhood sample plus post-run focus rather than an arbitrary visible slice.
+Remaining uncertainties:
+Did not rerun full repo `./.venv/bin/pytest -q` in this turn; proof is limited to the observatory frontend test/build surface. The live operator machine still needs one more agent/manual confirmation that the new sample is visibly narrower than the full graph.
+Next shortest proof path:
+Refresh the live observatory and rerun the agent flow. If the selected helper sample still looks full-scale, capture the post-helper `Selection` text and any visible node labels so the next patch can tighten the neighborhood heuristic further or add an explicit isolate-selection filter.
+## [2026-03-24 15:11:40 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the bounded helper path while revising its operator-visible effect: `Select Visible Sample` now means selecting and temporarily isolating a coherent local neighborhood sample in the current view, not merely selecting nodes inside the unchanged full graph.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now keeps a separate isolated-sample view state. The helper selects a bounded local neighborhood sample, isolates the visible graph to that sample, focuses it, exposes `Restore Full View`, and keeps selection-scoped layout semantics based on the underlying full filtered graph rather than collapsing the run context to a generic small full-view layout.
+Evidence produced (tests / traces / commands / exports):
+Ran `npm --prefix /Users/brianray/Adam/web/observatory test` and got `16 passed`. Ran `npm --prefix /Users/brianray/Adam/web/observatory run build:app` successfully; Vite rebuilt the checked-in observatory bundle and emitted only the existing chunk-size warning. Updated `App.test.tsx` to prove the helper reduces the mocked visible graph from the large filtered slice to `25` nodes and exposes `Restore Full View`.
+Status register changes:
+- Implemented:
+  - The over-cap helper now isolates the bounded local neighborhood sample in the visible graph view.
+  - The workbench now exposes an explicit `Restore Full View` path after helper isolation.
+- Instrumented:
+  - Existing browser-agent evidence remains the direct proof that helper focus without view isolation was still inadequate on the live graph.
+- Conceptual:
+  - Freeform drag-box selection on the live Sigma canvas remains outside the proved path for this turn.
+- Unknown:
+  - No headed-browser/manual proof was produced in this turn for the live workstation after the isolate-view patch.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`, and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` so the helper is described as selection + isolation + focus rather than selection/focus alone.
+Remaining uncertainties:
+Did not rerun full repo `./.venv/bin/pytest -q` in this turn; proof is limited to the observatory frontend test/build surface. The live operator machine still needs one more agent/manual confirmation that counts and canvas now collapse to the bounded sample.
+Next shortest proof path:
+Refresh the live observatory and rerun the agent flow. If the helper still does not show a clearly smaller visible graph, capture the new visible node count and whether `Restore Full View` appears so the next patch can inspect any live-shell staleness or a remaining view-state mismatch.

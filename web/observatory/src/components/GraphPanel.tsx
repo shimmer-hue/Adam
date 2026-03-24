@@ -16,6 +16,8 @@ type Props = {
   addedNodeIds?: string[];
   addedEdgeIds?: string[];
   cameraVersion?: number;
+  focusNodeIds?: string[];
+  focusVersion?: number;
   onSelectNode: (nodeId: string, additive: boolean) => void;
   onSelectEdge: (edgeId: string) => void;
   onClearSelection: () => void;
@@ -46,6 +48,8 @@ export default function GraphPanel({
   addedNodeIds = [],
   addedEdgeIds = [],
   cameraVersion = 0,
+  focusNodeIds = [],
+  focusVersion = 0,
   onSelectNode,
   onSelectEdge,
   onClearSelection,
@@ -63,7 +67,9 @@ export default function GraphPanel({
 
   useEffect(() => {
     if (!sigmaRef.current) return;
-    sigmaRef.current.getCamera().animatedReset({ duration: 180 });
+    sigmaRef.current.setCustomBBox(null);
+    sigmaRef.current.refresh();
+    void sigmaRef.current.getCamera().animatedReset({ duration: 180 });
   }, [cameraVersion]);
 
   useEffect(() => {
@@ -157,6 +163,16 @@ export default function GraphPanel({
     selectedEdgeId,
   ]);
 
+  useEffect(() => {
+    if (!sigmaRef.current || focusVersion === 0) return;
+    const renderer = sigmaRef.current;
+    const focusBounds = boundsForNodes(renderer.getGraph(), focusNodeIds);
+    if (!focusBounds) return;
+    renderer.setCustomBBox(expandBounds(focusBounds));
+    renderer.refresh();
+    void renderer.getCamera().animatedReset({ duration: 220 });
+  }, [focusNodeIds, focusVersion, coordinateMap, nodes]);
+
   if (renderError) {
     return (
       <div className="empty-state" data-testid="graph-canvas-fallback" role="note">
@@ -168,6 +184,41 @@ export default function GraphPanel({
   }
 
   return <div aria-label={ariaLabel} className="graph-panel" data-testid="graph-canvas" ref={containerRef} role="region" />;
+}
+
+function boundsForNodes(graph: Graph, nodeIds: string[]): { x: [number, number]; y: [number, number] } | null {
+  const validNodeIds = nodeIds.filter((nodeId) => graph.hasNode(nodeId));
+  if (!validNodeIds.length) return null;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const nodeId of validNodeIds) {
+    const attrs = graph.getNodeAttributes(nodeId) as { x?: number; y?: number };
+    const x = Number(attrs.x);
+    const y = Number(attrs.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) return null;
+  return { x: [minX, maxX], y: [minY, maxY] };
+}
+
+function expandBounds(bounds: { x: [number, number]; y: [number, number] }): { x: [number, number]; y: [number, number] } {
+  const xSpan = Math.max(bounds.x[1] - bounds.x[0], 0.8);
+  const ySpan = Math.max(bounds.y[1] - bounds.y[0], 0.8);
+  const xPad = xSpan * 0.22;
+  const yPad = ySpan * 0.22;
+  return {
+    x: [bounds.x[0] - xPad, bounds.x[1] + xPad],
+    y: [bounds.y[0] - yPad, bounds.y[1] + yPad],
+  };
 }
 
 function computeNodeSize(node: GraphNode, appearance: AppearanceState, selected: boolean, active: boolean, added: boolean): number {

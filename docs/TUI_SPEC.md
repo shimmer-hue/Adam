@@ -154,6 +154,7 @@ Secondary surfaces:
 - the topbar also carries a dedicated live turn-status strip so the operator can see Adam move through preflight, prompt-ready, generating, finalizing, and review phases without losing the aperture surface
 - `Open Browser Observatory` stays repeatable from the strip without forcing a reset back to review focus
 - when the current graph already has a React `observatory_index.html` shell that still carries the current bootstrap contract, `Open Browser Observatory` should launch the browser immediately from that shell and continue refreshing payloads in the background rather than blocking browser open on a full export rebuild
+- when the current graph only has a stale or legacy shell, the TUI should first rewrite a fresh React shell/asset bundle for the same graph and then launch the browser from that upgraded shell before the heavier payload export completes
 - immediate observatory launches must preserve the current session scope by appending a session override in the browser URL instead of silently falling back to the stale session baked into the previous export shell
 - immediate observatory launches also append a cache-busting shell token in the browser URL so repeated opens do not silently reuse a stale cached HTML shell while payload refresh is happening in the background
 - multiline composition is first-class

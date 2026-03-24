@@ -151,6 +151,8 @@ Generated per experiment under `exports/<experiment_id>/`:
   - the layout picker is organized as a 12-family terrain browser spanning force-directed, hierarchical, tree, circular, spectral, multilevel, constraint, orthogonal, planar, geographic, community, and edge-bundling families
   - every terrain item carries operator-facing explanation copy for what it is and how it is typically used
   - runnable browser-worker layouts currently include `forceatlas2`, `fruchterman_reingold`, `kamada_kawai`, `linlog`, `sugiyama_layered`, `radial_tree`, `simple_circular`, `circular_degree`, `circular_community`, `radial`, `noverlap`, `fixed_coordinate`, and `community_clusters`
+  - if the current filtered view exceeds the browser heavy-graph cap, the workbench must say so explicitly; when the operator has a bounded selection inside the cap, the layout may run on that selected subgraph while non-selected nodes keep their exported coordinates, and the browser view should isolate and refocus that selected subgraph so the result is inspectable
+  - `Overview` should expose a reachable bounded-selection helper for over-cap views so the operator can promote a coherent visible neighborhood sample into `Run Selected Layout` and temporarily isolate that sample without leaving the browser workbench
   - many additional algorithms are exposed as reference-only terrain items so the operator can browse the wider layout landscape without EDEN pretending they execute locally
   - presets and layout snapshots persist in browser-local storage keyed by experiment identity plus manifest / graph hash
   - layout, filter, appearance, and table state do not enter the measurement ledger
@@ -187,7 +189,9 @@ Generated per experiment under `exports/<experiment_id>/`:
 ## Public browser payload contract
 
 - graph payloads expose layout, appearance, filter, statistics, and export capability metadata so the React shell can stay declarative instead of hard-coding instrument assumptions
+- in `mode: hybrid`, the browser shell should use adjacent `payload_urls` for heavyweight initial bundles (`overview`, `measurements`, `basin`, `graph`, and deferred large sidecars when present) while retaining live runtime/session APIs and invalidation hooks for mutation/runtime surfaces
 - the exported React shell bootstrap includes an `asset_version` token, and the shell references `style.css` / `index.js` with versioned query strings so browser reopens do not silently reuse stale frontend bundle assets after a local rebuild
+- the shell/asset bundle can be refreshed independently of the heavier payload exports so stale `observatory_index.html` files do not block browser launch while JSON payload regeneration is still running
 - graph payload nodes and edges can expose `export_label` alongside stable internal ids so graph-document downloads can carry semantic labels into Gephi without sacrificing referential identity
 - graph payloads expose `assembly_nodes` and `assembly_edges` as a distinct second-order plane so `Assemblies` mode can show/export memode topology without collapsing it into the meme-only semantic slice
 - graph payload nodes expose projected ontology fields: `kind`, `entity_type`, `speech_act_mode`, and `storage_kind`

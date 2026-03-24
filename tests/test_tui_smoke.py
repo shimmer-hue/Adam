@@ -15,7 +15,16 @@ from textual.widgets import Button, Input, Select, Static, TextArea
 from eden.browser import BrowserOpenResult
 from eden.models.base import ModelResult
 from eden.models.mock import MockModelAdapter
-from eden.tui.app import ActionStrip, ChatScreen, ConversationAtlasModal, DeckModal, EdenTuiApp, IngestModal, SessionConfigModal
+from eden.tui.app import (
+    ActionStrip,
+    ChatScreen,
+    ConversationAtlasModal,
+    DeckModal,
+    EdenTuiApp,
+    IngestModal,
+    SessionConfigModal,
+    StartupScreen,
+)
 
 
 @pytest.mark.asyncio
@@ -1062,6 +1071,7 @@ async def test_tui_conversation_atlas_saves_taxonomy_and_resumes_session(runtime
         assert any(
             urlparse(url).path.endswith(f"{experiment['id']}/observatory_index.html")
             and parse_qs(urlparse(url).query).get("session_id") == [first_session["id"]]
+            and parse_qs(urlparse(url).query).get("shell_v")
             for url in opened_urls
         )
         modal.query_one("#atlas_turns_api_btn", Button).press()
@@ -1170,6 +1180,41 @@ async def test_open_browser_observatory_refreshes_current_export_and_targets_ind
         assert query.get("session_id") == [app.ui_state.session_id]
         assert query.get("shell_v")
         assert "observatory_index.html" in app.ui_state.last_feedback
+
+    runtime.stop_observatory()
+
+
+@pytest.mark.asyncio
+async def test_startup_action_menu_observatory_launches_versioned_gui(runtime, monkeypatch) -> None:
+    opened_urls: list[str] = []
+    original_execute = StartupScreen._execute_startup_action
+
+    def capture_open(url: str) -> BrowserOpenResult:
+        opened_urls.append(url)
+        return BrowserOpenResult(ok=True, method="mock")
+
+    def execute_only_observatory(self: StartupScreen, action: str) -> None:
+        if action == "observatory":
+            original_execute(self, action)
+
+    monkeypatch.setattr("eden.tui.app.open_browser_url", capture_open)
+    monkeypatch.setattr(StartupScreen, "_execute_startup_action", execute_only_observatory)
+
+    app = EdenTuiApp(runtime)
+    async with app.run_test(size=(200, 60)) as pilot:
+        await pilot.pause(1.0)
+        await app.push_screen(StartupScreen())
+        await pilot.pause(0.5)
+        assert isinstance(app.screen, StartupScreen)
+
+        menu = app.screen.query_one("#startup_action_menu", Select)
+        menu.value = "observatory"
+        await pilot.pause(0.8)
+
+        assert opened_urls
+        assert urlparse(opened_urls[0]).path.endswith(f"{runtime.primary_experiment()['id']}/observatory_index.html")
+        query = parse_qs(urlparse(opened_urls[0]).query)
+        assert query.get("shell_v")
 
     runtime.stop_observatory()
 
@@ -1284,7 +1329,7 @@ async def test_runtime_action_menu_digit_shortcut_opens_existing_observatory_she
 
 
 @pytest.mark.asyncio
-async def test_runtime_action_menu_digit_shortcut_waits_for_export_when_existing_shell_is_legacy(runtime, monkeypatch) -> None:
+async def test_runtime_action_menu_digit_shortcut_refreshes_legacy_shell_before_slow_export(runtime, monkeypatch) -> None:
     opened_urls: list[str] = []
     export_started = threading.Event()
     export_can_finish = threading.Event()
@@ -1319,15 +1364,14 @@ async def test_runtime_action_menu_digit_shortcut_waits_for_export_when_existing
         await pilot.pause(0.3)
 
         assert export_started.is_set()
-        assert not opened_urls
-
-        export_can_finish.set()
-        await pilot.pause(1.0)
-
         assert opened_urls
         query = parse_qs(urlparse(opened_urls[0]).query)
         assert query.get("session_id") == [app.ui_state.session_id]
         assert query.get("shell_v")
+        assert '"asset_version":' in (export_dir / "observatory_index.html").read_text(encoding="utf-8")
+
+        export_can_finish.set()
+        await pilot.pause(1.0)
 
     runtime.stop_observatory()
 

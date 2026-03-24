@@ -3573,6 +3573,10 @@ class EdenRuntime:
         out_dir = self.export_dir_for_experiment(experiment_id)
         return self.exporter.export_all(experiment_id=experiment_id, session_id=session_id, out_dir=out_dir)
 
+    def export_observatory_shell(self, *, experiment_id: str, session_id: str | None = None) -> dict[str, str]:
+        out_dir = self.export_dir_for_experiment(experiment_id)
+        return self.exporter.export_shell_bundle(experiment_id=experiment_id, session_id=session_id, out_dir=out_dir)
+
     def tanakh_get_passage(self, *, ref: str, mode: str = "keep_cantillation") -> dict[str, Any]:
         return self.tanakh_service.get_passage(ref, mode)
 

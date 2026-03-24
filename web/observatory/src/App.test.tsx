@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
@@ -9,13 +9,26 @@ vi.mock("./components/GraphPanel", () => ({
     ariaLabel,
     selectedNodeIds = [],
     selectedEdgeId = null,
+    focusNodeIds = [],
+    focusVersion = 0,
+    onSelectNode,
   }: {
-    nodes: Array<unknown>;
+    nodes: Array<Record<string, any>>;
     ariaLabel?: string;
     selectedNodeIds?: string[];
     selectedEdgeId?: string | null;
+    focusNodeIds?: string[];
+    focusVersion?: number;
+    onSelectNode?: (nodeId: string, additive: boolean) => void;
   }) => (
-    <div data-testid="graph-panel">{`${ariaLabel ?? "Graph canvas"}:${nodes.length}:nodesSelected=${selectedNodeIds.length}:edgeSelected=${selectedEdgeId ?? "none"}`}</div>
+    <div data-testid="graph-panel">
+      <div>{`${ariaLabel ?? "Graph canvas"}:${nodes.length}:nodesSelected=${selectedNodeIds.length}:edgeSelected=${selectedEdgeId ?? "none"}:focusNodes=${focusNodeIds.length}:focusVersion=${focusVersion}`}</div>
+      {nodes.slice(0, 5).map((node) => (
+        <button key={String(node.id)} onClick={() => onSelectNode?.(String(node.id), selectedNodeIds.length > 0)} type="button">
+          {`select-${node.id}`}
+        </button>
+      ))}
+    </div>
   ),
 }));
 
@@ -34,6 +47,33 @@ class EventSourceStub {
 
   close() {
     return undefined;
+  }
+}
+
+const workerInstances: WorkerStub[] = [];
+
+class WorkerStub {
+  onmessage: ((event: MessageEvent<any>) => void) | null = null;
+  onerror: ((event: ErrorEvent) => void) | null = null;
+  onmessageerror: (() => void) | null = null;
+  messages: any[] = [];
+  scriptUrl: string;
+
+  constructor(url: string | URL) {
+    this.scriptUrl = String(url);
+    workerInstances.push(this);
+  }
+
+  postMessage(message: any) {
+    this.messages.push(message);
+  }
+
+  terminate() {
+    return undefined;
+  }
+
+  emit(data: any) {
+    this.onmessage?.({ data } as MessageEvent<any>);
   }
 }
 
@@ -225,9 +265,63 @@ function measurementsPayload() {
   return { counts: { events: 1 }, events: [{ id: "evt-1", action_type: "geometry_measurement_run", evidence_label: "DERIVED", created_at: "2026-03-19T15:00:00Z" }] };
 }
 
+function largeGraphPayload(nodeCount = 330, heavyCap = 320) {
+  const base = graphPayload();
+  const nodes = Array.from({ length: nodeCount }, (_, index) => ({
+    id: `node-${index + 1}`,
+    label: `Node ${index + 1}`,
+    export_label: `Node ${index + 1}`,
+    kind: "meme",
+    domain: index % 2 === 0 ? "knowledge" : "behavior",
+    degree: index === 0 || index === nodeCount - 1 ? 1 : 2,
+    render_coords: { force: { x: index % 20, y: Math.floor(index / 20) } },
+  }));
+  const edges = nodes.slice(1).map((node, index) => ({
+    id: `edge-${index + 1}`,
+    source: nodes[index].id,
+    target: node.id,
+    type: "SUPPORTS",
+    weight: 1,
+    evidence_label: "AUTO_DERIVED",
+  }));
+  return {
+    ...base,
+    layout_defaults: {
+      ...base.layout_defaults,
+      heavy_graph_node_cap: heavyCap,
+    },
+    statistics_capabilities: {
+      ...(base.statistics_capabilities ?? {}),
+      heavy_graph_node_cap: heavyCap,
+    },
+    nodes,
+    edges,
+    semantic_nodes: nodes,
+    semantic_edges: edges,
+    assembly_nodes: nodes,
+    assembly_edges: edges,
+    assemblies: [],
+    memode_audit: {
+      summary: {
+        memodes: 0,
+        admissible_memodes: 0,
+        flagged_memodes: 0,
+        materialized_support_edges: 0,
+        unmaterialized_support_candidates: 0,
+        knowledge_informational_relations: 0,
+      },
+      memodes: [],
+      informational_relations: [],
+      capped: false,
+      total: 0,
+    },
+  };
+}
+
 describe("EDEN Observatory App", () => {
   beforeEach(() => {
     vi.stubGlobal("EventSource", EventSourceStub);
+    workerInstances.length = 0;
     window.localStorage.clear();
   });
 
@@ -406,6 +500,151 @@ describe("EDEN Observatory App", () => {
     expect(await screen.findByText("Sparse basin data")).toBeTruthy();
     expect(screen.getByText(/Build warning: stale build/)).toBeTruthy();
     expect(screen.getByText(/Not enough turns with non-empty active sets/)).toBeTruthy();
+  });
+
+  it("loads heavy payloads from static sidecars in hybrid mode without waiting for stalled live overview requests", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/status") return response({ status: { frontend_build: { warning: false } } });
+      if (url === "/graph.json") return response(graphPayload());
+      if (url === "/overview.json") return new Promise(() => {});
+      if (url === "/measurements.json") return new Promise(() => {});
+      if (url === "/basin.json") return new Promise(() => {});
+      if (url === "/api/sessions/session-1/turns") return response(transcriptPayload());
+      if (url === "/api/runtime/status") return response({ available: true });
+      if (url === "/api/runtime/model") return response({ available: true, backend: "mock" });
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <App
+        bootstrap={{
+          mode: "hybrid",
+          initial_surface: "graph",
+          experiment_id: "exp-hybrid",
+          session_id: "session-1",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+          live_api: {
+            status: "/api/status",
+            graph: "/api/graph",
+            basin: "/api/basin",
+            overview: "/api/overview",
+            measurements: "/api/measurements",
+            session_turns: "/api/sessions/session-1/turns",
+            runtime_status: "/api/runtime/status",
+            runtime_model: "/api/runtime/model",
+            events: "/api/events",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    expect(screen.getByText(/Hybrid mode uses adjacent JSON for heavy bundles/)).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/graph"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === "/graph.json")).toBe(true);
+  });
+
+  it("surfaces an explicit large-graph layout warning when the visible slice exceeds the browser cap", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("graph.json")) return response(largeGraphPayload());
+        if (url.endsWith("overview.json")) return response(overviewPayload());
+        if (url.endsWith("measurements.json")) return response(measurementsPayload());
+        if (url.endsWith("basin.json")) return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "graph",
+          experiment_id: "exp-large-layout",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    expect(screen.getByText(/Current filtered view has 330 nodes, above the browser layout cap of 320\./)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Select Nodes to Run" })[0].hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Select Visible Sample (25)" })).toBeTruthy();
+  });
+
+  it("runs a browser-local layout on a selected visible sample when the full graph exceeds the cap", async () => {
+    vi.stubGlobal("Worker", WorkerStub as any);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("graph.json")) return response(largeGraphPayload());
+        if (url.endsWith("overview.json")) return response(overviewPayload());
+        if (url.endsWith("measurements.json")) return response(measurementsPayload());
+        if (url.endsWith("basin.json")) return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "graph",
+          experiment_id: "exp-selection-layout",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Select Visible Sample (25)" }));
+
+    expect(screen.getByTestId("graph-panel").textContent).toContain("Graph canvas:25:nodesSelected=25");
+    expect(screen.getByTestId("graph-panel").textContent).toContain("focusNodes=25");
+    expect(screen.getAllByText(/Selected visible sample \(25 nodes\) for browser-local layout; isolated and focused that subgraph/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Run Selected Layout" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore Full View" })).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Run Selected Layout" })[0]);
+
+    const layoutWorker = workerInstances.find((instance) => instance.scriptUrl.includes("layoutWorker")) ?? workerInstances[0];
+    expect(layoutWorker).toBeTruthy();
+    expect(layoutWorker.messages[0].type).toBe("run");
+    expect(layoutWorker.messages[0].nodes).toHaveLength(25);
+    expect(layoutWorker.messages[0].edges.length).toBeGreaterThan(0);
+
+    act(() => {
+      layoutWorker.emit({
+        type: "done",
+        runId: layoutWorker.messages[0].runId,
+        layoutId: "forceatlas2",
+        coordinateMap: {
+          "node-1": { x: 1, y: 1 },
+          "node-2": { x: 2, y: 2 },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/ForceAtlas2 ready; isolated and focused selected subgraph \(25 nodes\)/).length).toBeGreaterThan(0);
+    });
+    expect(screen.getByTestId("graph-panel").textContent).toContain("Graph canvas:25:nodesSelected=25");
+    expect(screen.getByTestId("graph-panel").textContent).toContain("focusNodes=25");
   });
 
   it("keeps visible reasoning and hum continuity in the demoted status row", async () => {

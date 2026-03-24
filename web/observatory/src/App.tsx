@@ -8,6 +8,7 @@ import {
   applyFilters,
   applyPreviewPatch,
   buildNodeLookup,
+  componentMembership,
   csvForEdges,
   csvForNodes,
   defaultAppearanceState,
@@ -305,6 +306,8 @@ type DataBundle = {
 type ResolvedSources = Partial<Record<PayloadKey, string>> & {
   liveEnabled: boolean;
   staleBuildWarning: string | null;
+  sourceKinds: Partial<Record<PayloadKey, PayloadStatus["source"]>>;
+  hybridMode: boolean;
 };
 
 function applyBootstrapUrlOverrides(bootstrap: Bootstrap): Bootstrap {
@@ -319,6 +322,51 @@ function applyBootstrapUrlOverrides(bootstrap: Bootstrap): Bootstrap {
     ...bootstrap,
     session_id: sessionOverride,
     live_api: liveApi,
+  };
+}
+
+const HYBRID_STATIC_PAYLOAD_KEYS: PayloadKey[] = ["overview", "measurements", "basin", "graph", "geometry", "tanakh"];
+
+function resolveSources(bootstrap: Bootstrap, liveEnabled: boolean, staleBuildWarning: string | null): ResolvedSources {
+  const liveApiSources: Partial<Record<PayloadKey, string>> = {
+    graph: withSessionScope(bootstrap.live_api?.graph, bootstrap.session_id),
+    basin: withSessionScope(bootstrap.live_api?.basin, bootstrap.session_id),
+    overview: withSessionScope(bootstrap.live_api?.overview, bootstrap.session_id),
+    measurements: withSessionScope(bootstrap.live_api?.measurements, bootstrap.session_id),
+    geometry: withSessionScope(bootstrap.live_api?.geometry, bootstrap.session_id),
+    tanakh: withSessionScope(bootstrap.live_api?.tanakh, bootstrap.session_id),
+    transcript: bootstrap.live_api?.session_turns,
+    trace: bootstrap.live_api?.session_trace,
+    runtimeStatus: bootstrap.live_api?.runtime_status,
+    runtimeModel: bootstrap.live_api?.runtime_model,
+  };
+  const staticSources: Partial<Record<PayloadKey, string>> = {
+    graph: bootstrap.payload_urls?.graph,
+    basin: bootstrap.payload_urls?.basin,
+    overview: bootstrap.payload_urls?.overview,
+    measurements: bootstrap.payload_urls?.measurements,
+    geometry: bootstrap.payload_urls?.geometry,
+    tanakh: bootstrap.payload_urls?.tanakh,
+  };
+
+  const hybridMode = liveEnabled && bootstrap.mode === "hybrid";
+  const next: Partial<Record<PayloadKey, string>> = {};
+  const sourceKinds: Partial<Record<PayloadKey, PayloadStatus["source"]>> = {};
+
+  for (const key of PAYLOAD_ORDER) {
+    const useStatic = hybridMode && HYBRID_STATIC_PAYLOAD_KEYS.includes(key) && staticSources[key];
+    const url = useStatic ? staticSources[key] : liveEnabled ? liveApiSources[key] ?? staticSources[key] : staticSources[key];
+    if (!url) continue;
+    next[key] = url;
+    sourceKinds[key] = useStatic ? "static_export" : liveEnabled && liveApiSources[key] ? "live_api" : "static_export";
+  }
+
+  return {
+    ...next,
+    liveEnabled,
+    staleBuildWarning,
+    sourceKinds,
+    hybridMode,
   };
 }
 
@@ -337,6 +385,13 @@ type LayoutRunState = {
   target: string;
   lastMessage: string;
   activeRunId: string | null;
+};
+
+type LayoutRunContext = {
+  scope: "full" | "selection" | "blocked";
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  helperText: string;
 };
 
 type StatsPayload = {
@@ -373,6 +428,7 @@ const DEFAULT_ASSEMBLY_RENDER_MODE: AssemblyRenderMode = "hulls";
 const DEFAULT_LIFT_MODE: LiftMode = "flat";
 const DEFAULT_INTERACTION_MODE: InteractionMode = "INSPECT";
 const DEFAULT_RIGHT_DOCK_TAB: RightDockTab = "filters";
+const LAYOUT_VISIBLE_SAMPLE_SIZE = 25;
 const DEFAULT_DOCK_STATE: DockState = {
   leftWidth: 288,
   rightWidth: 236,
@@ -564,6 +620,25 @@ function sourceLabel(source: PayloadStatus["source"]): string {
   return "unavailable";
 }
 
+function runtimeModeLabel(liveEnabled: boolean, hybridMode: boolean): string {
+  if (!liveEnabled) return "Static export";
+  return hybridMode ? "Hybrid live" : "Live API";
+}
+
+function payloadModeCopy(liveEnabled: boolean, hybridMode: boolean, detailed = false): string {
+  if (!liveEnabled) {
+    return detailed
+      ? "Static export mode reads adjacent JSON artifacts; layout and mutation controls remain visible but non-authoritative."
+      : "Static export mode reads adjacent JSON artifacts.";
+  }
+  if (hybridMode) {
+    return detailed
+      ? "Hybrid mode loads heavy graph/basin/overview bundles from adjacent JSON sidecars while keeping live runtime, session, and invalidation APIs available."
+      : "Hybrid mode uses adjacent JSON for heavy bundles and live APIs for runtime/session refresh.";
+  }
+  return "Live mode prefers API payloads and refresh invalidations.";
+}
+
 function MetricList({ items }: { items: Array<[string, unknown]> }) {
   return (
     <dl className="metric-list">
@@ -631,12 +706,17 @@ function cappedItems<T>(items: T[], limit = TEXT_ACCESS_LIMIT): { items: T[]; ca
   };
 }
 
-function initializePayloadStatuses(sources: Partial<Record<PayloadKey, string>>, liveEnabled: boolean): Record<PayloadKey, PayloadStatus> {
+const EAGER_PAYLOADS: PayloadKey[] = ["overview", "measurements", "basin", "graph"];
+
+function initializePayloadStatuses(
+  sources: Partial<Record<PayloadKey, string>>,
+  sourceKinds: Partial<Record<PayloadKey, PayloadStatus["source"]>>,
+): Record<PayloadKey, PayloadStatus> {
   const next = structuredClone(EMPTY_STATUS);
   for (const key of PAYLOAD_ORDER) {
     if (sources[key]) {
-      next[key].source = liveEnabled ? "live_api" : "static_export";
-      next[key].status = ESSENTIAL_PAYLOADS.includes(key) ? "loading" : key === "geometry" || key === "tanakh" ? "deferred" : "idle";
+      next[key].source = sourceKinds[key] ?? "none";
+      next[key].status = EAGER_PAYLOADS.includes(key) ? "loading" : key === "geometry" || key === "tanakh" ? "deferred" : "idle";
     }
   }
   return next;
@@ -690,6 +770,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const [previewSettings, setPreviewSettings] = useState<PreviewSettings>(DEFAULT_PREVIEW_SETTINGS);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [cameraResetToken, setCameraResetToken] = useState(0);
+  const [graphFocusToken, setGraphFocusToken] = useState(0);
   const [draggingDock, setDraggingDock] = useState<"left" | "right" | null>(null);
   const [graphMode, setGraphMode] = useState<GraphMode>(DEFAULT_GRAPH_MODE);
   const [assemblyRenderMode, setAssemblyRenderMode] = useState<AssemblyRenderMode>(DEFAULT_ASSEMBLY_RENDER_MODE);
@@ -698,6 +779,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const [reasoningLens, setReasoningLens] = useState<ReasoningLens>("reasoning");
   const [interactionMode, setInteractionMode] = useState<InteractionMode>(DEFAULT_INTERACTION_MODE);
   const [coordinateMode, setCoordinateMode] = useState<string>("force");
+  const [graphFocusNodeIds, setGraphFocusNodeIds] = useState<string[]>([]);
+  const [layoutIsolatedNodeIds, setLayoutIsolatedNodeIds] = useState<string[]>([]);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [selectedAssemblyId, setSelectedAssemblyId] = useState<string | null>(null);
@@ -726,6 +809,10 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const layoutWorkerRef = useRef<Worker | null>(null);
   const statsWorkerRef = useRef<Worker | null>(null);
   const layoutSettingsRef = useRef<Record<string, Record<string, any>>>({});
+  const layoutRunDescriptorRef = useRef<{ scope: LayoutRunContext["scope"]; focusNodeIds: string[] }>({
+    scope: "full",
+    focusNodeIds: [],
+  });
 
   const presetStorageKey = useMemo(() => storageKey({ bootstrap, graph: data.graph, surface: workspace }), [bootstrap, data.graph, workspace]);
   const snapshotsStorageKey = useMemo(() => snapshotStorageKey(bootstrap, data.graph), [bootstrap, data.graph]);
@@ -763,10 +850,31 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const layoutCatalog = useMemo(() => resolveLayoutCatalog(data.graph?.layout_catalog ?? null), [data.graph?.layout_catalog]);
   const layoutDefaults = useMemo(() => resolveLayoutDefaults(data.graph?.layout_defaults ?? null), [data.graph?.layout_defaults]);
   const selectedLayoutMeta = layoutCatalog[layoutTarget] ?? null;
+  const heavyLayoutNodeCap = useMemo(
+    () => Number(layoutDefaults.heavy_graph_node_cap ?? data.graph?.statistics_capabilities?.heavy_graph_node_cap ?? 320),
+    [data.graph?.statistics_capabilities?.heavy_graph_node_cap, layoutDefaults.heavy_graph_node_cap],
+  );
 
-  const filteredBaseline = useMemo(
+  const filteredBaselineFull = useMemo(
     () => applyFilters(baseGraph.nodes, baseGraph.edges, filters, selectedNodeIds),
     [baseGraph.edges, baseGraph.nodes, filters, selectedNodeIds],
+  );
+  const filteredBaseline = useMemo(() => {
+    if (!layoutIsolatedNodeIds.length) return filteredBaselineFull;
+    const isolated = selectionGraphSlice(filteredBaselineFull.nodes, filteredBaselineFull.edges, layoutIsolatedNodeIds);
+    return {
+      nodes: isolated.nodes,
+      edges: isolated.edges,
+      componentIndex: componentMembership(isolated.nodes, isolated.edges),
+    };
+  }, [filteredBaselineFull, layoutIsolatedNodeIds]);
+  const layoutRunContext = useMemo(
+    () => resolveLayoutRunContext(filteredBaselineFull.nodes, filteredBaselineFull.edges, selectedNodeIds, heavyLayoutNodeCap),
+    [filteredBaselineFull.edges, filteredBaselineFull.nodes, heavyLayoutNodeCap, selectedNodeIds],
+  );
+  const layoutVisibleSampleNodeIds = useMemo(
+    () => selectVisibleLayoutSampleNodeIds(filteredBaselineFull.nodes, filteredBaselineFull.edges, Math.min(LAYOUT_VISIBLE_SAMPLE_SIZE, heavyLayoutNodeCap)),
+    [filteredBaselineFull.edges, filteredBaselineFull.nodes, heavyLayoutNodeCap],
   );
   const exportGraph = useMemo(
     () => graphForExportScope(data.graph, filteredBaseline, exportScope),
@@ -862,6 +970,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     }
     return [...values];
   }, [data.graph?.edges]);
+  const hybridMode = data.liveEnabled && resolvedSources?.hybridMode;
 
   useEffect(() => {
     layoutSettingsRef.current = layoutSettings;
@@ -885,6 +994,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         return;
       }
       if (payload.type === "done") {
+        const runDescriptor = layoutRunDescriptorRef.current;
         const settingsHash = hashText(JSON.stringify(layoutSettingsRef.current[payload.layoutId] ?? {}));
         const snapshot: LayoutSnapshot = {
           id: `layout-run::${payload.layoutId}::${settingsHash}::${Date.now()}`,
@@ -896,12 +1006,19 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         };
         setLayoutSnapshots((current) => dedupeSnapshots([...current.filter((entry) => entry.id !== snapshot.id), snapshot]));
         setCoordinateMode(snapshot.id);
+        if (runDescriptor.scope === "selection" && runDescriptor.focusNodeIds.length >= 2) {
+          setGraphFocusNodeIds(runDescriptor.focusNodeIds);
+          setGraphFocusToken((current) => current + 1);
+        }
         setLayoutRunState({
           running: false,
           paused: false,
           progress: 1,
           target: payload.layoutId,
-          lastMessage: `${humanLayoutLabel(payload.layoutId, layoutCatalog)} ready`,
+          lastMessage:
+            runDescriptor.scope === "selection" && runDescriptor.focusNodeIds.length >= 2
+              ? `${humanLayoutLabel(payload.layoutId, layoutCatalog)} ready; isolated and focused selected subgraph (${runDescriptor.focusNodeIds.length.toLocaleString("en-US")} nodes)`
+              : `${humanLayoutLabel(payload.layoutId, layoutCatalog)} ready`,
           activeRunId: null,
         });
         return;
@@ -926,6 +1043,24 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           activeRunId: null,
         }));
       }
+    };
+    layoutWorker.onerror = (event: ErrorEvent) => {
+      setLayoutRunState((current) => ({
+        ...current,
+        running: false,
+        paused: false,
+        lastMessage: event.message || "Layout worker failed to initialize.",
+        activeRunId: null,
+      }));
+    };
+    layoutWorker.onmessageerror = () => {
+      setLayoutRunState((current) => ({
+        ...current,
+        running: false,
+        paused: false,
+        lastMessage: "Layout worker returned an unreadable payload.",
+        activeRunId: null,
+      }));
     };
 
     const statsWorker = statsWorkerRef.current;
@@ -1145,36 +1280,10 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           }
         }
 
-        const sources = liveEnabled
-          ? {
-              graph: withSessionScope(bootstrap.live_api?.graph, bootstrap.session_id),
-              basin: withSessionScope(bootstrap.live_api?.basin, bootstrap.session_id),
-              overview: withSessionScope(bootstrap.live_api?.overview, bootstrap.session_id),
-              measurements: withSessionScope(bootstrap.live_api?.measurements, bootstrap.session_id),
-              geometry: withSessionScope(bootstrap.live_api?.geometry, bootstrap.session_id),
-              tanakh: withSessionScope(bootstrap.live_api?.tanakh, bootstrap.session_id),
-              transcript: bootstrap.live_api?.session_turns,
-              trace: bootstrap.live_api?.session_trace,
-              runtimeStatus: bootstrap.live_api?.runtime_status,
-              runtimeModel: bootstrap.live_api?.runtime_model,
-            }
-          : {
-              graph: bootstrap.payload_urls?.graph,
-              basin: bootstrap.payload_urls?.basin,
-              overview: bootstrap.payload_urls?.overview,
-              measurements: bootstrap.payload_urls?.measurements,
-              geometry: bootstrap.payload_urls?.geometry,
-              tanakh: bootstrap.payload_urls?.tanakh,
-            };
-
-        const nextSources: ResolvedSources = {
-          ...sources,
-          liveEnabled,
-          staleBuildWarning,
-        };
+        const nextSources = resolveSources(bootstrap, liveEnabled, staleBuildWarning);
         if (!cancelled) {
           setResolvedSources(nextSources);
-          setPayloadStatuses(initializePayloadStatuses(sources, liveEnabled));
+          setPayloadStatuses(initializePayloadStatuses(nextSources, nextSources.sourceKinds));
           setData((current) => ({
             ...current,
             liveEnabled,
@@ -1207,6 +1316,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         };
 
         const essentialTasks: Array<Promise<void>> = [];
+        let graphTask: Promise<void> | null = null;
         if (nextSources.overview) {
           essentialTasks.push(loadPayload("overview", nextSources.overview, (payload) => setData((current) => ({ ...current, overview: payload as OverviewPayload }))));
         }
@@ -1224,21 +1334,20 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             }),
           );
         }
+        if (nextSources.graph) {
+          graphTask = loadPayload("graph", nextSources.graph, (payload) => {
+            const graph = payload as GraphPayload;
+            setData((current) => ({ ...current, graph }));
+            if (!selectedAssemblyId && graph.assemblies?.length) {
+              setSelectedAssemblyId(graph.assemblies[0].id);
+            }
+          });
+        }
         await Promise.allSettled(essentialTasks);
         if (!cancelled) setLoading(false);
 
         const backgroundTasks: Array<Promise<void>> = [];
-        if (nextSources.graph) {
-          backgroundTasks.push(
-            loadPayload("graph", nextSources.graph, (payload) => {
-              const graph = payload as GraphPayload;
-              setData((current) => ({ ...current, graph }));
-              if (!selectedAssemblyId && graph.assemblies?.length) {
-                setSelectedAssemblyId(graph.assemblies[0].id);
-              }
-            }),
-          );
-        }
+        if (graphTask) backgroundTasks.push(graphTask);
         if (nextSources.transcript) {
           backgroundTasks.push(loadPayload("transcript", nextSources.transcript, (payload) => setData((current) => ({ ...current, transcript: payload as TranscriptPayload }))));
         }
@@ -1310,7 +1419,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     let cancelled = false;
     setPayloadStatuses((current) => ({
       ...current,
-      geometry: { ...current.geometry, status: "loading", source: resolvedSources.liveEnabled ? "live_api" : "static_export", error: undefined },
+      geometry: { ...current.geometry, status: "loading", source: resolvedSources.sourceKinds.geometry ?? "none", error: undefined },
     }));
     void fetchJson<Record<string, any>>(resolvedSources.geometry)
       .then((geometry) => {
@@ -1339,7 +1448,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     let cancelled = false;
     setPayloadStatuses((current) => ({
       ...current,
-      tanakh: { ...current.tanakh, status: "loading", source: resolvedSources.liveEnabled ? "live_api" : "static_export", error: undefined },
+      tanakh: { ...current.tanakh, status: "loading", source: resolvedSources.sourceKinds.tanakh ?? "none", error: undefined },
     }));
     void fetchJson<TanakhPayload>(resolvedSources.tanakh)
       .then((tanakh) => {
@@ -1442,22 +1551,26 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function handleClearSelection() {
+    setLayoutIsolatedNodeIds([]);
     setSelectedNodeIds([]);
     setSelectedEdgeId(null);
   }
 
   function handleSelectAssembly(assemblyId: string) {
+    setLayoutIsolatedNodeIds([]);
     setSelectedAssemblyId(assemblyId);
     setSelectedEdgeId(null);
     setSelectedNodeIds([]);
   }
 
   function handleSelectEdge(edgeId: string) {
+    setLayoutIsolatedNodeIds([]);
     setSelectedEdgeId(edgeId);
     setSelectedNodeIds([]);
   }
 
   function handleSelectTurn(turnId: string) {
+    setLayoutIsolatedNodeIds([]);
     setSelectedTurnId(turnId);
     setSelectedAssemblyId(null);
     setSelectedEdgeId(null);
@@ -1465,6 +1578,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function handleFocusNode(nodeId: string) {
+    setLayoutIsolatedNodeIds([]);
     setSelectedNodeIds([nodeId]);
     setSelectedEdgeId(null);
   }
@@ -1508,6 +1622,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function updateFilter<K extends keyof FilterState>(key: K, value: FilterState[K]) {
+    setLayoutIsolatedNodeIds([]);
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
@@ -1734,32 +1849,39 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
       });
       return;
     }
-    const heavyCap = Number(layoutDefaults.heavy_graph_node_cap ?? data.graph?.statistics_capabilities?.heavy_graph_node_cap ?? 320);
-    if (filteredBaseline.nodes.length > heavyCap) {
+    if (layoutRunContext.scope === "blocked") {
       setLayoutRunState({
         running: false,
         paused: false,
         progress: 0,
         target: layoutTarget,
-        lastMessage: `Layout skipped above heavy cap (${heavyCap} nodes). Exported coordinates remain authoritative.`,
+        lastMessage: layoutRunContext.helperText,
         activeRunId: null,
       });
       return;
     }
     const runId = `layout-${Date.now()}`;
+    const runScopeLabel =
+      layoutRunContext.scope === "selection"
+        ? `selected subgraph (${layoutRunContext.nodes.length.toLocaleString("en-US")} nodes)`
+        : `current filtered view (${layoutRunContext.nodes.length.toLocaleString("en-US")} nodes)`;
+    layoutRunDescriptorRef.current = {
+      scope: layoutRunContext.scope,
+      focusNodeIds: layoutRunContext.scope === "selection" ? layoutRunContext.nodes.map((node) => node.id) : [],
+    };
     setLayoutRunState({
       running: true,
       paused: false,
       progress: 0,
       target: layoutTarget,
-      lastMessage: `Running ${humanLayoutLabel(layoutTarget, layoutCatalog)}`,
+      lastMessage: `Running ${humanLayoutLabel(layoutTarget, layoutCatalog)} on ${runScopeLabel}`,
       activeRunId: runId,
     });
     layoutWorkerRef.current.postMessage({
       type: "run",
       runId,
       layoutId: layoutTarget,
-      nodes: filteredBaseline.nodes.map((node) => ({
+      nodes: layoutRunContext.nodes.map((node) => ({
         id: node.id,
         degree: node.degree,
         size: node.degree,
@@ -1767,7 +1889,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         latitude: Number(node.latitude ?? node.lat ?? node.geo_latitude ?? node.geo?.lat ?? Number.NaN),
         longitude: Number(node.longitude ?? node.lng ?? node.lon ?? node.geo_longitude ?? node.geo?.lng ?? Number.NaN),
       })),
-      edges: filteredBaseline.edges.map((edge) => ({ id: edge.id || edgeKey(edge), source: edge.source, target: edge.target, weight: edge.weight })),
+      edges: layoutRunContext.edges.map((edge) => ({ id: edge.id || edgeKey(edge), source: edge.source, target: edge.target, weight: edge.weight })),
       initialPositions: baselineCoordinateMap,
       settings: layoutSettings[layoutTarget] ?? {},
       selectedNodeIds,
@@ -1793,10 +1915,38 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function handleResetLayout() {
+    setGraphFocusNodeIds([]);
+    setGraphFocusToken((current) => current + 1);
+    setLayoutIsolatedNodeIds([]);
     setCoordinateMode(layoutDefaults.coordinate_mode ?? "force");
     setLayoutRunState((current) => ({
       ...current,
       lastMessage: "Reset to exported coordinate mode",
+    }));
+  }
+
+  function handleRestoreFullGraphView() {
+    setLayoutIsolatedNodeIds([]);
+    setGraphFocusNodeIds([]);
+    setGraphFocusToken((current) => current + 1);
+    setLayoutRunState((current) => ({
+      ...current,
+      lastMessage: "Restored full filtered graph view",
+    }));
+  }
+
+  function handleSelectVisibleLayoutSample() {
+    if (!layoutVisibleSampleNodeIds.length) return;
+    setLayoutIsolatedNodeIds(layoutVisibleSampleNodeIds);
+    setSelectedNodeIds(layoutVisibleSampleNodeIds);
+    setSelectedEdgeId(null);
+    setSelectedAssemblyId(null);
+    setGraphTool("select");
+    setGraphFocusNodeIds(layoutVisibleSampleNodeIds);
+    setGraphFocusToken((current) => current + 1);
+    setLayoutRunState((current) => ({
+      ...current,
+      lastMessage: `Selected visible sample (${layoutVisibleSampleNodeIds.length.toLocaleString("en-US")} nodes) for browser-local layout; isolated and focused that subgraph`,
     }));
   }
 
@@ -1916,9 +2066,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         <div className="status-strip-cell">
           <strong>Payloads</strong>
           <span>
-            {data.liveEnabled
-              ? "Live mode prefers API payloads and refresh invalidations."
-              : "Static export mode reads adjacent JSON artifacts."}
+            {payloadModeCopy(data.liveEnabled, Boolean(hybridMode))}
           </span>
         </div>
         <div className="status-strip-cell">
@@ -2542,6 +2690,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         onSelectEdge={handleSelectEdge}
         onClearSelection={graphTool === "pin" ? () => undefined : handleClearSelection}
         cameraVersion={cameraResetToken}
+        focusNodeIds={graphFocusNodeIds}
+        focusVersion={graphFocusToken}
       />
     );
 
@@ -2562,6 +2712,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         onClearSelection={graphTool === "pin" ? () => undefined : handleClearSelection}
         ariaLabel="Modified graph canvas"
         cameraVersion={cameraResetToken}
+        focusNodeIds={graphFocusNodeIds}
+        focusVersion={graphFocusToken}
       />
     );
 
@@ -3066,6 +3218,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
                 onClearSelection={handleClearSelection}
                 ariaLabel="Preview viewport"
                 cameraVersion={cameraResetToken}
+                focusNodeIds={graphFocusNodeIds}
+                focusVersion={graphFocusToken}
               />
             </div>
             {previewSettings.showCaption ? (
@@ -3097,7 +3251,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             items={[
               ["Experiment", bootstrap.experiment_id],
               ["Session", bootstrap.session_id],
-              ["Mode", data.liveEnabled ? "Live API" : "Static export"],
+              ["Mode", runtimeModeLabel(data.liveEnabled, Boolean(hybridMode))],
               ["Render", "Layout/render != evidence"],
             ]}
           />
@@ -3153,7 +3307,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
               ["Payload", payloadStatuses.tanakh.status],
               ["Ref", data.tanakh?.current_ref ?? data.overview?.tanakh?.current_ref],
               ["Bundle", data.tanakh?.bundle_hash ?? data.overview?.tanakh?.bundle_hash],
-              ["Mode", data.liveEnabled ? "Live/API + static sidecars" : "Static sidecars"],
+              ["Mode", hybridMode ? "Hybrid live + sidecars" : data.liveEnabled ? "Live/API + static sidecars" : "Static sidecars"],
             ]}
           />
         </Card>
@@ -3181,9 +3335,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         <div className="status-panel-copy">
           <strong>{loading ? "Loading observatory payloads" : activeLoads ? "Background payload activity" : "Payload status"}</strong>
           <span>
-            {data.liveEnabled
-              ? "Live mode prefers API payloads and refresh invalidations."
-              : "Static export mode reads adjacent JSON artifacts; layout and mutation controls remain visible but non-authoritative."}
+            {payloadModeCopy(data.liveEnabled, Boolean(hybridMode), true)}
           </span>
           <span>
             {activeLoads
@@ -3965,6 +4117,32 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     if (!data.graph) return null;
     const settings = layoutSettings[layoutTarget] ?? {};
     const selectedFamily = layoutFamilies.find((family) => family.id === selectedLayoutMeta?.familyId) ?? null;
+    const runDisabled = layoutRunState.running || selectedLayoutMeta?.status !== "runnable" || layoutRunContext.scope === "blocked";
+    const runLabel =
+      layoutRunContext.scope === "selection"
+        ? "Run Selected Layout"
+        : layoutRunContext.scope === "blocked"
+          ? filteredBaseline.nodes.length === 0
+            ? "No Visible Nodes"
+            : selectedNodeIds.length > 0
+              ? "Reduce Selection to Run"
+              : "Select Nodes to Run"
+          : "Run Layout";
+    const compactRunLabel =
+      layoutRunContext.scope === "selection"
+        ? "Run Selected"
+        : layoutRunContext.scope === "blocked"
+          ? filteredBaseline.nodes.length === 0
+            ? "No Nodes"
+            : selectedNodeIds.length > 0
+              ? "Reduce Selection"
+              : "Select Nodes"
+          : "Run";
+    const layoutStatusCopy = layoutRunState.lastMessage || (layoutRunContext.scope !== "full" ? layoutRunContext.helperText : "");
+    const runTitle = layoutRunContext.scope === "blocked" ? layoutRunContext.helperText : "";
+    const layoutStatusId = "layout-workbench-status";
+    const showSelectVisibleSample = layoutRunContext.scope === "blocked" && filteredBaselineFull.nodes.length > heavyLayoutNodeCap && layoutVisibleSampleNodeIds.length >= 2;
+    const showRestoreFullView = layoutIsolatedNodeIds.length >= 2;
     return (
       <Card title="Layout Workbench" accent={layoutRunState.lastMessage || humanLayoutLabel(layoutTarget, layoutCatalog)}>
         <div className="layout-compact-toolbar">
@@ -3980,8 +4158,16 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
                 ))}
             </select>
           </label>
-          <button className="primary-button" disabled={layoutRunState.running || selectedLayoutMeta?.status !== "runnable"} onClick={handleRunLayout} type="button">
-            Run
+          <button
+            aria-describedby={layoutStatusCopy ? layoutStatusId : undefined}
+            aria-disabled={runDisabled}
+            className="primary-button"
+            disabled={runDisabled}
+            onClick={handleRunLayout}
+            title={runTitle}
+            type="button"
+          >
+            {compactRunLabel}
           </button>
         </div>
         <div className="layout-detail-card layout-detail-card-compact">
@@ -4005,9 +4191,39 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         {selectedLayoutMeta?.status !== "runnable" ? (
           <p className="placeholder-copy">This terrain item is shown so operators can browse the wider layout landscape. Running it would require a dedicated implementation beyond the current browser worker.</p>
         ) : null}
+        {layoutStatusCopy ? (
+          <p className={layoutRunContext.scope === "blocked" ? "placeholder-copy placeholder-copy-warning" : "placeholder-copy"} id={layoutStatusId}>
+            {layoutStatusCopy}
+          </p>
+        ) : null}
+        {showSelectVisibleSample || showRestoreFullView ? (
+          <div className="toolbar">
+            {showSelectVisibleSample ? (
+              <button className="toolbar-button" onClick={handleSelectVisibleLayoutSample} type="button">
+                {`Select Visible Sample (${layoutVisibleSampleNodeIds.length.toLocaleString("en-US")})`}
+              </button>
+            ) : null}
+            {showRestoreFullView ? (
+              <button className="toolbar-button" onClick={handleRestoreFullGraphView} type="button">
+                Restore Full View
+              </button>
+            ) : null}
+            <button className="toolbar-button" onClick={() => setWorkspace("data_laboratory")} type="button">
+              Open Data Laboratory
+            </button>
+          </div>
+        ) : null}
         <div className="toolbar">
-          <button className="primary-button" disabled={layoutRunState.running || selectedLayoutMeta?.status !== "runnable"} onClick={handleRunLayout} type="button">
-            Run Layout
+          <button
+            aria-describedby={layoutStatusCopy ? layoutStatusId : undefined}
+            aria-disabled={runDisabled}
+            className="primary-button"
+            disabled={runDisabled}
+            onClick={handleRunLayout}
+            title={runTitle}
+            type="button"
+          >
+            {runLabel}
           </button>
           <button className="toolbar-button" disabled={!layoutRunState.running} onClick={handlePauseResumeLayout} type="button">
             {layoutRunState.paused ? "Resume" : "Pause"}
@@ -4085,6 +4301,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         onSelectNode={handleSelectNode}
         onSelectEdge={handleSelectEdge}
         onClearSelection={handleClearSelection}
+        focusNodeIds={graphFocusNodeIds}
+        focusVersion={graphFocusToken}
       />
     );
 
@@ -4104,6 +4322,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         onSelectEdge={handleSelectEdge}
         onClearSelection={handleClearSelection}
         ariaLabel="Modified graph canvas"
+        focusNodeIds={graphFocusNodeIds}
+        focusVersion={graphFocusToken}
       />
     );
 
@@ -4611,7 +4831,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           <span className="workbench-subtitle">Gephi desktop replication with EDEN provenance discipline</span>
         </div>
         <div className="header-badges">
-          <span className={badgeClass("observed")}>{data.liveEnabled ? "Live API" : "Static export"}</span>
+          <span className={badgeClass("observed")}>{runtimeModeLabel(data.liveEnabled, Boolean(hybridMode))}</span>
           <span className={badgeClass("derived")}>View state != evidence</span>
           {data.staleBuildWarning ? <span className={badgeClass("warning")}>Build warning: {data.staleBuildWarning}</span> : null}
         </div>
@@ -4909,6 +5129,141 @@ function buildCoordinateMap(nodes: GraphNode[], coordinateMode: string, snapshot
     else map[node.id] = node.derived_coords?.[coordinateMode] ?? node.render_coords?.force ?? { x: 0, y: 0 };
   }
   return map;
+}
+
+function selectionGraphSlice(nodes: GraphNode[], edges: GraphEdge[], selectedNodeIds: string[]): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  if (!selectedNodeIds.length) return { nodes: [], edges: [] };
+  const selected = new Set(selectedNodeIds);
+  return {
+    nodes: nodes.filter((node) => selected.has(node.id)),
+    edges: edges.filter((edge) => selected.has(edge.source) && selected.has(edge.target)),
+  };
+}
+
+function selectVisibleLayoutSampleNodeIds(nodes: GraphNode[], edges: GraphEdge[], limit: number): string[] {
+  const boundedLimit = Math.max(0, Math.floor(limit));
+  if (!nodes.length || boundedLimit === 0) return [];
+  if (nodes.length <= boundedLimit) return nodes.map((node) => node.id);
+
+  const adjacency = new Map<string, Set<string>>();
+  const nodeLookup = new Map(nodes.map((node) => [node.id, node]));
+  for (const node of nodes) adjacency.set(node.id, new Set());
+  for (const edge of edges) {
+    adjacency.get(edge.source)?.add(edge.target);
+    adjacency.get(edge.target)?.add(edge.source);
+  }
+
+  const seedNode =
+    [...nodes]
+      .sort((left, right) => {
+        const degreeDelta = visibleLayoutSampleDegree(right, adjacency) - visibleLayoutSampleDegree(left, adjacency);
+        if (degreeDelta !== 0) return degreeDelta;
+        return visibleLayoutSampleRadius(left) - visibleLayoutSampleRadius(right);
+      })
+      .find((node) => adjacency.get(node.id)?.size) ?? nodes[0];
+  const seedCoords = visibleLayoutSampleCoords(seedNode);
+
+  const orderedNeighbors = (nodeId: string): string[] =>
+    [...(adjacency.get(nodeId) ?? [])].sort((leftId, rightId) => {
+      const leftNode = nodeLookup.get(leftId);
+      const rightNode = nodeLookup.get(rightId);
+      const degreeDelta = visibleLayoutSampleDegree(rightNode, adjacency) - visibleLayoutSampleDegree(leftNode, adjacency);
+      if (degreeDelta !== 0) return degreeDelta;
+      const distanceDelta = visibleLayoutSampleDistance(leftNode, seedCoords) - visibleLayoutSampleDistance(rightNode, seedCoords);
+      if (distanceDelta !== 0) return distanceDelta;
+      return String(leftId).localeCompare(String(rightId));
+    });
+
+  const visited = new Set<string>([seedNode.id]);
+  const queue = [seedNode.id];
+  const result: string[] = [];
+  while (queue.length && result.length < boundedLimit) {
+    const nodeId = queue.shift()!;
+    result.push(nodeId);
+    for (const neighborId of orderedNeighbors(nodeId)) {
+      if (visited.has(neighborId)) continue;
+      visited.add(neighborId);
+      queue.push(neighborId);
+    }
+  }
+
+  if (result.length >= 2 || result.length === nodes.length) return result;
+
+  const fallback = [...nodes]
+    .sort((left, right) => visibleLayoutSampleDistance(left, seedCoords) - visibleLayoutSampleDistance(right, seedCoords))
+    .slice(0, boundedLimit)
+    .map((node) => node.id);
+  return fallback;
+}
+
+function visibleLayoutSampleDegree(node: GraphNode | undefined, adjacency: Map<string, Set<string>>): number {
+  if (!node) return -1;
+  return adjacency.get(node.id)?.size ?? Number(node.degree ?? 0);
+}
+
+function visibleLayoutSampleCoords(node: GraphNode | undefined): { x: number; y: number } {
+  return {
+    x: Number(node?.render_coords?.force?.x ?? node?.derived_coords?.spectral?.x ?? 0),
+    y: Number(node?.render_coords?.force?.y ?? node?.derived_coords?.spectral?.y ?? 0),
+  };
+}
+
+function visibleLayoutSampleDistance(node: GraphNode | undefined, origin: { x: number; y: number }): number {
+  const coords = visibleLayoutSampleCoords(node);
+  return Math.hypot(coords.x - origin.x, coords.y - origin.y);
+}
+
+function visibleLayoutSampleRadius(node: GraphNode | undefined): number {
+  const coords = visibleLayoutSampleCoords(node);
+  return Math.hypot(coords.x, coords.y);
+}
+
+function resolveLayoutRunContext(nodes: GraphNode[], edges: GraphEdge[], selectedNodeIds: string[], heavyCap: number): LayoutRunContext {
+  const boundedCap = Number.isFinite(heavyCap) && heavyCap > 0 ? Math.floor(heavyCap) : 320;
+  if (!nodes.length) {
+    return {
+      scope: "blocked",
+      nodes: [],
+      edges: [],
+      helperText: "No visible nodes match the current filters. Reset or widen the view before running a layout.",
+    };
+  }
+  if (nodes.length <= boundedCap) {
+    return {
+      scope: "full",
+      nodes,
+      edges,
+      helperText: "",
+    };
+  }
+
+  const selectedSlice = selectionGraphSlice(nodes, edges, selectedNodeIds);
+  const visibleCount = nodes.length.toLocaleString("en-US");
+  const capLabel = boundedCap.toLocaleString("en-US");
+  const selectedCount = selectedSlice.nodes.length.toLocaleString("en-US");
+
+  if (selectedSlice.nodes.length >= 2 && selectedSlice.nodes.length <= boundedCap) {
+    return {
+      scope: "selection",
+      nodes: selectedSlice.nodes,
+      edges: selectedSlice.edges,
+      helperText: `Current filtered view has ${visibleCount} nodes, above the browser layout cap of ${capLabel}. Running on the selected subgraph (${selectedCount} nodes) instead.`,
+    };
+  }
+  if (selectedSlice.nodes.length > boundedCap) {
+    return {
+      scope: "blocked",
+      nodes: [],
+      edges: [],
+      helperText: `Selected subgraph has ${selectedCount} nodes, above the browser layout cap of ${capLabel}. Reduce the selection or filter the graph further.`,
+    };
+  }
+  return {
+    scope: "blocked",
+    nodes: [],
+    edges: [],
+    helperText: `Current filtered view has ${visibleCount} nodes, above the browser layout cap of ${capLabel}. Select 2-${capLabel} nodes or filter the graph first.`,
+  };
 }
 
 function renderLayoutSettingsFields(

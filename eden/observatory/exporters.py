@@ -394,9 +394,35 @@ class ObservatoryExporter:
         self.tanakh_service = tanakh_service
         self.hum_provider = hum_provider
 
-    def export_all(self, *, experiment_id: str, session_id: str | None, out_dir: Path) -> dict[str, str]:
+    def export_shell_bundle(self, *, experiment_id: str, session_id: str | None, out_dir: Path) -> dict[str, str]:
         out_dir.mkdir(parents=True, exist_ok=True)
         copy_frontend_assets(out_dir)
+        html_path = out_dir / "observatory_index.html"
+        html_path.write_text(
+            self._shell_html(
+                title="EDEN Observatory",
+                bootstrap=self._shell_bootstrap(
+                    experiment_id=experiment_id,
+                    session_id=session_id,
+                    initial_surface="overview",
+                ),
+            ),
+            encoding="utf-8",
+        )
+        self.store.record_export_artifact(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            artifact_type="observatory_index_html",
+            path=html_path,
+        )
+        return {"observatory_index_html": str(html_path)}
+
+    def export_all(self, *, experiment_id: str, session_id: str | None, out_dir: Path) -> dict[str, str]:
+        shell_paths = self.export_shell_bundle(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            out_dir=out_dir,
+        )
         snapshot = self.store.graph_snapshot(experiment_id)
         basin_paths, basin_payload = self.export_behavioral_basin(
             experiment_id=experiment_id,
@@ -453,7 +479,7 @@ class ObservatoryExporter:
             tanakh_paths=tanakh_paths,
             tanakh_payload=tanakh_payload,
         )
-        return {**graph_paths, **basin_paths, **geometry_paths, **measurement_paths, **tanakh_paths, **index_paths}
+        return {**shell_paths, **graph_paths, **basin_paths, **geometry_paths, **measurement_paths, **tanakh_paths, **index_paths}
 
     def export_graph_knowledge_base(
         self,
