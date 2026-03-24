@@ -12,6 +12,8 @@ from .ontology_projection import project_node_ontology
 from .regard import explicit_feedback_relevance, regard_breakdown, selection_score
 from .utils import cosine_similarity, now_utc, safe_excerpt
 
+CONVERSATIONAL_SOURCE_KINDS = {"feedback", "turn_adam", "turn_user"}
+
 
 @dataclass(slots=True)
 class CandidateScore:
@@ -166,6 +168,129 @@ class RetrievalService:
             node["_kind"] = "memode"
         return memes + memodes
 
+    def _score_document_chunk_candidate(self, row: dict[str, Any], *, query: str) -> CandidateScore:
+        chunk_metadata: dict[str, Any]
+        document_metadata: dict[str, Any]
+        try:
+            chunk_metadata = json.loads(row.get("chunk_metadata_json") or "{}")
+        except json.JSONDecodeError:
+            chunk_metadata = {}
+        try:
+            document_metadata = json.loads(row.get("document_metadata_json") or "{}")
+        except json.JSONDecodeError:
+            document_metadata = {}
+
+        text = str(row.get("chunk_text") or "")
+        document_title = str(row.get("document_title") or "document")
+        provenance = str(document_metadata.get("source_path") or row.get("document_path") or document_title)
+        briefing = str(document_metadata.get("briefing") or "")
+        page_number_raw = row.get("page_number")
+        try:
+            page_number = int(page_number_raw) if page_number_raw is not None else None
+        except (TypeError, ValueError):
+            page_number = None
+        label = f"{document_title} p.{page_number}" if page_number is not None else document_title
+        semantic = cosine_similarity(query, f"{document_title} {briefing} {text}")
+        quality_score_raw = chunk_metadata.get("quality_score", document_metadata.get("quality_score"))
+        try:
+            quality_score = float(quality_score_raw) if quality_score_raw is not None else None
+        except (TypeError, ValueError):
+            quality_score = None
+        quality_flags = [str(flag) for flag in chunk_metadata.get("quality_flags", []) if str(flag).strip()]
+        quality_bonus = (quality_score if quality_score is not None else 1.0) * 0.35
+        selection = max(0.05, semantic * 1.35 + quality_bonus)
+        return CandidateScore(
+            node_kind="document_chunk",
+            display_kind="document_excerpt",
+            node_id=str(row["chunk_id"]),
+            label=label,
+            domain="knowledge",
+            scope="global",
+            source_kind="document_chunk",
+            entity_type="document_excerpt",
+            speech_act_mode="constative",
+            semantic_similarity=semantic,
+            activation=0.0,
+            regard=0.0,
+            session_bias=0.0,
+            explicit_feedback=0.0,
+            scope_penalty=0.0,
+            membrane_penalty=0.0,
+            selection=selection,
+            breakdown={
+                "reward": 0.0,
+                "evidence": 0.0,
+                "coherence": 0.0,
+                "persistence": 0.0,
+                "decay": 0.0,
+                "isolation_penalty": 0.0,
+                "risk": 0.0,
+                "bm25_score": float(row.get("bm25_score", 0.0)),
+                "quality_bonus": round(quality_bonus, 4),
+            },
+            text=text,
+            provenance=provenance,
+            document_id=str(row["document_id"]),
+            document_title=document_title,
+            page_number=page_number,
+            evidence_excerpt=safe_excerpt(text, limit=220),
+            quality_score=quality_score,
+            quality_flags=quality_flags,
+        )
+
+    def _select_candidates(self, scored: list[CandidateScore], *, settings: RuntimeSettings) -> list[CandidateScore]:
+        scored.sort(key=lambda item: item.selection, reverse=True)
+        behavior = [item for item in scored if item.domain == "behavior"]
+        knowledge = [item for item in scored if item.domain != "behavior"]
+        document_chunks = [item for item in knowledge if item.node_kind == "document_chunk"]
+        other_document_knowledge = [item for item in knowledge if item.document_id and item.node_kind != "document_chunk"]
+        document_knowledge = document_chunks + other_document_knowledge
+        other_knowledge = [
+            item for item in knowledge if not item.document_id and item.source_kind not in CONVERSATIONAL_SOURCE_KINDS
+        ]
+        conversational_knowledge = [
+            item for item in knowledge if not item.document_id and item.source_kind in CONVERSATIONAL_SOURCE_KINDS
+        ]
+        nonconversational_behavior = [item for item in behavior if item.source_kind not in CONVERSATIONAL_SOURCE_KINDS]
+        conversational_behavior = [item for item in behavior if item.source_kind in CONVERSATIONAL_SOURCE_KINDS]
+
+        selected: list[CandidateScore] = []
+        if document_knowledge:
+            document_target = min(len(document_knowledge), max(2, math.ceil(settings.max_context_items / 2)))
+            selected.extend(document_knowledge[:document_target])
+            remaining_slots = settings.max_context_items - len(selected)
+            if remaining_slots > 0 and nonconversational_behavior:
+                selected.extend(nonconversational_behavior[:1])
+                remaining_slots = settings.max_context_items - len(selected)
+            if remaining_slots > 0:
+                selected.extend(other_knowledge[:remaining_slots])
+                remaining_slots = settings.max_context_items - len(selected)
+            if remaining_slots > 0:
+                selected.extend(nonconversational_behavior[1 : 1 + remaining_slots])
+                remaining_slots = settings.max_context_items - len(selected)
+            if remaining_slots > 0:
+                selected.extend(conversational_knowledge[:remaining_slots])
+                remaining_slots = settings.max_context_items - len(selected)
+            if remaining_slots > 0:
+                selected.extend(conversational_behavior[:remaining_slots])
+        else:
+            behavior_target = max(2, math.ceil(settings.max_context_items / 3))
+            selected.extend(behavior[:behavior_target])
+            remaining_slots = settings.max_context_items - len(selected)
+            selected.extend(knowledge[:remaining_slots])
+
+        if len(selected) < settings.max_context_items:
+            selected.extend(scored[: settings.max_context_items])
+
+        deduped: list[CandidateScore] = []
+        seen_ids: set[str] = set()
+        for item in selected:
+            if item.node_id in seen_ids:
+                continue
+            seen_ids.add(item.node_id)
+            deduped.append(item)
+        return deduped[: settings.max_context_items]
+
     def retrieve(
         self,
         *,
@@ -177,6 +302,7 @@ class RetrievalService:
         graph_metrics, health_metrics = self.build_graph_metrics(experiment_id)
         raw_memes = [self._expand_node(node) for node in self.store.search_memes(experiment_id, query, limit=settings.retrieval_depth)]
         raw_memodes = [self._expand_node(node) for node in self.store.search_memodes(experiment_id, query, limit=settings.retrieval_depth)]
+        raw_document_chunks = self.store.search_document_chunks(experiment_id, query, limit=settings.retrieval_depth)
         for node in raw_memes:
             node["_kind"] = "meme"
         for node in raw_memodes:
@@ -274,24 +400,10 @@ class RetrievalService:
                     quality_flags=quality_flags,
                 )
             )
+        for row in raw_document_chunks:
+            scored.append(self._score_document_chunk_candidate(row, query=query))
 
-        scored.sort(key=lambda item: item.selection, reverse=True)
-        behavior = [item for item in scored if item.domain == "behavior"]
-        knowledge = [item for item in scored if item.domain != "behavior"]
-        selected: list[CandidateScore] = []
-        behavior_target = max(2, math.ceil(settings.max_context_items / 3))
-        selected.extend(behavior[:behavior_target])
-        remaining_slots = settings.max_context_items - len(selected)
-        selected.extend(knowledge[:remaining_slots])
-        if len(selected) < settings.max_context_items:
-            selected.extend(scored[len(selected) : settings.max_context_items])
-        deduped: list[CandidateScore] = []
-        seen_ids: set[str] = set()
-        for item in selected:
-            if item.node_id in seen_ids:
-                continue
-            seen_ids.add(item.node_id)
-            deduped.append(item)
+        deduped = self._select_candidates(scored, settings=settings)
 
         items = [asdict(item) for item in deduped]
         prompt_context_parts: list[str] = []
@@ -315,8 +427,16 @@ class RetrievalService:
                 continue
             prompt_context_parts.append(self._format_document_group(document_groups[str(value)]))
 
+        trace_candidates = list(deduped)
+        selected_ids = {candidate.node_id for candidate in deduped}
+        for candidate in sorted(scored, key=lambda item: item.selection, reverse=True):
+            if len(trace_candidates) >= 10:
+                break
+            if candidate.node_id in selected_ids:
+                continue
+            trace_candidates.append(candidate)
         trace = []
-        for candidate in scored[: min(10, len(scored))]:
+        for candidate in trace_candidates[:10]:
             trace.append(
                 {
                     "label": candidate.label,

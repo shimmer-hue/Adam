@@ -354,13 +354,23 @@ def test_start_session_normalizes_legacy_knowledge_rows(runtime) -> None:
     assert session_meta["session_graph_normalization"]["edges_added"] >= 1
 
 
-def test_start_session_keeps_mlx_wakeup_review_opt_in_by_default(runtime, monkeypatch) -> None:
+def test_start_session_uses_mlx_wakeup_review_by_default_when_ready(runtime, monkeypatch) -> None:
     runtime.settings.model_backend = "mlx"
     monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
     monkeypatch.setattr(
         runtime,
         "_adam_identity_relation_review",
-        lambda **kwargs: (_ for _ in ()).throw(AssertionError("session-start MLX review should stay gated by default")),
+        lambda **kwargs: [
+            {
+                "source_label": "Michel Foucault",
+                "source_entity_type": "author",
+                "target_label": "The Archaeology of Knowledge",
+                "target_entity_type": "work",
+                "edge_type": "AUTHOR_OF",
+                "confidence": 0.94,
+                "sentence_excerpt": "Michel Foucault wrote The Archaeology of Knowledge.",
+            }
+        ],
     )
 
     experiment = runtime.initialize_experiment("blank")
@@ -380,10 +390,10 @@ def test_start_session_keeps_mlx_wakeup_review_opt_in_by_default(runtime, monkey
     provenance = json.loads(author_edge["provenance_json"] or "{}")
     session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
 
-    assert provenance["assertion_origin"] == "legacy_normalization_deterministic"
-    assert session_meta["session_graph_normalization"]["mode"] == "deterministic"
-    assert session_meta["session_graph_normalization"]["mlx_review_gate"] == "disabled_by_default"
-    assert session_meta["session_graph_wakeup"]["mode"] == "deterministic"
+    assert provenance["assertion_origin"] == "adam_identity_mlx"
+    assert session_meta["session_graph_normalization"]["mode"] == "adam_identity_mlx"
+    assert session_meta["session_graph_normalization"]["mlx_review_gate"] == "enabled_by_default"
+    assert session_meta["session_graph_wakeup"]["mode"] == "adam_identity_mlx"
 
 
 def test_start_session_uses_adam_identity_mlx_review_for_graph_normalization(runtime, monkeypatch) -> None:
@@ -615,6 +625,75 @@ def test_start_session_uses_adam_identity_mlx_for_behavior_taxonomy(runtime, mon
     assert audited_metadata["memeplex_hint"] == "reflective repair chain"
     assert session_meta["session_graph_taxonomy"]["mode"] == "adam_identity_mlx"
     assert session_meta["session_graph_taxonomy"]["mlx_review_applied_bundles"] >= 1
+
+
+def test_start_session_uses_adam_identity_mlx_for_coherence_reweave(runtime, monkeypatch) -> None:
+    runtime.settings.model_backend = "mlx"
+    monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
+
+    experiment = runtime.initialize_experiment("blank")
+    first = runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Offer a repair plan",
+        text="Offer a repair plan before finalizing an answer.",
+        domain="behavior",
+        source_kind="turn_adam",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={"origin": "adam", "candidate_kind": "phrase"},
+    )
+    second = runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Compare against the graph",
+        text="Compare the answer against the graph before persisting it.",
+        domain="behavior",
+        source_kind="turn_adam",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={"origin": "adam", "candidate_kind": "phrase"},
+    )
+    runtime.store.set_edge(
+        experiment_id=experiment["id"],
+        src_kind="meme",
+        src_id=first["id"],
+        dst_kind="meme",
+        dst_id=second["id"],
+        edge_type="CO_OCCURS_WITH",
+        provenance={"actor": "adam", "assertion_origin": "auto_derived", "evidence_label": "AUTO_DERIVED", "confidence": 1.0},
+    )
+    repair_memode = runtime.store.upsert_memode(
+        experiment_id=experiment["id"],
+        label="repair weave",
+        member_ids=[first["id"], second["id"]],
+        summary="A repair-first weave that checks the graph before finalizing.",
+        domain="behavior",
+        metadata={"origin": "adam"},
+    )
+
+    monkeypatch.setattr(
+        runtime,
+        "_adam_identity_coherence_reweave_review",
+        lambda candidates: {
+            "anchor_memode_ids": [repair_memode["id"]],
+            "focus_summary": "Wake the session through the repair weave first.",
+            "confidence": 0.93,
+        },
+    )
+
+    before = runtime.store.get_memode(repair_memode["id"])
+    before_usage = int(before.get("usage_count") or 0)
+
+    session = runtime.start_session(experiment["id"], title="Coherence wake")
+    after = runtime.store.get_memode(repair_memode["id"])
+    session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
+    trace_events = runtime.store.list_trace_events(experiment["id"], session_id=session["id"])
+
+    assert int(after.get("usage_count") or 0) > before_usage
+    assert session_meta["session_graph_coherence"]["mode"] == "adam_identity_mlx"
+    assert session_meta["session_graph_coherence"]["mlx_review_applied"] is True
+    assert session_meta["session_graph_coherence"]["anchor_memode_ids"] == [repair_memode["id"]]
+    assert session_meta["session_graph_coherence"]["focus_summary"] == "Wake the session through the repair weave first."
+    assert any(event["event_type"] == "GRAPH_COHERENCE_REWEAVE" for event in trace_events)
 
 
 def test_session_state_snapshot_includes_resolved_profile_before_first_turn(runtime) -> None:

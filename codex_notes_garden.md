@@ -8157,3 +8157,177 @@ Remaining uncertainties:
 There is still an unrelated modified `/Users/brianray/Adam/.DS_Store` in the working tree that I did not touch. The new `requirements.txt` is intentionally a thin wrapper, not a pinned dependency lock.
 Next shortest proof path:
 If reproducible collaborator installs become necessary, add a separate lock-generation workflow or pinned requirements artifact instead of flattening `pyproject.toml` by hand.
+## [2026-03-24 09:42:48 EDT] PRE-FLIGHT
+Operator task:
+Convert `/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo- copy.pdf` into a Markdown file.
+Task checksum:
+`12b6232ab6d3214a42e1a30a81c4b41d3f270df65b7a32ae0e4d40b761370398`
+Repo situation:
+Working tree is dirty only at unrelated `/Users/brianray/Adam/.DS_Store`. No existing Markdown sibling for the target PDF was found. Do not disturb unrelated files.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`
+Natural-language contracts in force:
+PDF extraction order is `pdfplumber`, `pypdf`, then `pdftotext -layout` with page-level scoring and explicit failure if extraction quality is unusable. Provenance discipline requires retaining page order and parser-visible evidence surfaces rather than overclaiming layout fidelity.
+Files/modules likely in scope:
+`/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo- copy.pdf`; `/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo- copy.md`; `/Users/brianray/Adam/eden/ingest/extractors.py`; `/Users/brianray/Adam/codex_notes_garden.md`
+Status register:
+- Implemented:
+  - Repo already has page-scored PDF extraction logic in `/Users/brianray/Adam/eden/ingest/extractors.py`.
+  - Local dependencies and CLI support are present for `pdfplumber`, `pypdf`, and `pdftotext`.
+- Instrumented:
+  - `docs/DOCUMENT_INGEST.md` documents parser order, quality scoring, and provenance fields.
+- Conceptual:
+  - Markdown heading inference beyond the extractor's normalized page text is not yet justified for this file.
+- Unknown:
+  - Whether this PDF's typography is consistent enough for strong heading reconstruction instead of plain page-bounded markdown text.
+Risks / invariants:
+Use the repo-local `.venv`. Preserve page order. Do not invent semantic structure not supported by the extracted text. Keep the output adjacent to the source PDF unless the conversion path forces a different artifact location.
+Evidence plan:
+Write the Markdown file from the extractor's selected page texts, then verify existence, page count coverage, parser mix, and sample output from the beginning, middle, and end of the file.
+Shortest proof path:
+Run the existing extractor against the target PDF in `.venv`, serialize one Markdown section per page to the sibling `.md`, and inspect representative slices plus file stats.
+## [2026-03-24 09:46:44 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo- copy.md`; `/Users/brianray/Adam/codex_notes_garden.md`
+Specs changed:
+None. Existing ingest contract in `/Users/brianray/Adam/docs/DOCUMENT_INGEST.md` was preserved.
+Natural-language contracts added/revised/preserved:
+Preserved the page-scored PDF extraction contract and provenance discipline by writing a sibling Markdown artifact with page-bounded sections, parser-strategy metadata, and no invented structural claims beyond page headings. No repo runtime or ontology contract changed.
+Behavior implemented or modified:
+Created `/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo- copy.md` from the target PDF using the existing extractor stack. Added a narrow cleanup for page 2 to replace `(cid:3)` control-token noise with cleaner text from the alternate `pdftotext -layout` extraction path.
+Evidence produced (tests / traces / commands / exports):
+Ran `./.venv/bin/python` against `eden.ingest.extractors.iter_extract_pdf` to generate the Markdown artifact. Command output reported `pages=376`, `parser_counts={'pdfplumber': 375, 'pypdf': 1}`, `mean_quality=0.9935`, and output size `bytes=727174` before the page-2 cleanup patch. Verified sampled content with `sed -n '1,80p'` and targeted reads around `## Page 188` and `## Page 376`. Rendered PDF page 1 via `pdftoppm -f 1 -l 1 -png` and visually checked it against the Markdown title page, then removed the temporary PNG. Verified final artifact integrity with `ls -lh`, `text.count('\n## Page ') == 376`, `starts_with_title=True`, `contains_page_376=True`, and `rg` returning no remaining `(cid:...)` tokens.
+Status register changes:
+- Implemented:
+  - Sibling Markdown conversion artifact now exists for the requested PDF with 376 page sections.
+  - Page 2 token noise was cleaned without changing the rest of the extracted document.
+- Instrumented:
+  - The Markdown header records source path, extracted page count, parser strategy, parser counts, mean quality score, and observed quality flags.
+- Conceptual:
+  - Semantic heading reconstruction beyond page boundaries was not attempted.
+- Unknown:
+  - Whether the operator wants additional editorial cleanup for dissertation front-matter spacing, bibliography formatting, or chapter-heading normalization beyond faithful extraction.
+Truth-table / limitations updates:
+None. No product capability status changed.
+Remaining uncertainties:
+The artifact is page-faithful, not layout-faithful Markdown; line-break normalization necessarily collapses some original typography. The working tree still contains unrelated `/Users/brianray/Adam/.DS_Store` changes that I did not touch.
+Next shortest proof path:
+If higher editorial fidelity is needed, run a second pass that reconstructs chapter headings, figure lists, and bibliography entries from the generated Markdown rather than re-extracting the PDF from scratch.
+## [2026-03-24 09:56:40 EDT] PRE-FLIGHT
+Operator task:
+Debug dissertation ingest/retrieval so ingested dissertation material is retrieved as graph knowledge/behavior rather than being overshadowed by memoir references and prior Adam confabulations.
+Task checksum:
+Confirm live graph state for dissertation vs memoir artifacts, patch retrieval to surface document-backed evidence authoritatively, and prove the fix with a regression test.
+Repo situation:
+Working tree is already dirty with unrelated `.DS_Store` changes and prior append-only note history in `codex_notes_garden.md`; live graph data in `data/eden.db` shows the dissertation markdown ingested on 2026-03-24 while the dissertation PDF is absent from `documents`.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`; `/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`; `/Users/brianray/Adam/docs/GRAPH_SCHEMA.md`; `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts in force:
+Ordinary external documents ingest into `knowledge`; active-set assembly must preserve document-backed evidence provenance; memes are first-class and memodes are derived; summaries are not evidence.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/retrieval.py`; `/Users/brianray/Adam/eden/storage/graph_store.py`; `/Users/brianray/Adam/tests/test_ingest.py`; `/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Dissertation markdown sidecar ingest into `documents` and `document_chunks`.
+  - PDF extraction for `/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo- copy.pdf` succeeds locally with 376 pages.
+- Instrumented:
+  - Trace events prove dissertation markdown ingest completed with 1,143 chunks and 6,837 derived memes.
+- Conceptual:
+  - Dynamic AI-driven graph uptake from ingested dissertation content as reliable retrieval behavior.
+- Unknown:
+  - Whether the dissertation PDF was ever submitted through the live ingest UI path.
+  - Whether current retrieval can surface dissertation chapter/title evidence ahead of session chatter without code changes.
+Risks / invariants:
+Do not break existing prompt-context grouping, ontology projection, or explicit feedback retrieval; keep document provenance explicit and avoid overclaiming PDF ingest state that is not in the DB.
+Evidence plan:
+Add deterministic regression coverage for document-priority retrieval under conversational contamination, then run targeted ingest/retrieval tests and full `./.venv/bin/pytest -q` if bounded.
+Shortest proof path:
+Patch retrieval/store search to include document chunks and reserve document-backed knowledge slots, reproduce the dissertation-style query in tests, and confirm prompt context surfaces dissertation evidence instead of memoir/session chatter.
+## [2026-03-24 10:09:33 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/retrieval.py`; `/Users/brianray/Adam/eden/storage/graph_store.py`; `/Users/brianray/Adam/tests/test_ingest.py`; `/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`; `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`; `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the contract that ordinary external documents ingest into `knowledge` and that prompt assembly surfaces document-backed evidence with explicit provenance. Revised the retrieval contract to state that persisted `document_chunks` are a direct active-set substrate, not merely a staging area for heuristic meme extraction.
+Behavior implemented or modified:
+Added `document_chunks` FTS search in the graph store and wired retrieval to score direct document excerpts alongside meme/memode candidates. Active-set selection now reserves document-backed knowledge slots ahead of conversational `turn_user` / `turn_adam` / `feedback` chatter when document evidence exists, and prompt-context trace ordering now includes selected document-backed items first. Added a regression test that simulates dissertation retrieval being polluted by a fabricated chapter-title answer and proves the dissertation document block now leads the prompt.
+Evidence produced (tests / traces / commands / exports):
+Ran `./.venv/bin/python -m py_compile eden/retrieval.py eden/storage/graph_store.py tests/test_ingest.py` successfully. Ran `./.venv/bin/pytest -q tests/test_ingest.py -k 'retrieval'` twice after the final selector/query refinements; both runs passed with `2 passed, 9 deselected`. Queried the live Adam graph via `build_runtime(...).retrieval_service.retrieve(...)` for `A Bad Trip in Difference dissertation first chapter title`; after the patch, the first active-set items were `document_chunk` rows from `/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo-.md`, and the first prompt block was `[KNOWLEDGE:document] A_Bad_Trip_in_Difference_Neo-.md`. Ran full `./.venv/bin/pytest -q` twice; both runs finished with the same pre-existing failure at `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing. No new suite failures were introduced by this turn.
+Status register changes:
+- Implemented:
+  - Direct `document_chunks` retrieval path.
+  - Document-priority active-set selection under conversational contamination.
+  - Regression coverage for dissertation-style retrieval pollution.
+- Instrumented:
+  - Live graph inspection now proves the dissertation markdown document block wins first-position prompt assembly for the failing query shape.
+- Conceptual:
+  - End-to-end “dynamic AI-driven uptake” remains broader than this fix; this turn repaired retrieval grounding, not the entirety of downstream answer-generation guarantees.
+- Unknown:
+  - Whether the dissertation PDF was ever submitted through the live ingest UI path, since no PDF `documents` row or dissertation-PDF trace event exists in `data/eden.db`.
+Truth-table / limitations updates:
+Added `Document-chunk retrieval path | Implemented` to `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`. Revised `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to note that briefing text is still not separately operator-tunable even though retrieval now searches persisted `document_chunks` directly.
+Remaining uncertainties:
+The dissertation PDF extractor is healthy locally, but the live graph still contains no dissertation PDF row, so the original PDF-ingest attempt cannot be reconstructed from DB evidence. The current document-chunk ranking still surfaces dissertation-grounded text before memoir material, but it does not yet guarantee the exact table-of-contents chunk is the very first excerpt for every chapter-title query. The repo-wide test suite remains non-green until the missing memoir PDF fixture is restored or the fixture test is deliberately guarded/retired.
+Next shortest proof path:
+Restore or retire `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` so repo-wide ingest proof goes green, then add one more retrieval regression that asserts chapter-heading chunks outrank generic dissertation mentions when the query explicitly asks for chapter titles.
+## [2026-03-24 10:18:35 EDT] PRE-FLIGHT
+Operator task:
+Make document ingest machine-facilitated by Adam qua graph plus MLX review rather than only deterministic heuristics, and make new-session graph wake-up run a bounded Adam-identity coherence reorganization by default.
+Task checksum:
+Promote existing bounded MLX review architecture from optional repair-only status into the primary ingest contextualization and session-start coherence path while preserving the ontology that memodes are behavior-only derived structures.
+Repo situation:
+Working tree is already dirty from the prior retrieval patch plus unrelated `.DS_Store` drift. The current codebase still routes document ingest through deterministic `extract_semantic_candidates(...)`, and session-start MLX wake-up remains env-gated opt-in despite the runtime already containing bounded JSON review hooks.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/PROJECT_CHARTER.md`; `/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md`; `/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`; `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`; `/Users/brianray/Adam/docs/REGARD_MECHANISM.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts in force:
+Documents ingest into `knowledge`; memodes are behavior-only second-order structures; session-start wake-up is trace-visible and bounded; the real runtime backend is MLX; summaries are not evidence.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/runtime.py`; `/Users/brianray/Adam/eden/ingest/pipeline.py`; `/Users/brianray/Adam/tests/test_ingest.py`; `/Users/brianray/Adam/tests/test_runtime_e2e.py`; `/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`; `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Deterministic document chunking and heuristic knowledge extraction.
+  - Bounded Adam-identity MLX review hooks for legacy knowledge normalization and behavior-taxonomy wake-up.
+- Instrumented:
+  - Session-start trace surfaces already record graph normalization, taxonomy, and wake-up audit reports.
+- Conceptual:
+  - Every ingest being machine-facilitated relative to existing graph experience.
+  - Default Adam-identity graph coherence rearrangement at new-session boot.
+- Unknown:
+  - Whether the existing MLX review hooks are stable enough on this machine when moved from opt-in to default bounded use.
+  - What the smallest operator-honest surface is for document-derived memetic contextualization without violating the knowledge/behavior split.
+Risks / invariants:
+Do not silently promote knowledge constatives into memodes. Keep every model-mediated pass bounded, trace-visible, and fallback-safe when MLX is unavailable, abstains, or returns invalid JSON. Preserve deterministic extraction as scaffold/evidence rather than deleting it.
+Evidence plan:
+Implement default MLX-backed document contextualization plus default session-start MLX wake-up review, then add/update regression tests for ingest and session-start metadata/traces and run targeted plus full pytest.
+Shortest proof path:
+Reuse the existing JSON-review pattern in `eden/runtime.py` to contextualize ingested documents against existing graph experience, index resulting behavior memes/memodes as document-contextual memetic lenses, flip session-start MLX wake-up to default bounded use with explicit fallback gates, and prove both changes in `tests/test_ingest.py` and `tests/test_runtime_e2e.py`.
+## [2026-03-24 10:33:02 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/runtime.py`; `/Users/brianray/Adam/eden/storage/graph_store.py`; `/Users/brianray/Adam/tests/test_ingest.py`; `/Users/brianray/Adam/tests/test_runtime_e2e.py`; `/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`; `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/DOCUMENT_INGEST.md`; `/Users/brianray/Adam/docs/TURN_LOOP_AND_MEMBRANE.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Revised the ingest contract so document knowledge ingest remains deterministic/provenance-backed while Adam-identity MLX adds a bounded behavior-domain contextualization pass over sampled chunks plus existing graph experience. Revised the session-start wake-up contract from a two-phase, opt-in MLX repair surface to a three-phase audit with default-on MLX review when ready plus explicit deterministic fallback and a new coherence reweave trace/metadata surface. Preserved the ontology rule that memodes remain behavior-only.
+Behavior implemented or modified:
+Added `list_document_chunks(...)` in the store so runtime can sample ingested document excerpts directly. In `eden/runtime.py`, added Adam-authored document contextualization review/materialization during `ingest_document(...)`, producing behavior memes/memodes plus `CONTEXTUALIZES_DOCUMENT` edges with explicit `contextualization_origin` metadata when MLX is ready. Added a bounded session-start coherence reweave phase that selects anchor behavior memodes, touches them and their member memes, records `GRAPH_COHERENCE_REWEAVE`, and stores `session_graph_coherence`. Changed MLX wake-up gating so MLX review is enabled by default when the local model is ready; `EDEN_DISABLE_MLX_WAKEUP_REVIEW=1` is now the hard opt-out, while the legacy enable env still works as an explicit opt-in/override surface.
+Evidence produced (tests / traces / commands / exports):
+Ran `./.venv/bin/python -m py_compile eden/runtime.py eden/storage/graph_store.py` successfully. Ran `./.venv/bin/pytest -q tests/test_ingest.py -k 'contextualization or retrieval'` and got `3 passed, 9 deselected`. Ran `./.venv/bin/pytest -q tests/test_runtime_e2e.py -k 'mlx_wakeup_review_by_default_when_ready or graph_normalization or behavior_taxonomy or coherence_reweave'` and got `5 passed, 10 deselected`. Ran full `./.venv/bin/pytest -q`; result was `121 passed, 1 failed, 3 warnings` in `97.57s`. The single failure is still `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing. No new failures were introduced by this turn.
+Status register changes:
+- Implemented:
+  - Adam-authored MLX document contextualization during ingest.
+  - Default-on MLX wake-up review when the local MLX model is ready.
+  - Session-start coherence reweave with trace and session metadata.
+- Instrumented:
+  - Ingest now emits `INGEST_CONTEXTUALIZATION` traces with gate/mode/count payloads.
+  - Session start now emits `GRAPH_COHERENCE_REWEAVE` and persists `session_graph_coherence`.
+- Conceptual:
+  - Exhaustive whole-document memetic uptake remains unimplemented; the current pass is sampled and bounded.
+- Unknown:
+  - Stability of these default-on MLX review paths on the operator's live M3 runtime under large real documents beyond the bounded test harness.
+Truth-table / limitations updates:
+Added `Adam-authored document contextualization` and revised the `Session-start graph wake-up audit` rows in `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`. Updated `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to describe bounded sampled contextualization, default-on MLX gating, and the deterministic hard-off switch.
+Remaining uncertainties:
+The live MLX path was not exercised end-to-end against a real large dissertation document in this turn; proof is currently monkeypatched/regression-level plus compile/test coverage. The full suite still is not green because the memoir PDF fixture is missing, and there is an unrelated Textual coroutine warning in `tests/test_tui_smoke.py::test_tui_conversation_atlas_saves_taxonomy_and_resumes_session`.
+Next shortest proof path:
+Run one real MLX ingest of `/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo-.md` or its PDF on the operator machine, inspect the resulting `INGEST_CONTEXTUALIZATION` trace plus `CONTEXTUALIZES_DOCUMENT` edges in `data/eden.db`, then restore or retire the missing memoir PDF fixture so the repo-wide suite is fully green.

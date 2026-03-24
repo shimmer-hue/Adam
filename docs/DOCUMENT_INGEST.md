@@ -36,11 +36,17 @@ The extractor normalizes ligatures and line-wrap artifacts, scores each parser c
 3. Stream page-like text units from the extractor instead of materializing the full document payload before storage.
 4. Chunk text into manageable blocks.
 5. Store `document_chunks` with parser, page provenance, and extraction-quality metadata as chunk materialization progresses.
-6. Extract top phrases heuristically into compatibility-table semantic units. Behavior-domain material projects outward as performative `meme`; knowledge-domain material projects outward as constative `information`.
-7. Add bounded auto-derived relation edges inside each chunk when explicit surface rules fire (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES` today), then add `CO_OCCURS_WITH` fallback edges across the chunk-local member set.
-8. Materialize a memode only when a behavior-domain chunk yields at least two behavior memes plus at least one qualifying support edge, and persist explicit `MEMODE_HAS_MEMBER` membership edges from the memode to its member memes together with `supporting_edge_ids`.
-9. Mark the document `ingested` on success or `failed` with error and extraction-quality metadata if extraction/ingest aborts.
-10. If a document or turn-attached behavior bundle predates the newer audit logic, session-start graph wake-up can later:
+6. Use persisted `document_chunks` as a direct retrieval substrate, so prompt assembly can surface source-grounded evidence even when heuristic meme labels are noisy or conversational graph chatter is semantically closer to the current query.
+7. Extract top phrases heuristically into compatibility-table semantic units. Behavior-domain material projects outward as performative `meme`; knowledge-domain material projects outward as constative `information`.
+8. Add bounded auto-derived relation edges inside each chunk when explicit surface rules fire (`AUTHOR_OF`, `INFLUENCES`, `REFERENCES` today), then add `CO_OCCURS_WITH` fallback edges across the chunk-local member set.
+9. Materialize a memode only when a behavior-domain chunk yields at least two behavior memes plus at least one qualifying support edge, and persist explicit `MEMODE_HAS_MEMBER` membership edges from the memode to its member memes together with `supporting_edge_ids`.
+10. When the live backend is MLX and the local model is ready, run a bounded Adam-identity contextualization pass over sampled document chunks plus related existing graph experience:
+   - the model does not rewrite the document's constative knowledge ingest
+   - instead it proposes behavior-domain contextualization memes and, when grounded, one behavior memode describing how the document should live in Adam's graph
+   - contextualization output is persisted as `CONTEXTUALIZES_DOCUMENT` edges plus ordinary behavior memes/memodes with explicit `contextualization_origin` and confidence metadata
+   - when MLX is unavailable, abstains, or produces invalid JSON, ingest falls back to the deterministic knowledge path without inventing machine-authored behavior context
+11. Mark the document `ingested` on success or `failed` with error and extraction-quality metadata if extraction/ingest aborts.
+12. If a document or turn-attached behavior bundle predates the newer audit logic, session-start graph wake-up can later:
     - upgrade persisted knowledge rows by materializing missing `information` entities plus typed informational edges from the already-stored text
     - derive bounded behavior memodes from already-persisted behavior bundles when qualifying support edges exist
     without forcing a full re-ingest.

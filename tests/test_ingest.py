@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import eden.runtime as runtime_module
 from eden.ingest.extractors import extract_pdf, iter_extract_document, normalize_pdf_text, score_pdf_text_quality
 from eden.semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
 from eden.storage.graph_store import GraphStore
@@ -227,6 +228,147 @@ def test_retrieval_prompt_context_groups_document_evidence(runtime, sample_files
     assert f"provenance={sample_files['pdf']}" in retrieval["prompt_context"]
     assert "page=1" in retrieval["prompt_context"]
     assert "excerpt=" in retrieval["prompt_context"]
+
+
+def test_ingest_uses_adam_identity_document_contextualization_when_mlx_ready(runtime, sample_files, monkeypatch) -> None:
+    runtime.settings.model_backend = "mlx"
+    monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
+    experiment = runtime.initialize_experiment("blank")
+    constitutional_memode = next(
+        memode for memode in runtime.store.list_memodes(experiment["id"]) if memode["label"] == "ADAM constitutional stack"
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_adam_identity_document_contextualization_review",
+        lambda **kwargs: {
+            "selected_labels": ["retrieve as theory anchor", "compare against graph memory"],
+            "memode_label": "theory ingest lens",
+            "memode_summary": "Hold the document as a durable theory anchor and compare it against existing graph memory.",
+            "related_graph_labels": ["ADAM constitutional stack"],
+            "confidence": 0.91,
+            "graph_context": [
+                {
+                    "node_kind": "memode",
+                    "node_id": constitutional_memode["id"],
+                    "label": "ADAM constitutional stack",
+                    "summary": "The constitutional scaffold that defines EDEN v1.",
+                    "member_labels": [],
+                    "score": 0.88,
+                }
+            ],
+            "chunk_rows": [{"text": "EDEN remembers by external graph state rather than by weight updates.", "page_number": 1}],
+        },
+    )
+
+    result = runtime.ingest_document(
+        experiment_id=experiment["id"],
+        path=str(sample_files["md"]),
+    )
+
+    assert result["contextualization_indexed"] is True
+    assert result["contextualization_mode"] == "adam_identity_mlx"
+    assert result["contextualization_gate"] == "enabled_by_default"
+    assert result["contextualization_meme_count"] >= 2
+    assert result["contextualization_memode_count"] == 1
+
+    contextual_memode = next(
+        memode
+        for memode in runtime.store.list_memodes(experiment["id"])
+        if json.loads(memode["metadata_json"] or "{}").get("contextualization_origin") == runtime_module.DOCUMENT_CONTEXTUALIZATION_ORIGIN
+    )
+    contextual_metadata = json.loads(contextual_memode["metadata_json"] or "{}")
+    assert contextual_memode["label"] == "theory ingest lens"
+    assert contextual_metadata["contextualization_mode"] == "adam_identity_mlx"
+    assert constitutional_memode["id"] in contextual_metadata["related_graph_node_ids"]
+
+    edges = runtime.store.list_edges(experiment["id"])
+    assert any(
+        edge["edge_type"] == "CONTEXTUALIZES_DOCUMENT"
+        and edge["src_kind"] == "document"
+        and edge["src_id"] == result["document_id"]
+        and edge["dst_kind"] == "memode"
+        and edge["dst_id"] == contextual_memode["id"]
+        for edge in edges
+    )
+    assert any(
+        edge["edge_type"] == "CONTEXTUALIZES_DOCUMENT"
+        and edge["src_kind"] == "document"
+        and edge["src_id"] == result["document_id"]
+        and edge["dst_kind"] == "memode"
+        and edge["dst_id"] == constitutional_memode["id"]
+        for edge in edges
+    )
+
+    trace = runtime.store._fetchone(
+        """
+        SELECT payload_json
+        FROM trace_events
+        WHERE experiment_id = ? AND event_type = 'INGEST_CONTEXTUALIZATION'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (experiment["id"],),
+    )
+    assert trace is not None
+    payload = json.loads(trace["payload_json"])
+    assert payload["mode"] == "adam_identity_mlx"
+    assert payload["mlx_review_gate"] == "enabled_by_default"
+
+
+def test_retrieval_prioritizes_document_chunks_over_conversational_confabulations(runtime, tmp_path: Path) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(experiment["id"], title="Dissertation Retrieval")
+    md_path = tmp_path / "A_Bad_Trip_in_Difference_Neo-.md"
+    md_path.write_text(
+        (
+            "# A Bad Trip in Difference\n\n"
+            "INTRODUCTION: Set and Setting.\n\n"
+            "TABLE OF CONTENTS\n"
+            "CHAPTER 1: Pillars of Red Pilled Warfare\n"
+            "CHAPTER 2: Southern California, A Memeplex of Reactionary Difference\n\n"
+            "Chapter 1 argues that the first chapter title is Pillars of Red Pilled Warfare.\n"
+        ),
+        encoding="utf-8",
+    )
+    runtime.ingest_document(
+        experiment_id=experiment["id"],
+        path=str(md_path),
+        briefing="This is Brian's dissertation.",
+        session_id=session["id"],
+    )
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="bad trip chapter",
+        text=(
+            'The title of the first chapter of your dissertation, *A Bad Trip in Difference*, '
+            'is "The Ontology of the Bad Trip."'
+        ),
+        domain="behavior",
+        source_kind="turn_adam",
+        metadata={"origin": "adam", "session_id": session["id"]},
+    )
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="first chapter dissertation",
+        text="Brian the operator: What is the title of the first chapter of my dissertation?",
+        domain="knowledge",
+        source_kind="turn_user",
+        metadata={"origin": "brian_operator", "session_id": session["id"]},
+    )
+
+    retrieval = runtime.retrieval_service.retrieve(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        query="A Bad Trip in Difference dissertation first chapter title",
+        settings=runtime.settings,
+    )
+
+    assert retrieval["items"][0]["document_id"] is not None
+    assert retrieval["items"][0]["provenance"] == str(md_path)
+    first_block = retrieval["prompt_context"].split("\n\n", 1)[0]
+    assert f"[KNOWLEDGE:document] {md_path.name}" in first_block
+    assert "Pillars of Red Pilled Warfare" in retrieval["prompt_context"]
+    assert '"The Ontology of the Bad Trip."' not in first_block
 
 
 def test_document_sha_dedupe_migration_merges_duplicate_rows(tmp_path: Path) -> None:

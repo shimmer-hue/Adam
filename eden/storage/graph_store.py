@@ -12,6 +12,39 @@ from uuid import uuid4
 from ..utils import compact_json, now_utc, safe_excerpt, sha256_file, slugify, tokenize
 from .schema import SCHEMA_SQL
 
+FTS_QUERY_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "do",
+    "for",
+    "from",
+    "have",
+    "if",
+    "in",
+    "is",
+    "it",
+    "my",
+    "not",
+    "of",
+    "on",
+    "or",
+    "so",
+    "that",
+    "the",
+    "this",
+    "to",
+    "what",
+    "with",
+    "you",
+    "your",
+}
+
 
 def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
     if row is None:
@@ -641,6 +674,15 @@ class GraphStore:
             (document_id,),
         )
         return int(row["count"]) if row is not None else 0
+
+    def list_document_chunks(self, document_id: str, *, limit: int | None = None) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM document_chunks WHERE document_id = ? ORDER BY chunk_index ASC, created_at ASC"
+        params: list[Any] = [document_id]
+        if limit is not None and limit > 0:
+            sql += " LIMIT ?"
+            params.append(int(limit))
+        rows = self._fetchall(sql, tuple(params))
+        return [_row_to_dict(row) for row in rows if row is not None]
 
     def reset_document_chunks(self, document_id: str) -> None:
         chunk_rows = self._fetchall("SELECT id FROM document_chunks WHERE document_id = ?", (document_id,))
@@ -1371,11 +1413,27 @@ class GraphStore:
         )
         return [_row_to_dict(row) for row in rows if row is not None]
 
-    def search_memes(self, experiment_id: str, query: str, *, limit: int = 20) -> list[dict[str, Any]]:
-        tokens = tokenize(query)[:8]
+    def _fts_safe_query(self, query: str, *, match_all: bool = False) -> str:
+        tokens = tokenize(query)
+        if match_all:
+            filtered = [token for token in tokens if len(token) > 2 and token not in FTS_QUERY_STOPWORDS]
+            tokens = filtered or tokens
+        tokens = tokens[:8]
         if not tokens:
+            return ""
+        joiner = " " if match_all and len(tokens) > 1 else " OR "
+        return joiner.join(f'"{token}"' for token in tokens)
+
+    def _filtered_or_fts_query(self, query: str) -> str:
+        tokens = [token for token in tokenize(query) if len(token) > 2 and token not in FTS_QUERY_STOPWORDS][:8]
+        if not tokens:
+            return self._fts_safe_query(query)
+        return " OR ".join(f'"{token}"' for token in tokens)
+
+    def search_memes(self, experiment_id: str, query: str, *, limit: int = 20) -> list[dict[str, Any]]:
+        safe_query = self._fts_safe_query(query)
+        if not safe_query:
             return []
-        safe_query = " OR ".join(f'"{token}"' for token in tokens)
         rows = self._fetchall(
             """
             SELECT m.*, bm25(meme_fts) AS bm25_score
@@ -1389,10 +1447,9 @@ class GraphStore:
         return [_row_to_dict(row) for row in rows if row is not None]
 
     def search_memodes(self, experiment_id: str, query: str, *, limit: int = 20) -> list[dict[str, Any]]:
-        tokens = tokenize(query)[:8]
-        if not tokens:
+        safe_query = self._fts_safe_query(query)
+        if not safe_query:
             return []
-        safe_query = " OR ".join(f'"{token}"' for token in tokens)
         rows = self._fetchall(
             """
             SELECT md.*, bm25(memode_fts) AS bm25_score
@@ -1404,6 +1461,43 @@ class GraphStore:
             (experiment_id, safe_query, limit),
         )
         return [_row_to_dict(row) for row in rows if row is not None]
+
+    def search_document_chunks(self, experiment_id: str, query: str, *, limit: int = 20) -> list[dict[str, Any]]:
+        def run_search(safe_query: str) -> list[dict[str, Any]]:
+            rows = self._fetchall(
+                """
+                SELECT
+                    c.id AS chunk_id,
+                    c.document_id,
+                    c.chunk_index,
+                    c.page_number,
+                    c.text AS chunk_text,
+                    c.metadata_json AS chunk_metadata_json,
+                    d.title AS document_title,
+                    d.path AS document_path,
+                    d.status AS document_status,
+                    d.metadata_json AS document_metadata_json,
+                    bm25(chunk_fts) AS bm25_score
+                FROM chunk_fts
+                JOIN document_chunks c ON c.id = chunk_fts.chunk_id
+                JOIN documents d ON d.id = c.document_id
+                WHERE c.experiment_id = ? AND d.status = 'ingested' AND chunk_fts MATCH ?
+                ORDER BY bm25_score LIMIT ?
+                """,
+                (experiment_id, safe_query, limit),
+            )
+            return [_row_to_dict(row) for row in rows if row is not None]
+
+        safe_query = self._fts_safe_query(query, match_all=True)
+        if not safe_query:
+            return []
+        rows = run_search(safe_query)
+        if rows:
+            return rows
+        relaxed_query = self._filtered_or_fts_query(query)
+        if not relaxed_query or relaxed_query == safe_query:
+            return rows
+        return run_search(relaxed_query)
 
     def recent_feedback(self, session_id: str, *, limit: int = 8) -> list[dict[str, Any]]:
         rows = self._fetchall(

@@ -17,21 +17,27 @@
 - phase 1 is legacy knowledge normalization:
   - it is limited to knowledge rows whose graph state is still missing author/work information nodes or typed informational edges
   - deterministic relation extraction runs first
-  - the Adam-identity MLX review layer is opt-in only via `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1`; without that flag, session start remains deterministic even when the live backend is MLX
-  - when the flag is enabled on the MLX path, a bounded Adam-identity JSON review can refine those candidate relations before persistence
+  - when the live backend is MLX and the local model is ready, Adam-identity JSON review is enabled by default and can refine those candidate relations before persistence
+  - the review can still be disabled explicitly via `EDEN_DISABLE_MLX_WAKEUP_REVIEW=1`, and deterministic repair remains the fallback when MLX is unavailable or abstains
 - phase 2 is behavior taxonomy:
   - it audits bounded turn-attached behavior bundles from Adam responses and explicit feedback
   - it can strengthen first-order behavior memes and materialize bounded behavior memodes when at least two selected behavior memes plus qualifying support edges are present
-  - the same `EDEN_ENABLE_MLX_WAKEUP_REVIEW=1` opt-in gate controls whether Adam performs the bounded MLX taxonomy review instead of deterministic selection
+  - the same default-on MLX gate controls whether Adam performs the bounded taxonomy review instead of deterministic selection
   - any `memeplex` output is report-only and does not become a first-class graph object in this pass
+- phase 3 is coherence reweave:
+  - it reviews a bounded candidate set of existing behavior memodes and selects the memodes Adam should wake through first
+  - the selected memodes and their member memes are touched so activation/regard pressure reflects the new session's coherence pass
+  - the pass is Adam-identity MLX by default when ready, with deterministic anchor selection as bounded fallback
 - the wake-up audit is not part of Adam's operator-facing reply generation
 - every run is recorded as visible trace:
   - `GRAPH_NORMALIZATION`
   - `GRAPH_TAXONOMY_AUDIT`
+  - `GRAPH_COHERENCE_REWEAVE`
   - `GRAPH_WAKEUP_AUDIT`
 - session metadata stores:
   - `session_graph_normalization`
   - `session_graph_taxonomy`
+  - `session_graph_coherence`
   - `session_graph_wakeup`
 
 ## What the membrane does
@@ -53,7 +59,7 @@
 ## Prompt assembly inputs
 
 - constitutional seed
-- retrieved active-set items, including document-backed evidence blocks with explicit provenance and page/excerpt context when available
+- retrieved active-set items, including direct `document_chunks` recall plus document-backed evidence blocks with explicit provenance and page/excerpt context when available
 - recent feedback summaries
 - bounded recent turn history
 

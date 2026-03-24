@@ -35,7 +35,7 @@ from .retrieval import RetrievalService
 from .semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE, extract_semantic_candidates
 from .storage.graph_store import GraphStore
 from .tanakh import DEFAULT_TANAKH_REF, TanakhService
-from .utils import now_utc, safe_excerpt, slugify
+from .utils import cosine_similarity, now_utc, safe_excerpt, slugify
 
 
 CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
@@ -55,9 +55,18 @@ GRAPH_TAXONOMY_MLX_REVIEW_LIMIT = 8
 GRAPH_TAXONOMY_BUNDLE_LIMIT = 12
 GRAPH_TAXONOMY_MEMBER_LIMIT = 4
 GRAPH_TAXONOMY_BEHAVIOR_ACTORS = {"adam", "feedback"}
+DOCUMENT_CONTEXTUALIZATION_CHUNK_LIMIT = 6
+DOCUMENT_CONTEXTUALIZATION_GRAPH_CONTEXT_LIMIT = 6
+DOCUMENT_CONTEXTUALIZATION_MEMBER_LIMIT = 4
+DOCUMENT_CONTEXTUALIZATION_ORIGIN = "document_ingest_contextualization_v1"
+DOCUMENT_CONTEXTUALIZATION_SOURCE_KIND = "document_contextualization"
+GRAPH_COHERENCE_REWEAVE_CANDIDATE_LIMIT = 8
+GRAPH_COHERENCE_REWEAVE_ANCHOR_LIMIT = 4
+SESSION_START_COHERENCE_REWEAVE = "session_start_coherence_reweave_v1"
 SESSION_START_BEHAVIOR_TAXONOMY = "session_start_behavior_taxonomy_v1"
 SESSION_START_GRAPH_WAKEUP = "session_start_graph_wakeup_v1"
 SESSION_START_MLX_REVIEW_ENV = "EDEN_ENABLE_MLX_WAKEUP_REVIEW"
+SESSION_START_MLX_REVIEW_DISABLE_ENV = "EDEN_DISABLE_MLX_WAKEUP_REVIEW"
 
 
 def _normalize_archive_folder(folder: Any) -> str:
@@ -605,6 +614,7 @@ class EdenRuntime:
                     "session_graph_wakeup": wakeup_report,
                     "session_graph_normalization": wakeup_report.get("knowledge_normalization", {}),
                     "session_graph_taxonomy": wakeup_report.get("taxonomy_audit", {}),
+                    "session_graph_coherence": wakeup_report.get("coherence_reweave", {}),
                 },
             )
         except Exception as exc:
@@ -637,6 +647,7 @@ class EdenRuntime:
                     "session_graph_wakeup": report,
                     "session_graph_normalization": report,
                     "session_graph_taxonomy": report,
+                    "session_graph_coherence": report,
                 },
             )
         return session
@@ -711,15 +722,20 @@ class EdenRuntime:
                 continue
         return None
 
-    def _session_start_mlx_review_status(self) -> tuple[bool, str]:
+    def _adam_identity_mlx_review_status(self) -> tuple[bool, str]:
         if self.settings.model_backend.lower() != "mlx":
             return False, "backend_not_mlx"
         if not bool(self.mlx_model_status().get("ready")):
             return False, "model_not_ready"
-        raw = str(os.environ.get(SESSION_START_MLX_REVIEW_ENV, "") or "").strip().lower()
-        if raw not in {"1", "true", "yes", "on"}:
-            return False, "disabled_by_default"
-        return True, "enabled"
+        disable_raw = str(os.environ.get(SESSION_START_MLX_REVIEW_DISABLE_ENV, "") or "").strip().lower()
+        if disable_raw in {"1", "true", "yes", "on"}:
+            return False, "disabled_by_env"
+        enable_raw = str(os.environ.get(SESSION_START_MLX_REVIEW_ENV, "") or "").strip().lower()
+        if enable_raw in {"0", "false", "no", "off"}:
+            return False, "disabled_by_env"
+        if enable_raw in {"1", "true", "yes", "on"}:
+            return True, "enabled"
+        return True, "enabled_by_default"
 
     def _sanitize_relation_review_payload(
         self,
@@ -990,7 +1006,7 @@ class EdenRuntime:
                     unresolved_relations.append(relation)
             if unresolved_relations:
                 candidate_rows.append({"row": row, "metadata": metadata, "relations": unresolved_relations})
-        use_mlx_review, mlx_review_gate = self._session_start_mlx_review_status()
+        use_mlx_review, mlx_review_gate = self._adam_identity_mlx_review_status()
         report = {
             "status": "completed",
             "ran_at": now_utc(),
@@ -1122,8 +1138,16 @@ class EdenRuntime:
             experiment_id=experiment_id,
             session_id=session_id,
         )
+        coherence_report = self._run_graph_coherence_reweave(
+            experiment_id=experiment_id,
+            session_id=session_id,
+        )
         mode = "deterministic"
-        if knowledge_report.get("mode") == "adam_identity_mlx" or taxonomy_report.get("mode") == "adam_identity_mlx":
+        if (
+            knowledge_report.get("mode") == "adam_identity_mlx"
+            or taxonomy_report.get("mode") == "adam_identity_mlx"
+            or coherence_report.get("mode") == "adam_identity_mlx"
+        ):
             mode = "adam_identity_mlx"
         report = {
             "status": "completed",
@@ -1131,6 +1155,7 @@ class EdenRuntime:
             "mode": mode,
             "knowledge_normalization": knowledge_report,
             "taxonomy_audit": taxonomy_report,
+            "coherence_reweave": coherence_report,
             "memeplex_summaries": list(taxonomy_report.get("memeplex_summaries") or []),
         }
         self.store.record_trace_event(
@@ -1634,7 +1659,7 @@ class EdenRuntime:
             for memode in self.store.list_memodes(experiment_id)
             if str(memode.get("domain") or "").lower() == "behavior"
         }
-        use_mlx_review, mlx_review_gate = self._session_start_mlx_review_status()
+        use_mlx_review, mlx_review_gate = self._adam_identity_mlx_review_status()
         report = {
             "status": "completed",
             "ran_at": now_utc(),
@@ -1706,6 +1731,709 @@ class EdenRuntime:
             event_type="GRAPH_TAXONOMY_AUDIT",
             level="INFO",
             message="Session-start graph taxonomy audit completed",
+            payload=report,
+        )
+        return report
+
+    def _sample_document_context_chunks(
+        self,
+        *,
+        document_id: str,
+        limit: int = DOCUMENT_CONTEXTUALIZATION_CHUNK_LIMIT,
+    ) -> list[dict[str, Any]]:
+        rows = self.store.list_document_chunks(document_id)
+        if len(rows) <= limit:
+            return rows
+        picked: list[dict[str, Any]] = []
+        seen_positions: set[int] = set()
+        for index in range(limit):
+            position = int(round(index * (len(rows) - 1) / max(1, limit - 1)))
+            if position in seen_positions:
+                continue
+            seen_positions.add(position)
+            picked.append(rows[position])
+        return picked
+
+    def _document_graph_context_candidates(
+        self,
+        *,
+        experiment_id: str,
+        document_id: str,
+        query: str,
+    ) -> list[dict[str, Any]]:
+        meme_lookup = {
+            str(row.get("id") or ""): row
+            for row in self.store.list_memes(experiment_id)
+            if str(row.get("domain") or "").lower() == "behavior"
+        }
+        candidates: list[dict[str, Any]] = []
+        for memode in self.store.list_memodes(experiment_id):
+            if str(memode.get("domain") or "").lower() != "behavior":
+                continue
+            metadata = self._memode_row_metadata(memode)
+            if str(metadata.get("document_id") or "") == document_id:
+                continue
+            member_ids = [str(member_id) for member_id in metadata.get("member_ids") or [] if str(member_id)]
+            member_labels = [
+                str(meme_lookup.get(member_id, {}).get("label") or member_id)
+                for member_id in member_ids[:4]
+            ]
+            summary = safe_excerpt(str(memode.get("summary") or ""), limit=180)
+            semantic = cosine_similarity(
+                query,
+                " ".join(
+                    part
+                    for part in [str(memode.get("label") or ""), summary, " / ".join(member_labels)]
+                    if part
+                ),
+            )
+            structural_bonus = min(len(member_labels), 4) * 0.05 + min(float(memode.get("evidence_n") or 0.0), 8.0) * 0.03
+            candidates.append(
+                {
+                    "node_kind": "memode",
+                    "node_id": str(memode.get("id") or ""),
+                    "label": str(memode.get("label") or ""),
+                    "summary": summary,
+                    "member_labels": member_labels,
+                    "score": semantic + structural_bonus,
+                }
+            )
+        for meme in meme_lookup.values():
+            metadata = self._meme_row_metadata(meme)
+            if str(metadata.get("document_id") or "") == document_id:
+                continue
+            semantic = cosine_similarity(
+                query,
+                " ".join(part for part in [str(meme.get("label") or ""), safe_excerpt(str(meme.get("text") or ""), limit=180)] if part),
+            )
+            stability_bonus = min(float(meme.get("evidence_n") or 0.0), 8.0) * 0.025
+            candidates.append(
+                {
+                    "node_kind": "meme",
+                    "node_id": str(meme.get("id") or ""),
+                    "label": str(meme.get("label") or ""),
+                    "summary": safe_excerpt(str(meme.get("text") or ""), limit=180),
+                    "member_labels": [],
+                    "score": semantic + stability_bonus,
+                }
+            )
+        candidates.sort(
+            key=lambda item: (-float(item.get("score") or 0.0), item.get("node_kind") != "memode", str(item.get("label") or "")),
+        )
+        selected: list[dict[str, Any]] = []
+        seen_labels: set[str] = set()
+        for item in candidates:
+            label = str(item.get("label") or "").strip()
+            if not label:
+                continue
+            lowered = label.lower()
+            if lowered in seen_labels:
+                continue
+            seen_labels.add(lowered)
+            selected.append(item)
+            if len(selected) >= DOCUMENT_CONTEXTUALIZATION_GRAPH_CONTEXT_LIMIT:
+                break
+        return selected
+
+    def _document_contextualization_system_prompt(self) -> str:
+        return (
+            f"You are {self.agent_profile['name']}, ingesting a new external document into your persistent graph in EDEN.\n"
+            "This is not a Brian-facing answer.\n"
+            "The document's factual content is already being stored as constative knowledge.\n"
+            "Your task is to add a bounded behavior-domain contextualization that explains how this document should live inside your graph relative to existing graph experience.\n"
+            "Select 2-4 short behavior labels grounded in the document excerpts and the provided graph context.\n"
+            "Use related_graph_labels only from the supplied graph context labels.\n"
+            "Return empty selected_labels if the excerpts do not support a coherent behavior lens.\n"
+            'Return strict JSON only in the form {"selected_labels":["..."],"memode_label":"...","memode_summary":"...","related_graph_labels":["..."],"confidence":0.0}.'
+        )
+
+    def _document_contextualization_prompt(
+        self,
+        *,
+        document_title: str,
+        source_path: str,
+        briefing: str,
+        chunk_rows: list[dict[str, Any]],
+        graph_context: list[dict[str, Any]],
+    ) -> str:
+        excerpt_lines: list[str] = []
+        for row in chunk_rows:
+            page_number = row.get("page_number")
+            page_label = f"page {page_number}" if page_number is not None else "page n/a"
+            excerpt_lines.append(f"- {page_label}: {safe_excerpt(str(row.get('text') or ''), limit=220)}")
+        context_lines: list[str] = []
+        for item in graph_context:
+            member_hint = f" members={json.dumps(item.get('member_labels') or [], ensure_ascii=True)}" if item.get("member_labels") else ""
+            context_lines.append(
+                f"- {item['node_kind']}::{item['node_id']}::{item['label']} score={float(item.get('score') or 0.0):.3f}{member_hint} summary={item.get('summary') or ''}"
+            )
+        return (
+            "Contextualize this ingested document.\n\n"
+            f"Title: {document_title}\n"
+            f"Source path: {source_path}\n"
+            f"Operator framing: {briefing or '[none]'}\n\n"
+            "Document excerpts:\n"
+            f"{chr(10).join(excerpt_lines) if excerpt_lines else '[none]'}\n\n"
+            "Existing graph context:\n"
+            f"{chr(10).join(context_lines) if context_lines else '[none]'}\n\n"
+            "Return empty selected_labels if no stable behavior-domain contextualization should be added.\n"
+            "Prefer concise, operator-readable labels.\n"
+            'Return only JSON: {"selected_labels":["..."],"memode_label":"...","memode_summary":"...","related_graph_labels":["..."],"confidence":0.0}.'
+        )
+
+    def _sanitize_document_contextualization_payload(
+        self,
+        payload: Any,
+        *,
+        graph_context: list[dict[str, Any]],
+        chunk_rows: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            return {}
+        raw_selected = payload.get("selected_labels") or []
+        raw_related = payload.get("related_graph_labels") or []
+        if not isinstance(raw_selected, list):
+            raw_selected = []
+        if not isinstance(raw_related, list):
+            raw_related = []
+        selected_labels: list[str] = []
+        for item in raw_selected:
+            label = re.sub(r"\s+", " ", str(item or "").strip())
+            if not label or label in selected_labels:
+                continue
+            selected_labels.append(label[:96])
+            if len(selected_labels) >= DOCUMENT_CONTEXTUALIZATION_MEMBER_LIMIT:
+                break
+        allowed_related = {str(item.get("label") or "") for item in graph_context if str(item.get("label") or "")}
+        related_graph_labels: list[str] = []
+        for item in raw_related:
+            label = str(item or "").strip()
+            if not label or label not in allowed_related or label in related_graph_labels:
+                continue
+            related_graph_labels.append(label)
+            if len(related_graph_labels) >= DOCUMENT_CONTEXTUALIZATION_GRAPH_CONTEXT_LIMIT:
+                break
+        memode_label = re.sub(r"\s+", " ", str(payload.get("memode_label") or "").strip())
+        memode_summary = re.sub(r"\s+", " ", str(payload.get("memode_summary") or "").strip())
+        try:
+            confidence = max(0.0, min(1.0, float(payload.get("confidence", 0.0) or 0.0)))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if not selected_labels:
+            return {
+                "selected_labels": [],
+                "memode_label": "",
+                "memode_summary": "",
+                "related_graph_labels": related_graph_labels,
+                "confidence": confidence,
+            }
+        fallback_summary = safe_excerpt(
+            " ".join(str(row.get("text") or "") for row in chunk_rows if str(row.get("text") or "").strip()),
+            limit=320,
+        )
+        return {
+            "selected_labels": selected_labels,
+            "memode_label": memode_label[:120],
+            "memode_summary": memode_summary[:320] or fallback_summary,
+            "related_graph_labels": related_graph_labels,
+            "confidence": confidence or 0.76,
+        }
+
+    def _adam_identity_document_contextualization_review(
+        self,
+        *,
+        experiment_id: str,
+        document_id: str,
+        document_title: str,
+        source_path: str,
+        briefing: str,
+    ) -> dict[str, Any]:
+        if self.settings.model_backend.lower() != "mlx":
+            return {}
+        if not bool(self.mlx_model_status().get("ready")):
+            return {}
+        chunk_rows = self._sample_document_context_chunks(document_id=document_id)
+        if not chunk_rows:
+            return {}
+        query = " ".join(
+            part
+            for part in [
+                document_title,
+                briefing,
+                " ".join(safe_excerpt(str(row.get("text") or ""), limit=180) for row in chunk_rows),
+            ]
+            if part
+        )
+        graph_context = self._document_graph_context_candidates(
+            experiment_id=experiment_id,
+            document_id=document_id,
+            query=query,
+        )
+        adapter = self._get_model_adapter()
+        model_result = adapter.generate(
+            system_prompt=self._document_contextualization_system_prompt(),
+            conversation_prompt=self._document_contextualization_prompt(
+                document_title=document_title,
+                source_path=source_path,
+                briefing=briefing,
+                chunk_rows=chunk_rows,
+                graph_context=graph_context,
+            ),
+            max_tokens=420,
+            temperature=0.35,
+            top_p=0.9,
+            repetition_penalty=1.02,
+        )
+        payload = self._extract_json_payload(str(model_result.answer_text or model_result.text or ""))
+        sanitized = self._sanitize_document_contextualization_payload(
+            payload,
+            graph_context=graph_context,
+            chunk_rows=chunk_rows,
+        )
+        if not sanitized:
+            return {}
+        sanitized["graph_context"] = graph_context
+        sanitized["chunk_rows"] = chunk_rows
+        return sanitized
+
+    def _materialize_document_contextualization(
+        self,
+        *,
+        experiment_id: str,
+        document_id: str,
+        document_title: str,
+        source_path: str,
+        session_id: str | None,
+        decision: dict[str, Any],
+        assertion_origin: str,
+    ) -> dict[str, Any]:
+        selected_labels = [str(label) for label in decision.get("selected_labels") or [] if str(label)]
+        related_graph_labels = [str(label) for label in decision.get("related_graph_labels") or [] if str(label)]
+        report = {
+            "status": "completed" if selected_labels else "skipped",
+            "mode": assertion_origin,
+            "selected_labels": selected_labels,
+            "related_graph_labels": related_graph_labels,
+            "related_graph_node_ids": [],
+            "confidence": float(decision.get("confidence", 0.0) or 0.0),
+            "memes_touched": 0,
+            "memodes_touched": 0,
+        }
+        if not selected_labels:
+            return report
+        graph_context = {
+            str(item.get("label") or ""): item
+            for item in decision.get("graph_context") or []
+            if str(item.get("label") or "")
+        }
+        contextual_meme_ids: list[str] = []
+        support_edge_ids: list[str] = []
+        related_meme_ids: list[str] = []
+        related_memode_ids: list[str] = []
+        confidence = max(0.1, float(decision.get("confidence", 0.0) or 0.0))
+        for label in selected_labels:
+            meme = self.store.upsert_meme(
+                experiment_id=experiment_id,
+                label=label,
+                text=str(decision.get("memode_summary") or label),
+                domain="behavior",
+                source_kind=DOCUMENT_CONTEXTUALIZATION_SOURCE_KIND,
+                scope="global",
+                evidence_inc=max(0.15, confidence),
+                metadata={
+                    "document_id": document_id,
+                    "source_path": source_path,
+                    "title": document_title,
+                    "session_id": session_id,
+                    "origin": "adam",
+                    "candidate_kind": "document_contextualization",
+                    "entity_type": "behavior_meme",
+                    "contextualization_origin": DOCUMENT_CONTEXTUALIZATION_ORIGIN,
+                    "contextualization_mode": assertion_origin,
+                    "related_graph_labels": related_graph_labels,
+                    "contextualization_confidence": confidence,
+                },
+            )
+            meme_id = str(meme.get("id") or "")
+            if not meme_id:
+                continue
+            contextual_meme_ids.append(meme_id)
+            self.store.add_edge(
+                experiment_id=experiment_id,
+                src_kind="document",
+                src_id=document_id,
+                dst_kind="meme",
+                dst_id=meme_id,
+                edge_type="CONTEXTUALIZES_DOCUMENT",
+                provenance={
+                    "source_path": source_path,
+                    "session_id": session_id,
+                    "assertion_origin": assertion_origin,
+                    "evidence_label": "ADAM_CONTEXTUALIZED",
+                    "confidence": confidence,
+                },
+            )
+        for left_index, left_id in enumerate(contextual_meme_ids):
+            for right_id in contextual_meme_ids[left_index + 1 :]:
+                edge = self.store.set_edge(
+                    experiment_id=experiment_id,
+                    src_kind="meme",
+                    src_id=left_id,
+                    dst_kind="meme",
+                    dst_id=right_id,
+                    edge_type="CO_OCCURS_WITH",
+                    provenance={
+                        "document_id": document_id,
+                        "source_path": source_path,
+                        "session_id": session_id,
+                        "assertion_origin": assertion_origin,
+                        "evidence_label": "ADAM_CONTEXTUALIZED",
+                        "confidence": confidence,
+                    },
+                )
+                support_edge_ids.append(str(edge.get("id") or ""))
+        for label in related_graph_labels:
+            item = graph_context.get(label)
+            if item is None:
+                continue
+            node_kind = str(item.get("node_kind") or "")
+            node_id = str(item.get("node_id") or "")
+            if not node_kind or not node_id:
+                continue
+            report["related_graph_node_ids"].append(node_id)
+            if node_kind == "meme":
+                related_meme_ids.append(node_id)
+            elif node_kind == "memode":
+                related_memode_ids.append(node_id)
+            self.store.add_edge(
+                experiment_id=experiment_id,
+                src_kind="document",
+                src_id=document_id,
+                dst_kind=node_kind,
+                dst_id=node_id,
+                edge_type="CONTEXTUALIZES_DOCUMENT",
+                provenance={
+                    "source_path": source_path,
+                    "session_id": session_id,
+                    "assertion_origin": assertion_origin,
+                    "evidence_label": "ADAM_CONTEXTUALIZED",
+                    "confidence": confidence,
+                },
+            )
+        memode_id = ""
+        member_subset = contextual_meme_ids[: min(DOCUMENT_CONTEXTUALIZATION_MEMBER_LIMIT, len(contextual_meme_ids))]
+        support_subset = sorted(dict.fromkeys(edge_id for edge_id in support_edge_ids if edge_id))
+        if memode_materialization_allowed("behavior") and len(member_subset) >= 2 and support_subset:
+            memode = self.store.upsert_memode(
+                experiment_id=experiment_id,
+                label=str(decision.get("memode_label") or f"ingest lens / {' / '.join(selected_labels[:3])}"),
+                member_ids=member_subset,
+                summary=safe_excerpt(str(decision.get("memode_summary") or " / ".join(selected_labels)), limit=320),
+                domain="behavior",
+                scope="global",
+                evidence_inc=max(0.2, confidence),
+                metadata={
+                    "document_id": document_id,
+                    "source_path": source_path,
+                    "title": document_title,
+                    "session_id": session_id,
+                    "origin": "adam",
+                    "supporting_edge_ids": support_subset,
+                    "member_order": member_subset,
+                    "contextualization_origin": DOCUMENT_CONTEXTUALIZATION_ORIGIN,
+                    "contextualization_mode": assertion_origin,
+                    "related_graph_labels": related_graph_labels,
+                    "related_graph_node_ids": report["related_graph_node_ids"],
+                    "contextualization_confidence": confidence,
+                },
+            )
+            memode_id = str(memode.get("id") or "")
+            if memode_id:
+                self.store.add_edge(
+                    experiment_id=experiment_id,
+                    src_kind="document",
+                    src_id=document_id,
+                    dst_kind="memode",
+                    dst_id=memode_id,
+                    edge_type="CONTEXTUALIZES_DOCUMENT",
+                    provenance={
+                        "source_path": source_path,
+                        "session_id": session_id,
+                        "assertion_origin": assertion_origin,
+                        "evidence_label": "ADAM_CONTEXTUALIZED",
+                        "confidence": confidence,
+                    },
+                )
+                for member_id in member_subset:
+                    self.store.add_edge(
+                        experiment_id=experiment_id,
+                        src_kind="memode",
+                        src_id=memode_id,
+                        dst_kind="meme",
+                        dst_id=member_id,
+                        edge_type=MEMODE_MEMBERSHIP_EDGE_TYPE,
+                        provenance={
+                            "document_id": document_id,
+                            "session_id": session_id,
+                            "assertion_origin": assertion_origin,
+                        },
+                    )
+        self.store.touch_nodes("meme", sorted(dict.fromkeys(related_meme_ids)))
+        self.store.touch_nodes("memode", sorted(dict.fromkeys(related_memode_ids)))
+        report["memes_touched"] = len(contextual_meme_ids)
+        report["memodes_touched"] = 1 if memode_id else 0
+        report["memode_id"] = memode_id
+        return report
+
+    def _contextualize_document_ingest(
+        self,
+        *,
+        experiment_id: str,
+        document_id: str,
+        document_title: str,
+        source_path: str,
+        briefing: str,
+        session_id: str | None,
+    ) -> dict[str, Any]:
+        use_mlx_review, mlx_review_gate = self._adam_identity_mlx_review_status()
+        report = {
+            "status": "skipped",
+            "ran_at": now_utc(),
+            "mode": "deterministic",
+            "mlx_review_attempted": use_mlx_review,
+            "mlx_review_gate": mlx_review_gate,
+            "mlx_review_applied": False,
+            "mlx_review_error": "",
+            "selected_labels": [],
+            "related_graph_labels": [],
+            "related_graph_node_ids": [],
+            "memes_touched": 0,
+            "memodes_touched": 0,
+            "memode_id": "",
+        }
+        if not use_mlx_review:
+            return report
+        report["mode"] = "adam_identity_mlx"
+        try:
+            decision = self._adam_identity_document_contextualization_review(
+                experiment_id=experiment_id,
+                document_id=document_id,
+                document_title=document_title,
+                source_path=source_path,
+                briefing=briefing,
+            )
+        except Exception as exc:
+            report["mlx_review_error"] = f"{type(exc).__name__}: {exc}"
+            return report
+        if not decision:
+            report["status"] = "completed"
+            return report
+        report["mlx_review_applied"] = True
+        materialized = self._materialize_document_contextualization(
+            experiment_id=experiment_id,
+            document_id=document_id,
+            document_title=document_title,
+            source_path=source_path,
+            session_id=session_id,
+            decision=decision,
+            assertion_origin="adam_identity_mlx",
+        )
+        report.update(materialized)
+        return report
+
+    def _collect_coherence_reweave_candidates(self, *, experiment_id: str) -> list[dict[str, Any]]:
+        meme_lookup = {
+            str(row.get("id") or ""): row
+            for row in self.store.list_memes(experiment_id)
+            if str(row.get("domain") or "").lower() == "behavior"
+        }
+        graph_metrics, _ = self.retrieval_service.build_graph_metrics(experiment_id)
+        candidates: list[dict[str, Any]] = []
+        for memode in self.store.list_memodes(experiment_id):
+            if str(memode.get("domain") or "").lower() != "behavior":
+                continue
+            metadata = self._memode_row_metadata(memode)
+            member_ids = [str(member_id) for member_id in metadata.get("member_ids") or [] if str(member_id)]
+            if len(member_ids) < 2:
+                continue
+            member_labels = [
+                str(meme_lookup.get(member_id, {}).get("label") or member_id)
+                for member_id in member_ids[:4]
+            ]
+            metric_bonus = 0.0
+            for member_id in member_ids:
+                metric_bonus += float(graph_metrics.get(member_id, {}).get("clustering", 0.0))
+            metric_bonus = metric_bonus / max(1, len(member_ids))
+            score = (
+                min(float(memode.get("evidence_n") or 0.0), 8.0) * 0.08
+                + min(float(memode.get("usage_count") or 0.0), 8.0) * 0.06
+                + min(len(member_ids), 4) * 0.12
+                + metric_bonus
+            )
+            candidates.append(
+                {
+                    "memode_id": str(memode.get("id") or ""),
+                    "label": str(memode.get("label") or ""),
+                    "summary": safe_excerpt(str(memode.get("summary") or ""), limit=220),
+                    "member_ids": member_ids,
+                    "member_labels": member_labels,
+                    "score": score,
+                }
+            )
+        candidates.sort(key=lambda item: (-float(item.get("score") or 0.0), str(item.get("label") or "")))
+        return candidates[:GRAPH_COHERENCE_REWEAVE_CANDIDATE_LIMIT]
+
+    def _default_coherence_reweave_decision(self, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        anchor_ids = [str(item.get("memode_id") or "") for item in candidates[: min(3, len(candidates))] if str(item.get("memode_id") or "")]
+        anchor_labels = [str(item.get("label") or "") for item in candidates[: min(3, len(candidates))] if str(item.get("label") or "")]
+        return {
+            "anchor_memode_ids": anchor_ids,
+            "focus_summary": f"Wake through {' / '.join(anchor_labels[:3])}" if anchor_labels else "",
+            "confidence": 0.58 if anchor_ids else 0.0,
+        }
+
+    def _graph_coherence_reweave_system_prompt(self) -> str:
+        return (
+            f"You are {self.agent_profile['name']}, waking into a new session and reweaving your own behavior graph for coherence.\n"
+            "This is not a Brian-facing answer.\n"
+            "Choose 2-4 anchor behavior memodes from the supplied candidate list that should be activated together first.\n"
+            "Prefer mutually coherent, reusable behavior formations.\n"
+            "Do not invent memode ids.\n"
+            'Return strict JSON only in the form {"anchor_memode_ids":["..."],"focus_summary":"...","confidence":0.0}.'
+        )
+
+    def _graph_coherence_reweave_prompt(self, candidates: list[dict[str, Any]]) -> str:
+        lines = [
+            (
+                f"- {item['memode_id']} :: {item['label']} score={float(item.get('score') or 0.0):.3f} "
+                f"members={json.dumps(item.get('member_labels') or [], ensure_ascii=True)} summary={item.get('summary') or ''}"
+            )
+            for item in candidates
+        ]
+        return (
+            "Select the anchor memodes for this wake-up coherence pass.\n\n"
+            "Candidates:\n"
+            f"{chr(10).join(lines) if lines else '[none]'}\n\n"
+            'Return only JSON: {"anchor_memode_ids":["..."],"focus_summary":"...","confidence":0.0}.'
+        )
+
+    def _sanitize_coherence_reweave_payload(
+        self,
+        payload: Any,
+        *,
+        candidates: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            return {}
+        raw_ids = payload.get("anchor_memode_ids") or []
+        if not isinstance(raw_ids, list):
+            raw_ids = []
+        allowed_ids = {str(item.get("memode_id") or "") for item in candidates if str(item.get("memode_id") or "")}
+        anchor_memode_ids: list[str] = []
+        for item in raw_ids:
+            memode_id = str(item or "").strip()
+            if not memode_id or memode_id not in allowed_ids or memode_id in anchor_memode_ids:
+                continue
+            anchor_memode_ids.append(memode_id)
+            if len(anchor_memode_ids) >= GRAPH_COHERENCE_REWEAVE_ANCHOR_LIMIT:
+                break
+        focus_summary = re.sub(r"\s+", " ", str(payload.get("focus_summary") or "").strip())[:220]
+        try:
+            confidence = max(0.0, min(1.0, float(payload.get("confidence", 0.0) or 0.0)))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        return {
+            "anchor_memode_ids": anchor_memode_ids,
+            "focus_summary": focus_summary,
+            "confidence": confidence or (0.74 if anchor_memode_ids else 0.0),
+        }
+
+    def _adam_identity_coherence_reweave_review(self, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        if self.settings.model_backend.lower() != "mlx":
+            return {}
+        if not bool(self.mlx_model_status().get("ready")):
+            return {}
+        adapter = self._get_model_adapter()
+        model_result = adapter.generate(
+            system_prompt=self._graph_coherence_reweave_system_prompt(),
+            conversation_prompt=self._graph_coherence_reweave_prompt(candidates),
+            max_tokens=260,
+            temperature=0.35,
+            top_p=0.9,
+            repetition_penalty=1.02,
+        )
+        payload = self._extract_json_payload(str(model_result.answer_text or model_result.text or ""))
+        return self._sanitize_coherence_reweave_payload(payload, candidates=candidates)
+
+    def _run_graph_coherence_reweave(
+        self,
+        *,
+        experiment_id: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        candidates = self._collect_coherence_reweave_candidates(experiment_id=experiment_id)
+        use_mlx_review, mlx_review_gate = self._adam_identity_mlx_review_status()
+        report = {
+            "status": "completed",
+            "ran_at": now_utc(),
+            "mode": "adam_identity_mlx" if use_mlx_review else "deterministic",
+            "candidate_memodes": len(candidates),
+            "anchor_memode_ids": [],
+            "anchor_labels": [],
+            "focus_summary": "",
+            "touched_memodes": 0,
+            "touched_memes": 0,
+            "mlx_review_attempted": use_mlx_review,
+            "mlx_review_gate": mlx_review_gate,
+            "mlx_review_applied": False,
+            "mlx_review_error": "",
+        }
+        if not candidates:
+            self.store.record_trace_event(
+                experiment_id=experiment_id,
+                session_id=session_id,
+                turn_id=None,
+                event_type="GRAPH_COHERENCE_REWEAVE",
+                level="INFO",
+                message="Session-start graph coherence reweave found no behavior memodes",
+                payload=report,
+            )
+            return report
+        decision = self._default_coherence_reweave_decision(candidates)
+        if use_mlx_review:
+            try:
+                reviewed = self._adam_identity_coherence_reweave_review(candidates)
+            except Exception as exc:
+                report["mlx_review_error"] = f"{type(exc).__name__}: {exc}"
+                reviewed = {}
+            if reviewed.get("anchor_memode_ids"):
+                decision = reviewed
+                report["mlx_review_applied"] = True
+        anchor_ids = [str(memode_id) for memode_id in decision.get("anchor_memode_ids") or [] if str(memode_id)]
+        candidate_lookup = {str(item.get("memode_id") or ""): item for item in candidates}
+        anchor_labels = [str(candidate_lookup.get(memode_id, {}).get("label") or memode_id) for memode_id in anchor_ids]
+        touched_member_ids = sorted(
+            dict.fromkeys(
+                member_id
+                for memode_id in anchor_ids
+                for member_id in candidate_lookup.get(memode_id, {}).get("member_ids") or []
+                if str(member_id)
+            )
+        )
+        self.store.touch_nodes("memode", anchor_ids)
+        self.store.touch_nodes("meme", touched_member_ids)
+        report["anchor_memode_ids"] = anchor_ids
+        report["anchor_labels"] = anchor_labels
+        report["focus_summary"] = str(decision.get("focus_summary") or "")
+        report["touched_memodes"] = len(anchor_ids)
+        report["touched_memes"] = len(touched_member_ids)
+        self.store.record_trace_event(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            turn_id=None,
+            event_type="GRAPH_COHERENCE_REWEAVE",
+            level="INFO",
+            message="Session-start graph coherence reweave completed",
             payload=report,
         )
         return report
@@ -2738,6 +3466,45 @@ class EdenRuntime:
             path=resolved_path,
             briefing=briefing_text,
         )
+        contextualization_report = self._contextualize_document_ingest(
+            experiment_id=experiment_id,
+            document_id=result.document_id,
+            document_title=resolved_path.name,
+            source_path=str(resolved_path),
+            briefing=briefing_text,
+            session_id=session_id,
+        )
+        contextualization_message = (
+            f"Recorded document contextualization review for {resolved_path.name}"
+            if str(contextualization_report.get("status") or "") == "completed"
+            else f"Skipped document contextualization review for {resolved_path.name}"
+        )
+        self.store.record_trace_event(
+            experiment_id=experiment_id,
+            session_id=session_id,
+            turn_id=None,
+            event_type="INGEST_CONTEXTUALIZATION",
+            level="INFO",
+            message=contextualization_message,
+            payload={
+                "document_id": result.document_id,
+                **contextualization_report,
+            },
+        )
+        self.runtime_log.emit(
+            "INFO",
+            "ingest_contextualized",
+            "Recorded document contextualization review.",
+            experiment_id=experiment_id,
+            session_id=session_id,
+            document_id=result.document_id,
+            document_title=resolved_path.name,
+            contextualization_status=contextualization_report.get("status"),
+            mode=contextualization_report.get("mode"),
+            gate=contextualization_report.get("mlx_review_gate"),
+            memes_touched=contextualization_report.get("memes_touched"),
+            memodes_touched=contextualization_report.get("memodes_touched"),
+        )
         brief_nodes = self._index_document_brief(
             experiment_id=experiment_id,
             document_id=result.document_id,
@@ -2780,6 +3547,13 @@ class EdenRuntime:
                 "briefing_indexed": bool(brief_nodes["meme_ids"] or brief_nodes["memode_ids"]),
                 "brief_meme_count": len(brief_nodes["meme_ids"]),
                 "brief_memode_count": len(brief_nodes["memode_ids"]),
+                "contextualization_indexed": bool(
+                    contextualization_report.get("memes_touched") or contextualization_report.get("memodes_touched")
+                ),
+                "contextualization_mode": contextualization_report.get("mode", "deterministic"),
+                "contextualization_gate": contextualization_report.get("mlx_review_gate", ""),
+                "contextualization_meme_count": int(contextualization_report.get("memes_touched") or 0),
+                "contextualization_memode_count": int(contextualization_report.get("memodes_touched") or 0),
             }
         )
         return payload
