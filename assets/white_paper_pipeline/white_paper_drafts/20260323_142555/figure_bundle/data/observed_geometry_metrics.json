@@ -1,0 +1,58 @@
+[
+  {
+    "metric": "circularity",
+    "label": "OBSERVED",
+    "score": 0.01,
+    "method": "cycle-basis ringness proxy",
+    "sample_size": 10356
+  },
+  {
+    "metric": "radiality",
+    "label": "OBSERVED",
+    "score": 0.2547,
+    "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+    "sample_size": 10356
+  },
+  {
+    "metric": "linearity",
+    "label": "OBSERVED",
+    "score": 0.0528,
+    "method": "path-likeness proxy from endpoint structure and acyclicity",
+    "sample_size": 10356
+  },
+  {
+    "metric": "community_structure",
+    "label": "OBSERVED",
+    "score": 0.5727,
+    "method": "greedy modularity community score",
+    "sample_size": 999
+  },
+  {
+    "metric": "triadic_closure",
+    "label": "OBSERVED",
+    "score": 0.5803,
+    "method": "mean of transitivity, clustering, and triangle density",
+    "sample_size": 10356
+  },
+  {
+    "metric": "mirror_symmetry",
+    "label": "DERIVED",
+    "score": 0.9907,
+    "method": "reflection-match proxy on PCA coordinates",
+    "sample_size": 10356
+  },
+  {
+    "metric": "chirality",
+    "label": "DERIVED",
+    "score": 0.466,
+    "method": "signed-area imbalance on directed temporal motifs",
+    "sample_size": 45706
+  },
+  {
+    "metric": "translation_symmetry",
+    "label": "DERIVED",
+    "score": 0.3704,
+    "method": "sparse edge-distance offset bins",
+    "sample_size": 45598
+  }
+]

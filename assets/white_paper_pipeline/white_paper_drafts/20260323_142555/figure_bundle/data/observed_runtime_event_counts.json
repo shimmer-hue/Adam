@@ -1,0 +1,42 @@
+[
+  {
+    "event": "export_basin",
+    "count": 186
+  },
+  {
+    "event": "export_graph",
+    "count": 161
+  },
+  {
+    "event": "export_geometry",
+    "count": 150
+  },
+  {
+    "event": "export_measurements",
+    "count": 149
+  },
+  {
+    "event": "export_tanakh",
+    "count": 135
+  },
+  {
+    "event": "hum_refreshed",
+    "count": 100
+  },
+  {
+    "event": "generation_start",
+    "count": 79
+  },
+  {
+    "event": "generation_complete",
+    "count": 77
+  },
+  {
+    "event": "observatory_start",
+    "count": 63
+  },
+  {
+    "event": "feedback_applied",
+    "count": 55
+  }
+]

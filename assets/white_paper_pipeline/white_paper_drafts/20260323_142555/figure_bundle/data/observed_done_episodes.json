@@ -1,0 +1,26 @@
+[
+  {
+    "episode_id": "E1",
+    "status": "DONE",
+    "hypothesis": "The direct v1 loop persists turn state, applies edit feedback, and emits the full export family.",
+    "manipulation": "Bootstrap blank graph, run one chat turn, apply edit feedback, then export the experiment.",
+    "observable": "Turn count increments, membrane strips scaffold headings, feedback enters retrieval, observatory exports materialize.",
+    "outcome": "Observed in the current test pass: `tests/test_runtime_e2e.py::test_single_graph_bootstrap_chat_feedback_and_exports`."
+  },
+  {
+    "episode_id": "E2",
+    "status": "DONE",
+    "hypothesis": "Preview/commit/revert persists attributable measurement events and graph rollback.",
+    "manipulation": "Seed a session, preview an edge-add action, commit it, then revert the committed event.",
+    "observable": "Measurement ledger delta, committed edge present after commit and absent after revert.",
+    "outcome": "Observed in the current test pass: `tests/test_observatory_measurements.py::test_edge_measurement_commit_and_revert_persist`."
+  },
+  {
+    "episode_id": "E3",
+    "status": "DONE",
+    "hypothesis": "Hum refresh remains a bounded continuity artifact and stays out of prompt injection.",
+    "manipulation": "Run a chat turn, apply edit feedback, then inspect hum payload and next-turn preview prompt.",
+    "observable": "Hum feedback counts rise; `current_hum.md` and `current_hum.json` are absent from prompt assembly.",
+    "outcome": "Observed in the current test pass: `tests/test_hum_runtime.py::test_feedback_refreshes_hum_without_prompt_injection`."
+  }
+]

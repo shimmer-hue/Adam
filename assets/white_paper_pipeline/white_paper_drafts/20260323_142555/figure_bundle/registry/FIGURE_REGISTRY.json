@@ -1,0 +1,481 @@
+[
+  {
+    "figure_id": "observed_archaeology_term_drift",
+    "title": "Observed claim drift across baseline and current surfaces",
+    "provenance": "OBSERVED",
+    "inputs": [
+      "/Users/brianray/Adam/tmp/source_inventory/eden_whitepaper_v14.txt",
+      "/Users/brianray/Adam/README.md",
+      "/Users/brianray/Adam/docs/PROJECT_CHARTER.md",
+      "/Users/brianray/Adam/assets/white_paper_pipeline/intel_briefs/adam_intelligence_20260323_130734_core_audit.md",
+      "/Users/brianray/Adam/assets/white_paper_pipeline/writing_memos/20260323_131951_codex_memo.md"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/observed_archaeology_term_drift.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/observed_archaeology_term_drift.png",
+      "interactive": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/interactive/observed_archaeology_term_drift.html"
+    },
+    "caption_tex": "[OBSERVED] Term-frequency drift across the baseline draft, current README/project charter, and the Step 1/2 pipeline artifacts. Governor and recursive language concentrate in the baseline rather than in current implementation-truth surfaces.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/observed\\_archaeology\\_term\\_drift.png}\n\\caption{[OBSERVED] Term-frequency drift across the baseline draft, current README/project charter, and the Step 1/2 pipeline artifacts. Governor and recursive language concentrate in the baseline rather than in current implementation-truth surfaces.}\n\\label{fig:observed-archaeology-term-drift}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": null,
+      "input_hashes": {
+        "/Users/brianray/Adam/tmp/source_inventory/eden_whitepaper_v14.txt": "e59caba075b40f21e46ae2d55d696fee68738bcfb4db28341575ab1e8d40ab2c",
+        "/Users/brianray/Adam/README.md": "7abd75ad4039651549816b6437816093ecd8b50897fbd5c1624ba2dccfcaa5ff",
+        "/Users/brianray/Adam/docs/PROJECT_CHARTER.md": "425ebfdc03ec80e3c6a292dac84b51cd12ae49e32a47edbbf717d6ddfd7fcae2",
+        "/Users/brianray/Adam/assets/white_paper_pipeline/intel_briefs/adam_intelligence_20260323_130734_core_audit.md": "d2b5b558547994450795d03c9d5f26228eb20f43560096ac73b074707c902d15",
+        "/Users/brianray/Adam/assets/white_paper_pipeline/writing_memos/20260323_131951_codex_memo.md": "052a27a0d24df34dfbd8c198eb7b394d6e64d71ce21f54c2a6f47ffc20a79925"
+      }
+    },
+    "provenance_locator": "tmp/source_inventory/eden_whitepaper_v14.txt; README.md; docs/PROJECT_CHARTER.md; assets/white_paper_pipeline/intel_briefs/adam_intelligence_20260323_130734_core_audit.md; assets/white_paper_pipeline/writing_memos/20260323_131951_codex_memo.md",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "archaeology",
+      "order": 1
+    }
+  },
+  {
+    "figure_id": "observed_done_episodes",
+    "title": "Observed completed episodes",
+    "provenance": "OBSERVED",
+    "inputs": [
+      "/Users/brianray/Adam/tests/test_runtime_e2e.py",
+      "/Users/brianray/Adam/tests/test_observatory_measurements.py",
+      "/Users/brianray/Adam/tests/test_hum_runtime.py"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/observed_done_episodes.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/observed_done_episodes.png",
+      "interactive": ""
+    },
+    "caption_tex": "[OBSERVED] Three bounded `DONE` episodes anchored to current-turn test execution: direct-loop e2e, observatory commit/revert persistence, and hum refresh without prompt injection.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/observed\\_done\\_episodes.png}\n\\caption{[OBSERVED] Three bounded `DONE` episodes anchored to current-turn test execution: direct-loop e2e, observatory commit/revert persistence, and hum refresh without prompt injection.}\n\\label{fig:observed-done-episodes}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": null,
+      "input_hashes": {
+        "/Users/brianray/Adam/tests/test_runtime_e2e.py": "a3d42fc1f371876c5a0ffdb8d766227be35ed4f726e34adea42be9161bc3e47b",
+        "/Users/brianray/Adam/tests/test_observatory_measurements.py": "c2e9a39751c79a693876196c3f43dd1cd04b145d18f502c3ca735fe994b34fac",
+        "/Users/brianray/Adam/tests/test_hum_runtime.py": "98bbb3dbcf409b47e45a8f981ff8a8ca094b2f236fbc95b053f5699c62570b75"
+      }
+    },
+    "provenance_locator": "tests/test_runtime_e2e.py:L11-L75; tests/test_observatory_measurements.py:L53-L167; tests/test_hum_runtime.py:L92-L121; pytest Step 3 run outputs",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "empirical_program",
+      "order": 1
+    }
+  },
+  {
+    "figure_id": "observed_memode_audit_summary",
+    "title": "Observed memode audit summary",
+    "provenance": "OBSERVED",
+    "inputs": [
+      "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/graph_knowledge_base.json"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/observed_memode_audit_summary.csv",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/observed_memode_audit_summary.png",
+      "interactive": ""
+    },
+    "caption_tex": "[OBSERVED] Memode audit summary exported with `graph\\_knowledge\\_base.json`: 200 audited memodes, 199 admissible, one flagged, and 1,189 materialized support edges.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/observed\\_memode\\_audit\\_summary.png}\n\\caption{[OBSERVED] Memode audit summary exported with `graph\\_knowledge\\_base.json`: 200 audited memodes, 199 admissible, one flagged, and 1,189 materialized support edges.}\n\\label{fig:observed-memode-audit-summary}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": null,
+      "input_hashes": {
+        "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/graph_knowledge_base.json": "5e5920be685246675d98e272bf59a578e1a8ceed677c0f888d13c1e06207b868"
+      }
+    },
+    "provenance_locator": "exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/graph_knowledge_base.json (memode_audit.summary)",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "memetic_objects",
+      "order": 1
+    }
+  },
+  {
+    "figure_id": "observed_memode_support_graph",
+    "title": "Observed memode support graph",
+    "provenance": "OBSERVED",
+    "inputs": [
+      "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/graph_knowledge_base.json"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/observed_memode_support_graph.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/observed_memode_support_graph.png",
+      "interactive": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/interactive/observed_memode_support_graph.html"
+    },
+    "caption_tex": "[OBSERVED] One audited memode from `graph\\_knowledge\\_base.json`, shown with member memes and qualifying support edges. The memode is derived and admissibility-gated, not a free-floating cluster label.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/observed\\_memode\\_support\\_graph.png}\n\\caption{[OBSERVED] One audited memode from `graph\\_knowledge\\_base.json`, shown with member memes and qualifying support edges. The memode is derived and admissibility-gated, not a free-floating cluster label.}\n\\label{fig:observed-memode-support-graph}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": 42,
+      "input_hashes": {
+        "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/graph_knowledge_base.json": "5e5920be685246675d98e272bf59a578e1a8ceed677c0f888d13c1e06207b868"
+      }
+    },
+    "provenance_locator": "exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/graph_knowledge_base.json (memode_audit.memodes[passes=true, support_edges>0])",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "memetic_objects",
+      "order": 2
+    }
+  },
+  {
+    "figure_id": "observed_measurement_ledger",
+    "title": "Observed measurement ledger events",
+    "provenance": "OBSERVED",
+    "inputs": [
+      "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_events.json",
+      "/Users/brianray/Adam/logs/runtime.jsonl"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/observed_measurement_ledger.csv",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/observed_measurement_ledger.png",
+      "interactive": ""
+    },
+    "caption_tex": "[OBSERVED] The exported measurement ledger for experiment `b178bed2-...` shows explicit `edge\\_add` and `revert` events with operator and evidence metadata.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/observed\\_measurement\\_ledger.png}\n\\caption{[OBSERVED] The exported measurement ledger for experiment `b178bed2-...` shows explicit `edge\\_add` and `revert` events with operator and evidence metadata.}\n\\label{fig:observed-measurement-ledger}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": null,
+      "input_hashes": {
+        "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_events.json": "d482b36e64327718d3d27b8d93b9cceacffd619a3eac1e5026eb4c32f6dc990c",
+        "/Users/brianray/Adam/logs/runtime.jsonl": "15b7b9e9f438ff7e4ac39b2806ef6feb6ea2ca579922a065cf41d85be0d2bad2"
+      }
+    },
+    "provenance_locator": "exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_events.json; logs/runtime.jsonl:L109-L114",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "observatory_contract",
+      "order": 1
+    }
+  },
+  {
+    "figure_id": "observed_geometry_metrics",
+    "title": "Observed geometry metrics and labels",
+    "provenance": "OBSERVED",
+    "inputs": [
+      "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/geometry_diagnostics.json"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/observed_geometry_metrics.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/observed_geometry_metrics.png",
+      "interactive": ""
+    },
+    "caption_tex": "[OBSERVED] Geometry diagnostics exported from `geometry\\_diagnostics.json`. The current build labels circularity, radiality, linearity, community structure, and triadic closure as observed, while symmetry proxies remain derived.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/observed\\_geometry\\_metrics.png}\n\\caption{[OBSERVED] Geometry diagnostics exported from `geometry\\_diagnostics.json`. The current build labels circularity, radiality, linearity, community structure, and triadic closure as observed, while symmetry proxies remain derived.}\n\\label{fig:observed-geometry-metrics}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": null,
+      "input_hashes": {
+        "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/geometry_diagnostics.json": "0deeeb3bfe726dd8286d97abf630cd5b7c48254199aff05d5e334b7d064e7042"
+      }
+    },
+    "provenance_locator": "exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/geometry_diagnostics.json (full_graph.metrics.metrics)",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "observatory_contract",
+      "order": 2
+    }
+  },
+  {
+    "figure_id": "observed_runtime_event_counts",
+    "title": "Observed runtime event counts",
+    "provenance": "OBSERVED",
+    "inputs": [
+      "/Users/brianray/Adam/logs/runtime.jsonl"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/observed_runtime_event_counts.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/observed_runtime_event_counts.png",
+      "interactive": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/interactive/observed_runtime_event_counts.html"
+    },
+    "caption_tex": "[OBSERVED] Runtime event counts aggregated from `logs/runtime.jsonl`. Export, generation, and hum-refresh events dominate the current trace surface.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/observed\\_runtime\\_event\\_counts.png}\n\\caption{[OBSERVED] Runtime event counts aggregated from `logs/runtime.jsonl`. Export, generation, and hum-refresh events dominate the current trace surface.}\n\\label{fig:observed-runtime-event-counts}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": null,
+      "input_hashes": {
+        "/Users/brianray/Adam/logs/runtime.jsonl": "15b7b9e9f438ff7e4ac39b2806ef6feb6ea2ca579922a065cf41d85be0d2bad2"
+      }
+    },
+    "provenance_locator": "logs/runtime.jsonl:L1-L1366",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "operational_evidence",
+      "order": 1
+    }
+  },
+  {
+    "figure_id": "observed_store_counts",
+    "title": "Observed persistent store cardinalities",
+    "provenance": "OBSERVED",
+    "inputs": [
+      "/Users/brianray/Adam/data/eden.db"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/observed_store_counts.csv",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/observed_store_counts.png",
+      "interactive": ""
+    },
+    "caption_tex": "[OBSERVED] Selected SQLite table counts from `data/eden.db` at run time. The persistence substrate is graph state rather than model-weight adaptation.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/observed\\_store\\_counts.png}\n\\caption{[OBSERVED] Selected SQLite table counts from `data/eden.db` at run time. The persistence substrate is graph state rather than model-weight adaptation.}\n\\label{fig:observed-store-counts}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": null,
+      "input_hashes": {
+        "/Users/brianray/Adam/data/eden.db": "152021f95f1198ba3bd289f5ded945c6e4813530bd5432f1d290ec6c87de11cb"
+      }
+    },
+    "provenance_locator": "data/eden.db (SQLite counts query over experiments, sessions, turns, memes, memodes, edges, feedback_events, measurement_events, membrane_events, trace_events, export_artifacts)",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "operational_evidence",
+      "order": 2
+    }
+  },
+  {
+    "figure_id": "synthetic_regard_decay",
+    "title": "Synthetic regard trajectories",
+    "provenance": "SYNTHETIC",
+    "inputs": [
+      "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/synthetic_regard_decay.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/synthetic_regard_decay.png",
+      "interactive": ""
+    },
+    "caption_tex": "[SYNTHETIC] Deterministic regard trajectories used only to validate the paper's metric and visualization pipeline. Seed = 11; no observed runtime performance is implied.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/synthetic\\_regard\\_decay.png}\n\\caption{[SYNTHETIC] Deterministic regard trajectories used only to validate the paper's metric and visualization pipeline. Seed = 11; no observed runtime performance is implied.}\n\\label{fig:synthetic-regard-decay}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": 11,
+      "input_hashes": {
+        "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py": "9820612afc929fb8b36e5b5a4fe33e42a8414371c93dafc6947b60056b7622ce"
+      }
+    },
+    "provenance_locator": "assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "synthetic_appendix",
+      "order": 1
+    }
+  },
+  {
+    "figure_id": "synthetic_active_set_budgets",
+    "title": "Synthetic prompt-budget partition",
+    "provenance": "SYNTHETIC",
+    "inputs": [
+      "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/synthetic_active_set_budgets.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/synthetic_active_set_budgets.png",
+      "interactive": ""
+    },
+    "caption_tex": "[SYNTHETIC] Deterministic prompt-budget partitions that illustrate bounded active-set assembly without claiming live telemetry. Seed = 17.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/synthetic\\_active\\_set\\_budgets.png}\n\\caption{[SYNTHETIC] Deterministic prompt-budget partitions that illustrate bounded active-set assembly without claiming live telemetry. Seed = 17.}\n\\label{fig:synthetic-active-set-budgets}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": 17,
+      "input_hashes": {
+        "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py": "9820612afc929fb8b36e5b5a4fe33e42a8414371c93dafc6947b60056b7622ce"
+      }
+    },
+    "provenance_locator": "assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "synthetic_appendix",
+      "order": 2
+    }
+  },
+  {
+    "figure_id": "synthetic_browser_contract_layers",
+    "title": "Synthetic browser contract layers",
+    "provenance": "SYNTHETIC",
+    "inputs": [
+      "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/synthetic_browser_contract_layers.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/synthetic_browser_contract_layers.png",
+      "interactive": ""
+    },
+    "caption_tex": "[SYNTHETIC] An explanatory stack that separates browser-local view state from live mutation and persistent measurement evidence. Seed = 23.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/synthetic\\_browser\\_contract\\_layers.png}\n\\caption{[SYNTHETIC] An explanatory stack that separates browser-local view state from live mutation and persistent measurement evidence. Seed = 23.}\n\\label{fig:synthetic-browser-contract-layers}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": 23,
+      "input_hashes": {
+        "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py": "9820612afc929fb8b36e5b5a4fe33e42a8414371c93dafc6947b60056b7622ce"
+      }
+    },
+    "provenance_locator": "assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "synthetic_appendix",
+      "order": 3
+    }
+  },
+  {
+    "figure_id": "synthetic_measurement_state_machine",
+    "title": "Synthetic measurement state machine",
+    "provenance": "SYNTHETIC",
+    "inputs": [
+      "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/synthetic_measurement_state_machine.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/synthetic_measurement_state_machine.png",
+      "interactive": ""
+    },
+    "caption_tex": "[SYNTHETIC] Deterministic preview-separated mutation flow used to explain the measurement-event contract. Seed = 31.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/synthetic\\_measurement\\_state\\_machine.png}\n\\caption{[SYNTHETIC] Deterministic preview-separated mutation flow used to explain the measurement-event contract. Seed = 31.}\n\\label{fig:synthetic-measurement-state-machine}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": 31,
+      "input_hashes": {
+        "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py": "9820612afc929fb8b36e5b5a4fe33e42a8414371c93dafc6947b60056b7622ce"
+      }
+    },
+    "provenance_locator": "assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "synthetic_appendix",
+      "order": 4
+    }
+  },
+  {
+    "figure_id": "synthetic_memetic_proxies",
+    "title": "Synthetic memetic proxy trajectories",
+    "provenance": "SYNTHETIC",
+    "inputs": [
+      "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/synthetic_memetic_proxies.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/synthetic_memetic_proxies.png",
+      "interactive": ""
+    },
+    "caption_tex": "[SYNTHETIC] Deterministic memetic proxy curves used only to show how fidelity, fecundity, and longevity could be operationalized in later work. Seed = 37.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/synthetic\\_memetic\\_proxies.png}\n\\caption{[SYNTHETIC] Deterministic memetic proxy curves used only to show how fidelity, fecundity, and longevity could be operationalized in later work. Seed = 37.}\n\\label{fig:synthetic-memetic-proxies}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": 37,
+      "input_hashes": {
+        "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py": "9820612afc929fb8b36e5b5a4fe33e42a8414371c93dafc6947b60056b7622ce"
+      }
+    },
+    "provenance_locator": "assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "synthetic_appendix",
+      "order": 5
+    }
+  },
+  {
+    "figure_id": "synthetic_geometry_pipeline",
+    "title": "Synthetic geometry evidence pipeline",
+    "provenance": "SYNTHETIC",
+    "inputs": [
+      "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/synthetic_geometry_pipeline.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/synthetic_geometry_pipeline.png",
+      "interactive": ""
+    },
+    "caption_tex": "[SYNTHETIC] Deterministic geometry-instrumentation flow used to keep the paper's explanation aligned with the repo's evidence policy. Seed = 43.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/synthetic\\_geometry\\_pipeline.png}\n\\caption{[SYNTHETIC] Deterministic geometry-instrumentation flow used to keep the paper's explanation aligned with the repo's evidence policy. Seed = 43.}\n\\label{fig:synthetic-geometry-pipeline}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": 43,
+      "input_hashes": {
+        "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py": "9820612afc929fb8b36e5b5a4fe33e42a8414371c93dafc6947b60056b7622ce"
+      }
+    },
+    "provenance_locator": "assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "synthetic_appendix",
+      "order": 6
+    }
+  },
+  {
+    "figure_id": "synthetic_runtime_spine",
+    "title": "Synthetic Adam v1 runtime spine",
+    "provenance": "SYNTHETIC",
+    "inputs": [
+      "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py"
+    ],
+    "outputs": {
+      "data": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/data/synthetic_runtime_spine.json",
+      "static": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/figure_bundle/static/synthetic_runtime_spine.png",
+      "interactive": ""
+    },
+    "caption_tex": "[SYNTHETIC] Deterministic controlled-English rendering of the direct Adam v1 loop. Seed = 53.",
+    "latex": "\\begin{figure*}[t]\n\\centering\n\\includegraphics[width=0.92\\textwidth]{../figure\\_bundle/static/synthetic\\_runtime\\_spine.png}\n\\caption{[SYNTHETIC] Deterministic controlled-English rendering of the direct Adam v1 loop. Seed = 53.}\n\\label{fig:synthetic-runtime-spine}\n\\end{figure*}\n",
+    "build": {
+      "generator": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+      "seed": 53,
+      "input_hashes": {
+        "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py": "9820612afc929fb8b36e5b5a4fe33e42a8414371c93dafc6947b60056b7622ce"
+      }
+    },
+    "provenance_locator": "assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py",
+    "reproduction_notes": "Run `./.venv/bin/python assets/white_paper_pipeline/white_paper_drafts/20260323_142555/data/generate_figure_bundle.py` from the repo root.",
+    "export_status": "ok",
+    "failure_reason": "",
+    "paper": {
+      "include": true,
+      "section": "synthetic_appendix",
+      "order": 7
+    }
+  }
+]

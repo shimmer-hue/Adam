@@ -1,0 +1,8 @@
+metric,count
+memodes,200
+admissible_memodes,199
+flagged_memodes,1
+materialized_support_edges,1189
+informational_relations,35095
+knowledge_informational_relations,32448
+unmaterialized_support_candidates,1752

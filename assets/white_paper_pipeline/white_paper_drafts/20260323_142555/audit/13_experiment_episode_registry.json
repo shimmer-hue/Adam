@@ -1,0 +1,42 @@
+[
+  {
+    "episode_id": "E1",
+    "status": "DONE",
+    "hypothesis": "The direct v1 loop persists turn state, edit feedback, and the export family.",
+    "manipulation": "Bootstrap blank graph, run one chat turn, apply edit feedback, export experiment.",
+    "measured_observable": "turn persistence, active-set presence, membrane sanitation, retrieval of feedback, exported artifact family",
+    "outcome": "Supported",
+    "confounds": "bounded test harness rather than full live-user session; does not prove long-horizon generalization",
+    "evidence_locators": [
+      "tests/test_runtime_e2e.py:L11-L75"
+    ]
+  },
+  {
+    "episode_id": "E2",
+    "status": "DONE",
+    "hypothesis": "Preview/commit/revert persists attributable measurement events and explicit rollback.",
+    "manipulation": "Preview edge_add, commit, then revert committed event.",
+    "measured_observable": "ledger delta, committed edge present after commit, absent after revert",
+    "outcome": "Supported",
+    "confounds": "server-side test plus export/log corroboration; no fresh Playwright rerun this turn",
+    "evidence_locators": [
+      "tests/test_observatory_measurements.py:L53-L167",
+      "exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_events.json",
+      "logs/runtime.jsonl:L109-L114"
+    ]
+  },
+  {
+    "episode_id": "E3",
+    "status": "DONE",
+    "hypothesis": "Hum refresh remains a bounded continuity artifact and does not leak into prompt assembly.",
+    "manipulation": "Run chat turn, apply edit feedback, inspect hum payload and preview prompt.",
+    "measured_observable": "hum payload counts rise while hum file paths stay absent from prompt assembly",
+    "outcome": "Supported",
+    "confounds": "bounded runtime path; does not prove all future hum variants stay injection-free without regression checks",
+    "evidence_locators": [
+      "tests/test_hum_runtime.py:L92-L121",
+      "exports/conversations/adam-graph-bb298723/operator-session-8a5213f7.md",
+      "logs/runtime.jsonl:L1233-L1235"
+    ]
+  }
+]

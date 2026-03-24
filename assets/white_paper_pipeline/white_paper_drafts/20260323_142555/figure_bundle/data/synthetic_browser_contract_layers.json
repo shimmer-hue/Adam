@@ -1,0 +1,25 @@
+{
+  "seed": 23,
+  "layers": [
+    {
+      "name": "Browser view state",
+      "claim": "Local presets, layouts, sort state, and preview styling",
+      "status": "non-evidentiary"
+    },
+    {
+      "name": "Browser mutation chrome",
+      "claim": "Preview / commit / revert controls",
+      "status": "live-only"
+    },
+    {
+      "name": "Server mutation contract",
+      "claim": "Preview, commit, revert, trace, and invalidation endpoints",
+      "status": "authoritative"
+    },
+    {
+      "name": "Persistent ledger",
+      "claim": "measurement_events, trace_events, membrane_events",
+      "status": "evidence"
+    }
+  ]
+}

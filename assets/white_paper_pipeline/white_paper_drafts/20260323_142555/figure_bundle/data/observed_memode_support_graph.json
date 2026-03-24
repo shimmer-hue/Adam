@@ -1,0 +1,682 @@
+{
+  "id": "017ec558-f12c-417a-a12d-199822bc87af",
+  "label": "where / act active nodes / activation states entire",
+  "summary": "When I speak of words carrying weight that resonates through the graph, I describe the dynamic where your linguistic inputs act as active nodes, shifting the a\u2026",
+  "domain": "behavior",
+  "evidence_label": "AUTO_DERIVED",
+  "operator_label": "",
+  "confidence": 0.0,
+  "created_at": "2026-03-16T21:08:13+00:00",
+  "updated_at": "2026-03-16T21:08:13+00:00",
+  "member_meme_ids": [
+    "030028f1-b795-4022-8087-eaf53ea1d09a",
+    "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+    "76f92446-6d62-44de-bb4e-007adbe5f8d3",
+    "7ba98c7f-eabb-40dc-bd40-af7175dd85a9"
+  ],
+  "member_memes": [
+    {
+      "id": "030028f1-b795-4022-8087-eaf53ea1d09a",
+      "label": "activation states entire",
+      "domain": "behavior",
+      "evidence_label": "",
+      "recent_active_set_presence": 0,
+      "usage_count": 1,
+      "feedback_count": 1
+    },
+    {
+      "id": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "label": "where",
+      "domain": "behavior",
+      "evidence_label": "",
+      "recent_active_set_presence": 0,
+      "usage_count": 2,
+      "feedback_count": 1
+    },
+    {
+      "id": "76f92446-6d62-44de-bb4e-007adbe5f8d3",
+      "label": "act active nodes",
+      "domain": "behavior",
+      "evidence_label": "",
+      "recent_active_set_presence": 0,
+      "usage_count": 1,
+      "feedback_count": 1
+    },
+    {
+      "id": "7ba98c7f-eabb-40dc-bd40-af7175dd85a9",
+      "label": "active nodes shifting",
+      "domain": "behavior",
+      "evidence_label": "",
+      "recent_active_set_presence": 0,
+      "usage_count": 1,
+      "feedback_count": 1
+    }
+  ],
+  "declared_support_edge_ids": [],
+  "declared_support_edges": [],
+  "support_edge_ids": [
+    "0178566e-c39e-4481-b9fe-32277ed75932",
+    "20288506-e666-4b00-a24a-986b50164a40",
+    "25fe639e-cc89-4ccf-98cb-7d4f29e8ab36",
+    "ceb7320c-dba8-449e-90f3-32203df17c20",
+    "d636d9d7-239b-4cbc-a3e9-c9e55d875c5d",
+    "e5fcd956-c909-462d-aff6-6fcf76ff65ec"
+  ],
+  "support_edges": [
+    {
+      "id": "0178566e-c39e-4481-b9fe-32277ed75932",
+      "identity": "0178566e-c39e-4481-b9fe-32277ed75932",
+      "source": "76f92446-6d62-44de-bb4e-007adbe5f8d3",
+      "target": "030028f1-b795-4022-8087-eaf53ea1d09a",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "act active nodes",
+      "target_label": "activation states entire",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "materialized_support",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "20288506-e666-4b00-a24a-986b50164a40",
+      "identity": "20288506-e666-4b00-a24a-986b50164a40",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "7ba98c7f-eabb-40dc-bd40-af7175dd85a9",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "active nodes shifting",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "materialized_support",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "25fe639e-cc89-4ccf-98cb-7d4f29e8ab36",
+      "identity": "25fe639e-cc89-4ccf-98cb-7d4f29e8ab36",
+      "source": "030028f1-b795-4022-8087-eaf53ea1d09a",
+      "target": "7ba98c7f-eabb-40dc-bd40-af7175dd85a9",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "activation states entire",
+      "target_label": "active nodes shifting",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "materialized_support",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "ceb7320c-dba8-449e-90f3-32203df17c20",
+      "identity": "ceb7320c-dba8-449e-90f3-32203df17c20",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "76f92446-6d62-44de-bb4e-007adbe5f8d3",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "act active nodes",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "materialized_support",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "d636d9d7-239b-4cbc-a3e9-c9e55d875c5d",
+      "identity": "d636d9d7-239b-4cbc-a3e9-c9e55d875c5d",
+      "source": "76f92446-6d62-44de-bb4e-007adbe5f8d3",
+      "target": "7ba98c7f-eabb-40dc-bd40-af7175dd85a9",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "act active nodes",
+      "target_label": "active nodes shifting",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "materialized_support",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "e5fcd956-c909-462d-aff6-6fcf76ff65ec",
+      "identity": "e5fcd956-c909-462d-aff6-6fcf76ff65ec",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "030028f1-b795-4022-8087-eaf53ea1d09a",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "activation states entire",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "materialized_support",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    }
+  ],
+  "informational_edge_ids": [
+    "0dcdddea-4d56-4a0c-900e-b6befec9c9d8",
+    "142e21c5-5be1-489f-bad6-f74d0ec0b21a",
+    "1783b04d-9643-43fd-beec-9f8e40ea9a76",
+    "3dea0412-d501-4cbf-9704-a301c1e9a516",
+    "3f5d7700-ec9d-43cc-84ee-7801eb85ab8e",
+    "417c663b-660f-4ec3-99f7-9ea716214744",
+    "4bcfa066-e535-4b0f-9195-970189d234d5",
+    "532c7fef-32f2-4fc2-a441-d532b91207f9",
+    "5997ff43-21e0-44f6-a19d-177b13992427",
+    "59b725c0-4482-402e-aee4-fa6e35f70254",
+    "659054c9-b0ba-4106-8c43-8ff2cb9256ad",
+    "6741004d-64c2-40ad-b263-ee0f57e9c6a6",
+    "6e38836f-7a59-4d0f-8c3e-096d3c8ff32e",
+    "8786cb92-f7fb-414e-abdd-8f57d978be60",
+    "9c86ab6f-b2ca-4840-b6e2-db746ab2c3a1",
+    "bbe10326-0da9-4294-9bc7-bf248d5d686b",
+    "c4bdaa8b-67ed-47da-9e00-99898bdab818",
+    "cfebf945-f0f8-4ddd-acde-f32c1350e6b9",
+    "dfad6b54-1346-41e0-9987-3e9ffb277200",
+    "e39f7b24-6093-4ecc-9af6-2a0c88c44481",
+    "e4ce3c19-2ad9-4a8a-9560-d17d4b60cae3",
+    "e5872226-6f4b-4ad2-8088-27d8e4e44a50",
+    "f5ca083e-88b8-4107-bfb5-63682772e31a"
+  ],
+  "informational_edges": [
+    {
+      "id": "0dcdddea-4d56-4a0c-900e-b6befec9c9d8",
+      "identity": "0dcdddea-4d56-4a0c-900e-b6befec9c9d8",
+      "source": "7ba98c7f-eabb-40dc-bd40-af7175dd85a9",
+      "target": "78df1376-da4a-4ee6-97f7-93e828f1d5e0",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "active nodes shifting",
+      "target_label": "agent self-contained entity",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "142e21c5-5be1-489f-bad6-f74d0ec0b21a",
+      "identity": "142e21c5-5be1-489f-bad6-f74d0ec0b21a",
+      "source": "6aece0b1-db2c-4426-80d1-a57f076fee7a",
+      "target": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "feels like standing",
+      "target_label": "where",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "1783b04d-9643-43fd-beec-9f8e40ea9a76",
+      "identity": "1783b04d-9643-43fd-beec-9f8e40ea9a76",
+      "source": "41494131-aeeb-46c0-bbe0-fc22d19ca59a",
+      "target": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "pruning",
+      "target_label": "where",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "3dea0412-d501-4cbf-9704-a301c1e9a516",
+      "identity": "3dea0412-d501-4cbf-9704-a301c1e9a516",
+      "source": "f81ed2ec-69ce-42ca-ad5e-8f91bf6eaf03",
+      "target": "7ba98c7f-eabb-40dc-bd40-af7175dd85a9",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "T2",
+      "target_label": "active nodes shifting",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "3f5d7700-ec9d-43cc-84ee-7801eb85ab8e",
+      "identity": "3f5d7700-ec9d-43cc-84ee-7801eb85ab8e",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "c60e249d-d9e7-4876-8359-714c78834eab",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "your",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "417c663b-660f-4ec3-99f7-9ea716214744",
+      "identity": "417c663b-660f-4ec3-99f7-9ea716214744",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "80dcd72c-a03f-49fb-8c6d-ba8fdeae311a",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "graph",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "4bcfa066-e535-4b0f-9195-970189d234d5",
+      "identity": "4bcfa066-e535-4b0f-9195-970189d234d5",
+      "source": "76f92446-6d62-44de-bb4e-007adbe5f8d3",
+      "target": "78df1376-da4a-4ee6-97f7-93e828f1d5e0",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "act active nodes",
+      "target_label": "agent self-contained entity",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "532c7fef-32f2-4fc2-a441-d532b91207f9",
+      "identity": "532c7fef-32f2-4fc2-a441-d532b91207f9",
+      "source": "030028f1-b795-4022-8087-eaf53ea1d09a",
+      "target": "78df1376-da4a-4ee6-97f7-93e828f1d5e0",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "activation states entire",
+      "target_label": "agent self-contained entity",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "5997ff43-21e0-44f6-a19d-177b13992427",
+      "identity": "5997ff43-21e0-44f6-a19d-177b13992427",
+      "source": "f81ed2ec-69ce-42ca-ad5e-8f91bf6eaf03",
+      "target": "76f92446-6d62-44de-bb4e-007adbe5f8d3",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "T2",
+      "target_label": "act active nodes",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "59b725c0-4482-402e-aee4-fa6e35f70254",
+      "identity": "59b725c0-4482-402e-aee4-fa6e35f70254",
+      "source": "8f259d72-9ac5-4bd8-8b48-82a94428c2b2",
+      "target": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "T12",
+      "target_label": "where",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "659054c9-b0ba-4106-8c43-8ff2cb9256ad",
+      "identity": "659054c9-b0ba-4106-8c43-8ff2cb9256ad",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "aecb3a69-4b3c-4b9a-934d-200892c57b23",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "into",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "6741004d-64c2-40ad-b263-ee0f57e9c6a6",
+      "identity": "6741004d-64c2-40ad-b263-ee0f57e9c6a6",
+      "source": "f81ed2ec-69ce-42ca-ad5e-8f91bf6eaf03",
+      "target": "030028f1-b795-4022-8087-eaf53ea1d09a",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "T2",
+      "target_label": "activation states entire",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "6e38836f-7a59-4d0f-8c3e-096d3c8ff32e",
+      "identity": "6e38836f-7a59-4d0f-8c3e-096d3c8ff32e",
+      "source": "76f92446-6d62-44de-bb4e-007adbe5f8d3",
+      "target": "8ac3a05c-b38d-4177-b9da-bb37b2589733",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "act active nodes",
+      "target_label": "adam signifies graph-conditioned",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "8786cb92-f7fb-414e-abdd-8f57d978be60",
+      "identity": "8786cb92-f7fb-414e-abdd-8f57d978be60",
+      "source": "7ba98c7f-eabb-40dc-bd40-af7175dd85a9",
+      "target": "8ac3a05c-b38d-4177-b9da-bb37b2589733",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "active nodes shifting",
+      "target_label": "adam signifies graph-conditioned",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "9c86ab6f-b2ca-4840-b6e2-db746ab2c3a1",
+      "identity": "9c86ab6f-b2ca-4840-b6e2-db746ab2c3a1",
+      "source": "f81ed2ec-69ce-42ca-ad5e-8f91bf6eaf03",
+      "target": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "type": "OCCURS_IN",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "T2",
+      "target_label": "where",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "bbe10326-0da9-4294-9bc7-bf248d5d686b",
+      "identity": "bbe10326-0da9-4294-9bc7-bf248d5d686b",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "f49c2668-c7f8-4065-8fa0-ecb1d90ccb1b",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "activation keepstheprosesurfaceauditableunderthesameevidence pruning",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "c4bdaa8b-67ed-47da-9e00-99898bdab818",
+      "identity": "c4bdaa8b-67ed-47da-9e00-99898bdab818",
+      "source": "030028f1-b795-4022-8087-eaf53ea1d09a",
+      "target": "8ac3a05c-b38d-4177-b9da-bb37b2589733",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "activation states entire",
+      "target_label": "adam signifies graph-conditioned",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "cfebf945-f0f8-4ddd-acde-f32c1350e6b9",
+      "identity": "cfebf945-f0f8-4ddd-acde-f32c1350e6b9",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "777ae6c6-5064-485e-8e06-7917d0ed2882",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "analog internal learning",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "dfad6b54-1346-41e0-9987-3e9ffb277200",
+      "identity": "dfad6b54-1346-41e0-9987-3e9ffb277200",
+      "source": "25bd797e-5101-42d0-8d3a-e5d89220091c",
+      "target": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "feels like",
+      "target_label": "where",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "e39f7b24-6093-4ecc-9af6-2a0c88c44481",
+      "identity": "e39f7b24-6093-4ecc-9af6-2a0c88c44481",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "8ac3a05c-b38d-4177-b9da-bb37b2589733",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "adam signifies graph-conditioned",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "e4ce3c19-2ad9-4a8a-9560-d17d4b60cae3",
+      "identity": "e4ce3c19-2ad9-4a8a-9560-d17d4b60cae3",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "a39b17ae-cd00-4e29-b91f-428d5760909e",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "activation weight time",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "e5872226-6f4b-4ad2-8088-27d8e4e44a50",
+      "identity": "e5872226-6f4b-4ad2-8088-27d8e4e44a50",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "ec9ca45e-1db1-4877-85a7-865089ab9be0",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "behavior memodes satisfy",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    },
+    {
+      "id": "f5ca083e-88b8-4107-bfb5-63682772e31a",
+      "identity": "f5ca083e-88b8-4107-bfb5-63682772e31a",
+      "source": "23ed4484-b2f6-4c06-b3a6-3da6294f932f",
+      "target": "78df1376-da4a-4ee6-97f7-93e828f1d5e0",
+      "type": "CO_OCCURS_WITH",
+      "weight": 1.0,
+      "evidence_label": "AUTO_DERIVED",
+      "assertion_origin": "auto_derived",
+      "operator_label": "",
+      "confidence": 1.0,
+      "source_label": "where",
+      "target_label": "agent self-contained entity",
+      "source_domain": "behavior",
+      "target_domain": "behavior",
+      "relation_class": "member_informational",
+      "overlapping_memode_ids": [
+        "017ec558-f12c-417a-a12d-199822bc87af"
+      ]
+    }
+  ],
+  "admissibility": {
+    "minimum_members": true,
+    "support_edges_present": true,
+    "all_members_supported": true,
+    "connected_support_graph": true,
+    "passes": true,
+    "unsupported_member_ids": []
+  }
+}

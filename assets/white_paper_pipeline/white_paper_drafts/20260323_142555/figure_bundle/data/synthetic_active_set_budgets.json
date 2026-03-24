@@ -1,0 +1,26 @@
+{
+  "seed": 17,
+  "rows": [
+    {
+      "profile": "manual:balanced",
+      "history": 0.35,
+      "feedback": 0.18,
+      "active_set": 0.27,
+      "instructions": 0.2
+    },
+    {
+      "profile": "runtime_auto:wide",
+      "history": 0.31,
+      "feedback": 0.15,
+      "active_set": 0.36,
+      "instructions": 0.18
+    },
+    {
+      "profile": "runtime_auto:tight",
+      "history": 0.25,
+      "feedback": 0.14,
+      "active_set": 0.39,
+      "instructions": 0.22
+    }
+  ]
+}

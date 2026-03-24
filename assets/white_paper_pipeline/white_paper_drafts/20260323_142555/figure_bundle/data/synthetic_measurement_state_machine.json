@@ -1,0 +1,21 @@
+{
+  "seed": 31,
+  "states": [
+    [
+      "Observe",
+      "Choose an attributable action and preserve the baseline."
+    ],
+    [
+      "Preview",
+      "Compute deltas and `preview_graph_patch` without mutation."
+    ],
+    [
+      "Commit",
+      "Persist a measurement event and refresh graph/geometry surfaces."
+    ],
+    [
+      "Revert",
+      "Persist a second event that undoes the prior committed change."
+    ]
+  ]
+}

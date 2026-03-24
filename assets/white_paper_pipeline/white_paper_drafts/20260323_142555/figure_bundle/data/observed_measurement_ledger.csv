@@ -1,0 +1,3 @@
+index,event_id,action_type,evidence_label,created_at,reverted_from_event_id
+1,ed41de04-3244-4ba8-86fc-46ebb91cff06,edge_add,OPERATOR_ASSERTED,2026-03-06T21:33:18+00:00,
+2,f689054c-5889-4b1d-8459-3aae0f1a65b6,revert,OPERATOR_REFINED,2026-03-06T21:33:18+00:00,ed41de04-3244-4ba8-86fc-46ebb91cff06

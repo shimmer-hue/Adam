@@ -1,0 +1,80 @@
+[
+  {
+    "claim_id": "C01",
+    "claim": "Direct-loop runtime persists turns, feedback, and export family.",
+    "evidence_type": "test",
+    "path": "/Users/brianray/Adam/tests/test_runtime_e2e.py",
+    "locator": "L11-L75",
+    "sha256": "a3d42fc1f371876c5a0ffdb8d766227be35ed4f726e34adea42be9161bc3e47b",
+    "register": "IMPLEMENTED"
+  },
+  {
+    "claim_id": "C02",
+    "claim": "Observatory preview/commit/revert persists attributable measurement events.",
+    "evidence_type": "test+export+runtime_log",
+    "path": "/Users/brianray/Adam/tests/test_observatory_measurements.py",
+    "locator": "L53-L167; measurement_events.json; logs/runtime.jsonl:L109-L114",
+    "sha256": "c2e9a39751c79a693876196c3f43dd1cd04b145d18f502c3ca735fe994b34fac",
+    "register": "IMPLEMENTED"
+  },
+  {
+    "claim_id": "C03",
+    "claim": "Hum refresh is bounded continuity and not prompt injection.",
+    "evidence_type": "test+transcript+runtime_log",
+    "path": "/Users/brianray/Adam/tests/test_hum_runtime.py",
+    "locator": "L92-L121; operator-session-8a5213f7.md; logs/runtime.jsonl:L1233-L1235",
+    "sha256": "98bbb3dbcf409b47e45a8f981ff8a8ca094b2f236fbc95b053f5699c62570b75",
+    "register": "IMPLEMENTED"
+  },
+  {
+    "claim_id": "C04",
+    "claim": "Memodes are derived and admissibility-gated.",
+    "evidence_type": "normative_doc+export+test",
+    "path": "/Users/brianray/Adam/docs/CANONICAL_ONTOLOGY.md",
+    "locator": "L20-L24, L51-L57; graph_knowledge_base.json memode_audit; tests/test_observatory_measurements.py",
+    "sha256": "62acd5284a56a5e9e26455cc5fda636749e0bdd6b34ea764253ebebaed4b22e9",
+    "register": "IMPLEMENTED"
+  },
+  {
+    "claim_id": "C05",
+    "claim": "MLX is the active repo-local runtime backend.",
+    "evidence_type": "doc+code+runtime_log",
+    "path": "/Users/brianray/Adam/eden/config.py",
+    "locator": "README.md model path; eden/config.py; logs/runtime.jsonl generation_complete",
+    "sha256": "0541565972ecb42541efcc7275da92a947e9071f6ea62df0f1907bd346d62c75",
+    "register": "IMPLEMENTED"
+  },
+  {
+    "claim_id": "C06",
+    "claim": "Browser-local state is non-evidentiary and browser causality is bounded.",
+    "evidence_type": "doc+frontend+audit",
+    "path": "/Users/brianray/Adam/web/observatory/src/App.tsx",
+    "locator": "App.tsx live/static disclosures; OBSERVATORY_E2E_AUDIT.md; KNOWN_LIMITATIONS.md",
+    "sha256": "47fa52e2e4786b3e3b93e90efd217ef1741183a3c29cacb2ebe6cb16d9f24185",
+    "register": "INSTRUMENTED",
+    "modifiers": [
+      "EXPLICIT_BROWSER_CONTRACT_GAP"
+    ]
+  },
+  {
+    "claim_id": "C07",
+    "claim": "Observed/derived geometry labels are explicit.",
+    "evidence_type": "export",
+    "path": "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/geometry_diagnostics.json",
+    "locator": "full_graph.metrics.metrics",
+    "sha256": "0deeeb3bfe726dd8286d97abf630cd5b7c48254199aff05d5e334b7d064e7042",
+    "register": "IMPLEMENTED"
+  },
+  {
+    "claim_id": "C08",
+    "claim": "Full repo proof is not fully green because the ingest memoir fixture is missing.",
+    "evidence_type": "test_run",
+    "path": "/Users/brianray/Adam/tests/test_ingest.py",
+    "locator": "pytest -q failure on test_pages_pdf_fixture_extracts_readable_text",
+    "sha256": "8c8b6a437aeb5c1688b0b03165f971f92cf23c6922f7eecca78f8bccc6c99a7c",
+    "register": "IMPLEMENTED",
+    "modifiers": [
+      "DEFERRED_BY_DESIGN"
+    ]
+  }
+]

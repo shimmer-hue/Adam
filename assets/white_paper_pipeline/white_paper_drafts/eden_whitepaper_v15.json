@@ -1,0 +1,19 @@
+{
+  "source_run_directory": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260323_142555",
+  "timestamp": "2026-03-23T14:37:19-04:00",
+  "hash": "d02cbb0cc76810145e8302a3e70b7d3d525d4d958a6c98d74916f31226101f59",
+  "resolved_numbered_baseline_artifact": {
+    "path": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/eden_whitepaper_v14.pdf",
+    "sha256": "0ac4ed914143db71d9035d92f9091327800e8380988fd9bc0fc3b445d1129107",
+    "version": 14
+  },
+  "resolved_support_manuscript": {
+    "path": "/Users/brianray/Adam/assets/white_paper_pipeline/white_paper_drafts/20260320_111343/pdf/adam_whitepaper_20260320_111343.pdf",
+    "sha256": "0c5659e33917a8526f96591cb8cde105efde09f10219dd383fbd5e857dcd2e54"
+  },
+  "preserved_strengths_summary": [
+    "Retained Adam-first empirical framing from the March 20 support manuscript.",
+    "Retained graph-structured memode/measurement visuals via regenerated observed and synthetic figure bundles.",
+    "Restored numbered-lineage theoretical apparatus from v14 by recompiling Foucault/Austin/Butler/Barad/Blackmore/Dennett (and Zhang as comparator) into the main body."
+  ]
+}

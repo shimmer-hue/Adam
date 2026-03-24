@@ -1,0 +1,21 @@
+{
+  "seed": 43,
+  "steps": [
+    [
+      "Slice",
+      "Choose full graph, active set, session, or verdict slice."
+    ],
+    [
+      "Measure",
+      "Compute observed metrics plus clearly labeled derived proxies."
+    ],
+    [
+      "Interpret",
+      "Keep projection aesthetics subordinate to evidence labels."
+    ],
+    [
+      "Export",
+      "Persist geometry, graph, and measurement sidecars for audit."
+    ]
+  ]
+}

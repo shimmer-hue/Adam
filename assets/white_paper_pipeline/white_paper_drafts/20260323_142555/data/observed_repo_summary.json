@@ -1,0 +1,168 @@
+{
+  "inputs": {
+    "runtime_log": "/Users/brianray/Adam/logs/runtime.jsonl",
+    "measurement_events": "/Users/brianray/Adam/exports/b178bed2-731e-4f8b-b5f8-a93d1300b2f7/measurement_events.json",
+    "graph_knowledge_base": "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/graph_knowledge_base.json",
+    "geometry_diagnostics": "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/geometry_diagnostics.json",
+    "observatory_index": "/Users/brianray/Adam/exports/bb298723-5fbf-4554-bf6b-ec5f4d336fbd/observatory_index.json",
+    "conversation_transcript": "/Users/brianray/Adam/exports/conversations/adam-graph-bb298723/operator-session-8a5213f7.md",
+    "brief": "/Users/brianray/Adam/assets/white_paper_pipeline/intel_briefs/adam_intelligence_20260323_130734_core_audit.md",
+    "memo": "/Users/brianray/Adam/assets/white_paper_pipeline/writing_memos/20260323_131951_codex_memo.md",
+    "baseline_text": "/Users/brianray/Adam/tmp/source_inventory/eden_whitepaper_v14.txt"
+  },
+  "runtime_event_counts": {
+    "export_basin": 186,
+    "export_graph": 161,
+    "export_geometry": 150,
+    "export_measurements": 149,
+    "export_tanakh": 135,
+    "hum_refreshed": 100,
+    "generation_start": 79,
+    "generation_complete": 77,
+    "observatory_start": 63,
+    "feedback_applied": 55,
+    "turn_preview_ready": 52,
+    "ingest_start": 44,
+    "ingest_complete": 39,
+    "session_start": 30,
+    "experiment_create": 17,
+    "constitution_seeded": 17,
+    "ingest_brief_applied": 8,
+    "canon_seeded": 7,
+    "observatory_stop": 4,
+    "observatory_commit": 1,
+    "observatory_revert": 1,
+    "tanakh_run": 1,
+    "primary_graph_adopted": 1,
+    "ingest_reused": 1
+  },
+  "db_counts": {
+    "experiments": 17,
+    "sessions": 30,
+    "turns": 78,
+    "documents": 13,
+    "document_chunks": 7075,
+    "memes": 82232,
+    "memodes": 18392,
+    "edges": 447734,
+    "feedback_events": 56,
+    "measurement_events": 2,
+    "membrane_events": 78,
+    "trace_events": 249,
+    "export_artifacts": 2730
+  },
+  "graph_counts": {
+    "sessions": 28,
+    "turns": 74,
+    "documents": 13,
+    "memes": 8285,
+    "memodes": 1901,
+    "edges": 48279,
+    "feedback": 53,
+    "measurement_events": 2
+  },
+  "memode_audit_summary": {
+    "memodes": 200,
+    "admissible_memodes": 199,
+    "flagged_memodes": 1,
+    "materialized_support_edges": 1189,
+    "informational_relations": 35095,
+    "knowledge_informational_relations": 32448,
+    "unmaterialized_support_candidates": 1752
+  },
+  "geometry_metrics": {
+    "circularity": {
+      "label": "OBSERVED",
+      "score": 0.01,
+      "method": "cycle-basis ringness proxy",
+      "sample_size": 10356
+    },
+    "radiality": {
+      "label": "OBSERVED",
+      "score": 0.2547,
+      "method": "hub-and-spoke proxy from center dominance and leaf fraction",
+      "sample_size": 10356
+    },
+    "linearity": {
+      "label": "OBSERVED",
+      "score": 0.0528,
+      "method": "path-likeness proxy from endpoint structure and acyclicity",
+      "sample_size": 10356
+    },
+    "community_structure": {
+      "label": "OBSERVED",
+      "score": 0.5727,
+      "method": "greedy modularity community score",
+      "sample_size": 999
+    },
+    "triadic_closure": {
+      "label": "OBSERVED",
+      "score": 0.5803,
+      "method": "mean of transitivity, clustering, and triangle density",
+      "sample_size": 10356
+    },
+    "mirror_symmetry": {
+      "label": "DERIVED",
+      "score": 0.9907,
+      "method": "reflection-match proxy on PCA coordinates",
+      "sample_size": 10356
+    },
+    "chirality": {
+      "label": "DERIVED",
+      "score": 0.466,
+      "method": "signed-area imbalance on directed temporal motifs",
+      "sample_size": 45706
+    },
+    "translation_symmetry": {
+      "label": "DERIVED",
+      "score": 0.3704,
+      "method": "sparse edge-distance offset bins",
+      "sample_size": 45598
+    }
+  },
+  "measurement_counts": {
+    "events": 2,
+    "action_types": {
+      "edge_add": 1,
+      "revert": 1
+    },
+    "evidence_labels": {
+      "OPERATOR_ASSERTED": 1,
+      "OPERATOR_REFINED": 1
+    }
+  },
+  "observatory_index_counts": {
+    "nodes": 10356,
+    "edges": 45706,
+    "turns": 74,
+    "sessions": 22,
+    "measurement_events": 0,
+    "tanakh_ref": "Ezek 1"
+  },
+  "episodes": [
+    {
+      "episode_id": "E1",
+      "status": "DONE",
+      "hypothesis": "The direct v1 loop persists turn state, applies edit feedback, and emits the full export family.",
+      "manipulation": "Bootstrap blank graph, run one chat turn, apply edit feedback, then export the experiment.",
+      "observable": "Turn count increments, membrane strips scaffold headings, feedback enters retrieval, observatory exports materialize.",
+      "outcome": "Observed in the current test pass: `tests/test_runtime_e2e.py::test_single_graph_bootstrap_chat_feedback_and_exports`."
+    },
+    {
+      "episode_id": "E2",
+      "status": "DONE",
+      "hypothesis": "Preview/commit/revert persists attributable measurement events and graph rollback.",
+      "manipulation": "Seed a session, preview an edge-add action, commit it, then revert the committed event.",
+      "observable": "Measurement ledger delta, committed edge present after commit and absent after revert.",
+      "outcome": "Observed in the current test pass: `tests/test_observatory_measurements.py::test_edge_measurement_commit_and_revert_persist`."
+    },
+    {
+      "episode_id": "E3",
+      "status": "DONE",
+      "hypothesis": "Hum refresh remains a bounded continuity artifact and stays out of prompt injection.",
+      "manipulation": "Run a chat turn, apply edit feedback, then inspect hum payload and next-turn preview prompt.",
+      "observable": "Hum feedback counts rise; `current_hum.md` and `current_hum.json` are absent from prompt assembly.",
+      "outcome": "Observed in the current test pass: `tests/test_hum_runtime.py::test_feedback_refreshes_hum_without_prompt_injection`."
+    }
+  ]
+}

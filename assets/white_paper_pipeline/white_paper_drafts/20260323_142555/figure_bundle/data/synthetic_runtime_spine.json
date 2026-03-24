@@ -1,0 +1,21 @@
+{
+  "seed": 53,
+  "steps": [
+    [
+      "Operator Input",
+      "Brian writes to the TUI, not to a hidden planner."
+    ],
+    [
+      "Retrieve / Assemble",
+      "The runtime builds a bounded active set and prompt context."
+    ],
+    [
+      "Respond / Membrane",
+      "MLX generation yields a response, then the membrane sanitizes and records visible events."
+    ],
+    [
+      "Feedback / Graph Update",
+      "Explicit verdicts and edits alter later retrieval pressure and persistence."
+    ]
+  ]
+}
