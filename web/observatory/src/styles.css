@@ -553,6 +553,16 @@ button {
   color: var(--muted);
 }
 
+.json-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.json-preview-toolbar {
+  display: grid;
+  gap: 8px;
+}
+
 .payload-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -1124,6 +1134,14 @@ button {
   background: #f5f5f5;
 }
 
+.dock-shortcuts {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid #b7bcc4;
+  background: #eceff3;
+}
+
 .dock-tab-strip {
   display: flex;
   flex-wrap: wrap;
@@ -1277,6 +1295,16 @@ button {
   color: #4f5560;
 }
 
+.graph-window-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid #c9ced5;
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
 .graph-mode-strip,
 .graph-workbench-toolbar {
   display: flex;
@@ -1304,10 +1332,17 @@ button {
 
 .graph-stage-shell {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-columns: 176px minmax(0, 1fr);
   gap: 1px;
   min-height: 0;
   flex: 1;
+  background: #c2c7cf;
+}
+
+.graph-tool-column {
+  display: grid;
+  align-content: start;
+  gap: 1px;
   background: #c2c7cf;
 }
 
@@ -1333,6 +1368,10 @@ button {
   border-radius: 0;
   background: #eef1f4;
   font-size: 15px;
+}
+
+.graph-tool-instruction {
+  border: none;
 }
 
 .graph-stage {
@@ -1414,6 +1453,20 @@ button {
 
 .module-tab-strip-secondary {
   padding-top: 0;
+}
+
+.appearance-note {
+  display: grid;
+  gap: 3px;
+  padding: 6px 8px;
+  border: 1px solid #d2d6dc;
+  background: #f7f8fa;
+  color: #5d646d;
+  font-size: 11px;
+}
+
+.appearance-note strong {
+  color: #394048;
 }
 
 .gephi-panel-note {
@@ -1627,6 +1680,80 @@ button {
   font-size: 11px;
 }
 
+.instruction-callout {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid #c9ced5;
+  background: #f7f8fa;
+}
+
+.instruction-callout-compact {
+  padding: 7px 9px;
+}
+
+.instruction-callout h3 {
+  margin: 0;
+  font-size: 12px;
+  color: #2f353c;
+}
+
+.instruction-line {
+  margin: 0;
+  font-size: 11px;
+  color: #394048;
+  line-height: 1.35;
+}
+
+.instruction-neutral,
+.instruction-informational {
+  border-left: 3px solid #8ba8c8;
+}
+
+.instruction-ready {
+  border-left: 3px solid #8ebf9e;
+}
+
+.instruction-blocked {
+  border-left: 3px solid #d3a26d;
+}
+
+.instruction-authority {
+  border-left: 3px solid #b57b57;
+  background: #faf4ef;
+}
+
+.mode-guide {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #c9ced5;
+  background: #f7f8fa;
+}
+
+.mode-guide-ready {
+  border-left: 3px solid #8ebf9e;
+}
+
+.mode-guide-blocked {
+  border-left: 3px solid #d3a26d;
+}
+
+.mode-guide-informational {
+  border-left: 3px solid #8ba8c8;
+}
+
+.mode-guide-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.mode-guide h2 {
+  margin: 0;
+  font-size: 13px;
+  color: #2f353c;
+}
+
 .query-grid,
 .context-stat-grid {
   display: grid;
@@ -1655,17 +1782,39 @@ button {
   color: #373c42;
 }
 
+.workspace-instruction {
+  border: none;
+  border-bottom: 1px solid #c2c7cf;
+}
+
 .workspace-shell .eyebrow {
   margin: 0 0 2px;
   color: #617388;
   font-size: 10px;
 }
 
+.context-callout-heading,
+.data-lab-selection-note {
+  padding: 0 2px;
+}
+
+.authority-actions {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #c9ced5;
+  background: #f8f1ea;
+}
+
 .data-lab-meta {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   background: #c2c7cf;
+}
+
+.payload-summary-copy {
+  padding: 8px 10px 0;
 }
 
 .metric-callout {
@@ -1882,6 +2031,10 @@ button {
   }
 
   .graph-stage-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-tool-column {
     grid-template-columns: 1fr;
   }
 

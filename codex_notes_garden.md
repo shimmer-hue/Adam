@@ -8917,3 +8917,248 @@ Remaining uncertainties:
 Did not rerun full repo `./.venv/bin/pytest -q` in this turn; proof is limited to the observatory frontend test/build surface. One final agent/manual confirmation on the live workstation would prove that the stale `25 nodes` selection and `100%` meter no longer persist after restore.
 Next shortest proof path:
 Refresh the live observatory and rerun the helper flow once more. Confirm that `Restore Full View` now returns to the full graph with no lingering helper selection and a reset `0%` progress meter.
+
+## [2026-03-24 16:00:34 EDT] PRE-FLIGHT
+Operator task:
+Implement the Observatory affordance refactor across build-status honesty, Overview context/right-dock ownership, Appearance panel clarity, Data Laboratory selection wording, interaction-mode helper guidance, and heavy-panel rendering so the browser workbench stops presenting inert or misleading controls.
+Task checksum:
+`f2f9f9d9f67d4f1a`
+Repo situation:
+Worktree is clean at start of turn. Recent observatory fixes landed for launch, payload loading, and bounded browser-local layout/sample flows. Browser-agent audit now identifies remaining affordance debt: stale/misleading build warning text, blended right-dock ownership, inert Appearance tabs, ambiguous Measure mode, Data Lab node/edge wording drift, and heavy JSON/tab rendering surfaces.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+Observatory remains a browser-visible observability instrument with explicit browser-local view state and preview-first mutation boundaries. Major controls must be either runnable, explicitly gated, or clearly out of scope. Build freshness warning must remain truthful and tied to `build-meta.json`, not suppressed. Right dock should behave as a deterministic switchable workbench rather than a blended content stack.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/package.json`; `/Users/brianray/Adam/web/observatory/scripts/build.mjs`; `/Users/brianray/Adam/eden/observatory/frontend_assets.py`; `/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/styles.css`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/tests/test_observatory_server.py`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Bounded visible-sample browser-local layout flow with isolate/run/restore in Overview.
+  - Live/static observatory boot, React shell, deterministic dock grammar, Data Laboratory and Preview workspaces.
+- Instrumented:
+  - Browser-agent audit proving the remaining affordance mismatches and misleading copy/state.
+- Conceptual:
+  - Typed `ContextSummary`, typed dock-tab ownership config, and explicit interaction-mode helper descriptors.
+- Unknown:
+  - Whether any existing right-dock duplication is relied upon by operators; safest path is to preserve launch shortcuts while removing recursive content ownership.
+Risks / invariants:
+Do not regress the already-proved layout/sample workflow, preview/commit mutation boundary, or hybrid payload-loading behavior. Keep the build warning honest. Keep browser-local/non-authoritative semantics explicit. Avoid introducing heavier rendering paths while trying to improve the heavy tabs.
+Evidence plan:
+Patch the build contract and asset-status classification, refactor App.tsx around typed summary/helper configs, simplify Appearance controls, clarify Data Lab wording, collapse heavy tabs to summary-first rendering, extend Vitest coverage plus targeted Python tests for asset-status semantics, run the frontend build/test surface, then run full repo `./.venv/bin/pytest -q`.
+Shortest proof path:
+Make `build:app` produce build metadata, teach `frontend_assets.build_status()` to distinguish missing/misaligned/stale cases, add focused React tests for the audited affordances, rebuild the checked-in frontend bundle, and finish with full pytest to prove no cross-repo regression.
+## [2026-03-24 16:27:41 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/package.json`; `/Users/brianray/Adam/eden/observatory/frontend_assets.py`; `/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/styles.css`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/tests/test_frontend_assets.py`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/style.css`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the browser-local vs authoritative mutation boundary and the build-freshness warning contract. Revised the observatory shell contract so the right dock has one fixed `Context` panel plus one owned tab body, the `Appearance` panel exposes only truthful subject-specific controls, `MEASURE`/`COMPARE`/`EDIT`/`ABLATE` advertise prerequisites explicitly, and heavy diagnostic JSON surfaces default to summary-first rather than eager full dumps.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/package.json` now makes `build:app` the canonical metadata-writing frontend build and adds `build:bundle` for the rare bundle-only path. `/Users/brianray/Adam/eden/observatory/frontend_assets.py` now distinguishes missing bundle, missing metadata, invalid metadata, and stale metadata, and emits recovery copy that names `npm --prefix web/observatory run build`. `/Users/brianray/Adam/web/observatory/src/App.tsx` now derives a typed `ContextSummary`, drives the context panel from that summary only, separates graph mode/current plane/export scope, gives the right dock strict tab ownership with a footer shortcuts region, simplifies `Appearance` to `Nodes`/`Edges` subject toggles, gives `Data Laboratory` table-kind-aware selection wording plus bounded row expansion, adds explicit interaction-mode helper banners, and makes heavy raw JSON panes summary-first/collapsed by default. The checked-in observatory bundle was rebuilt in `/Users/brianray/Adam/eden/observatory/static/observatory_app/` and refreshed `build-meta.json`.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix /Users/brianray/Adam/web/observatory test` -> `20 passed`; `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_frontend_assets.py` -> `2 passed`; `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_observatory_server.py` -> `7 passed`; `npm --prefix /Users/brianray/Adam/web/observatory run build` -> success, wrote refreshed checked-in bundle plus `build-meta.json`; `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `{"ok": true, "warning": false, "state": "ok"}` with matching source/built hash `e09602dbd5aff75c`; `./.venv/bin/pytest -q` -> `125 passed, 1 failed`, where the lone failure is `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing on disk.
+Status register changes:
+- Implemented:
+  - Truthful frontend build-status classification and canonical build command.
+  - Truthful context/export-scope rendering, strict right-dock ownership, subject-specific `Appearance`, relation-aware Data Lab wording, explicit interaction-mode guidance, and summary-first heavy diagnostics.
+- Instrumented:
+  - The build-meta freshness check remains the live evidence surface for checked-in frontend freshness.
+- Conceptual:
+  - Freeform Sigma `Box Select` remains a separate unproved affordance surface; this refactor did not expand it.
+- Unknown:
+  - No current-turn headed-browser proof was produced for every right-dock tab after the refactor; coverage is test-led plus prior agent audit.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to reflect the new dock/context/build-status semantics, bounded Data Lab rendering, and summary-first heavy JSON behavior.
+Remaining uncertainties:
+The full repo suite still has one unrelated ingest failure caused by a missing local PDF fixture, not by observatory code. Browser-agent validation was not rerun after this full-shell refactor; proof is via targeted React/Python tests plus a successful frontend rebuild and build-meta check.
+Next shortest proof path:
+Run one final browser-agent sweep against the refactored shell to confirm the right-dock tabs feel mutually exclusive, `MEASURE` surfaces its prerequisite banner, and the build-warning badge is gone in the live workstation session.
+## [2026-03-24 17:09:12 EDT] PRE-FLIGHT
+Operator task:
+Implement the observatory affordance + instructional-copy follow-up: normalize startup to `INSPECT`, remove duplicate layout reset chrome, separate authority controls from safe interaction modes, unify operator-facing target language around `selection`, stop inspector raw JSON leakage, and add persistent medium-density instructions across the major shell/workspace/panel surfaces.
+Task checksum:
+`1a6eb97b41dce7f1`
+Repo situation:
+Worktree is already dirty from the preceding observatory affordance refactor and rebuilt checked-in frontend bundle. The current live agent audit says the broad refactor landed, but remaining UI debt persists: `Inspector` still leaks raw JSON in practice, `MEASURE` guidance still says `relation focus`, the graph header still shows ambiguous `Dragging` text, startup can restore into `MEASURE`, there are duplicate `Reset layout` controls, and the shell still wants more explicit instructional copy across major areas.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/AGENTS.md`.
+Natural-language contracts in force:
+Observatory remains a browser-visible observability instrument with browser-local view state and explicit preview/commit/revert mutation boundaries. Major controls must stay truthful about prerequisites and safety. `selection` is now the preferred operator-facing targeting term unless the copy is explicitly about camera/view focus. Heavy diagnostics must stay summary-first until explicitly revealed. Instruction copy should be persistent and compact, not hover-only or tutorial-heavy.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/styles.css`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Broad observatory affordance refactor: truthful build warning states, fixed `Context` panel + owned right-dock tabs, subject-specific `Appearance`, bounded Data Lab rendering, large-graph sample/layout flow, summary-first heavy diagnostics in several panels.
+- Instrumented:
+  - Browser-agent audit proving remaining UI inconsistencies after the larger refactor.
+- Conceptual:
+  - Typed instructional-copy registry driving persistent workspace/panel instructions.
+- Unknown:
+  - Whether the `Inspector` JSON leak is purely a cards/raw-tab implementation gap or also a CSS/layout overlap issue in the live shell; safest plan is to fix both behavior and presentation.
+Risks / invariants:
+Do not regress the working sample-layout flow, build-status truthfulness, or browser-local vs authoritative mutation boundary. Preserve the right-dock ownership refactor. Avoid adding so much help copy that panels become unreadable. Keep the checked-in bundle and docs in sync with the shell behavior.
+Evidence plan:
+Patch `App.tsx` to add typed instructional descriptors, separate authority actions, remove duplicate reset chrome, normalize startup interaction mode, tighten inspector raw JSON gating, and update selection-oriented copy; extend Vitest coverage; update observatory docs/status surfaces; rebuild the checked-in bundle; rerun frontend tests, build-meta check, targeted pytest, and full repo pytest if feasible.
+Shortest proof path:
+Implement the shell copy/structure changes in the React app, add tests covering startup mode, single reset control, authority region, selection wording, instruction copy, and inspector raw-JSON gating, run `npm --prefix web/observatory test`, `npm --prefix web/observatory run build`, `./.venv/bin/python scripts/check_observatory_build_meta.py`, targeted pytest, then finish with `./.venv/bin/pytest -q`.
+## [2026-03-24 17:18:42 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/styles.css`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/style.css`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the browser-local vs authoritative mutation boundary, the large-graph bounded sample/layout workflow, and summary-first heavy diagnostics. Revised the observatory contract so startup always normalizes to `INSPECT`, one global `Reset layout` owns shell reset semantics, `Preview` / `Commit` live in a distinct `Authority actions` region, operator-facing targeting language uses `selection`, and major workspaces/panels carry compact persistent purpose/state/next-step/boundary copy.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now drives workspace headers, panel callouts, and interaction-mode guidance from typed instructional descriptors; startup no longer restores a saved interaction mode; `Graph focus` copy is now `Graph selection`; the graph header exposes a truthful canvas-tool status plus `Open Actions`; the left dock no longer duplicates `Reset layout`; `Preview` / `Commit` moved into a visually separate authority region; `Context` labels visible-domain composition explicitly; `Data Laboratory` explains `Table selection` vs `Graph selection`; `MEASURE`/`COMPARE`/`EDIT`/`ABLATE` use selection-first prerequisite copy; and `Inspector` / `Runtime` / `Geometry` / `Payloads` stay summary-first with explicit raw-JSON reveal. `/Users/brianray/Adam/web/observatory/src/styles.css` adds the instruction/authority/tool-status presentation layer. `/Users/brianray/Adam/web/observatory/src/App.test.tsx` now proves the new shell/instruction/selection/raw-JSON contract. The checked-in observatory bundle was rebuilt under `/Users/brianray/Adam/eden/observatory/static/observatory_app/`.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix /Users/brianray/Adam/web/observatory test` -> `22 passed`; `npm --prefix /Users/brianray/Adam/web/observatory run build` -> success, refreshed checked-in bundle and `build-meta.json`; `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `{"ok": true, "warning": false, "state": "ok"}` with matching source/built hash `42e56c8a8180d20c`; `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_frontend_assets.py /Users/brianray/Adam/tests/test_observatory_server.py` -> `9 passed`; `./.venv/bin/pytest -q` -> `125 passed, 1 failed`, where the lone failure is `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing on disk.
+Status register changes:
+- Implemented:
+  - Deterministic `INSPECT` startup, one global reset control, authority-action separation, persistent instructional copy across major observatory surfaces, selection-first operator wording, and explicit inspector raw-JSON reveal.
+- Instrumented:
+  - Existing build-meta freshness check remains the proof surface for the rebuilt checked-in frontend bundle.
+- Conceptual:
+  - Freeform Sigma drag-box selection remains out of scope; this pass did not prove it.
+- Unknown:
+  - No current-turn browser-agent sweep was rerun after this polish pass; live headed-browser proof remains indirect through tests plus the rebuilt bundle.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to record the instructional layer, deterministic `INSPECT` startup, authority-region separation, and the intentional non-restoration of prior interaction modes.
+Remaining uncertainties:
+Full repo proof still carries the same unrelated ingest-fixture failure caused by a missing local PDF. Headed browser validation of the new instructional density and authority-region readability was not rerun in this turn.
+Next shortest proof path:
+Run one final browser-agent journey against the rebuilt shell to verify that the instructional copy remains readable at real density, `Authority actions` reads as gated rather than safe, `Inspector` no longer leaks raw JSON in cards mode, and the `Canvas tool` status chip is clearer than the old ambiguous header text.
+## [2026-03-24 18:34:33 EDT] PRE-FLIGHT
+Operator task:
+Close the remaining observatory UI gaps surfaced by the latest browser-agent audit: stop raw JSON from leaking before explicit reveal, remove the blank Preview export action, remove duplicated Geometry summary lines, add the same instruction/gating treatment to Tanakh, and tighten the operator-facing stale-build warning copy.
+Task checksum:
+`observatory-agent-audit-followup-rawjson-tanakh-buildwarn-v1`
+Repo situation:
+Working tree is already dirty from the earlier observatory affordance/instructional refactor and rebuilt checked-in bundle. No rollback requested. This follow-up is bounded to the remaining audit findings plus contract alignment.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts in force:
+Observatory remains a bounded browser observability instrument. Browser-local state is not evidence. Preview / commit / revert remain the only attributable mutation path. Heavy diagnostics must be summary-first until explicitly revealed. Tanakh remains an additive derived-tool surface, not a first-class measurement-event path.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/components/TanakhPanel.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/web/observatory/src/components/TanakhPanel.test.tsx`; `/Users/brianray/Adam/eden/observatory/frontend_assets.py`; `/Users/brianray/Adam/tests/test_frontend_assets.py`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Deterministic `INSPECT` startup, one global `Reset layout`, selection-first guidance, bounded sample/layout flow, separate authority actions, and summary-first heavy diagnostics as the intended observatory contract.
+- Instrumented:
+  - Browser-agent audit now isolates the remaining truth gaps in Tanakh/heavy panels and operator-facing warning copy.
+- Conceptual:
+  - None needed beyond the already agreed observatory contract; this pass is corrective, not a new feature family.
+- Unknown:
+  - Whether the stale-build warning seen by the agent was an actually stale running shell or only an operator-copy problem; safest path is to improve the copy and rebuild again, then prove against current metadata.
+Risks / invariants:
+Do not regress the now-working sample-layout path, selection wording, or authority boundary. Keep raw JSON fully hidden until explicit reveal across every heavy panel. Do not let Tanakh imply preview/commit semantics it does not own. Keep the checked-in bundle, metadata, tests, and docs aligned in one turn.
+Evidence plan:
+Patch the remaining React surfaces and Tanakh panel, extend Vitest and targeted pytest, rebuild the checked-in bundle and build metadata, run the metadata checker, then rerun full repo pytest so the handoff can truthfully distinguish observatory proof from the unrelated ingest-fixture failure.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch the remaining observatory UI truth gaps, update the observatory docs/truth-table/limitations to match, run `npm --prefix web/observatory test`, `npm --prefix web/observatory run build`, `./.venv/bin/python scripts/check_observatory_build_meta.py`, `./.venv/bin/pytest -q /Users/brianray/Adam/tests/test_frontend_assets.py /Users/brianray/Adam/tests/test_observatory_server.py`, then `./.venv/bin/pytest -q`, and finish with POST-FLIGHT plus exact residual unknowns.
+## [2026-03-24 18:55:43 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/style.css`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the existing observatory contract for browser-local vs authoritative mutation surfaces. Revised the interaction contract so a default assembly context can preload for summaries without being described as graph selection, and preserved the summary-first heavy-diagnostics rule while making reveal latency visible as preparation rather than inertness.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now sanitizes export-format tokens before rendering button labels, applies the same filtered export-action helper to the older Data Lab card path, treats the auto-seeded assembly as context rather than selection unless the operator explicitly pins an assembly, and makes `JsonPreview` lazy so heavy payloads are not stringified while collapsed and show a short preparation state when explicitly revealed. The overview instruction line and inspector guidance now stay aligned on “no graph selection yet” when only the default assembly context is present.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix /Users/brianray/Adam/web/observatory test` -> `25 passed`; `npm --prefix /Users/brianray/Adam/web/observatory run build` -> success, refreshed checked-in bundle and `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `{"ok": true, "warning": false, "state": "ok"}` with matching source/built hash `68b639ebf6eff53f`; `./.venv/bin/pytest -q` -> `125 passed, 1 failed`, where the lone failure remains `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing on disk.
+Status register changes:
+- Implemented:
+  - Default assembly context no longer masquerades as graph selection in observatory guidance; heavy JSON previews are lazy and show preparation state on reveal; invisible/blank export-format tokens are filtered before button rendering.
+- Instrumented:
+  - Build metadata continues to prove the checked-in frontend bundle matches the current source tree.
+- Conceptual:
+  - None added in this corrective pass.
+- Unknown:
+  - A headed-browser proof for Geometry reveal responsiveness after the lazy-preview change was not rerun in this turn; the code/test path now shows truthful preparation state, but live-browser timing is still unmeasured.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md` to distinguish default assembly context from explicit graph selection.
+Remaining uncertainties:
+The browser-agent report’s blank Preview control was not reproduced directly in a local DOM harness, so the export-token sanitization fix is evidence-backed by code/tests rather than direct browser repro. Geometry reveal latency in a real headed browser still needs one fresh observatory pass.
+Next shortest proof path:
+Run one more browser-agent pass against the rebuilt shell to confirm Preview no longer shows a blank export button, Overview and Inspector agree on selection state when the default assembly context is loaded, and Geometry reveal now shows the preparation state instead of appearing inert.
+## [2026-03-24 19:13:09 EDT] PRE-FLIGHT
+Operator task:
+Close the remaining observatory issues from the latest browser-agent verification: remove the blank Preview export control, keep Overview and Inspector aligned when the shell preloads an assembly context, and make Geometry reveal read as preparation rather than inertness when the heavy payload expands.
+Task checksum:
+`observatory-agent-followup-preview-export-selection-geometry-v1`
+Repo situation:
+Working tree remains dirty from the broader observatory refactor and the prior agent-audit follow-up. Checked-in frontend bundle/build metadata are already part of the active contract surface. No rollback requested.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts in force:
+Observatory remains a bounded browser observability instrument. Browser-local controls are not evidence. Heavy diagnostics should be summary-first with explicit reveal. Default context preload is allowed for summaries, but graph selection must reflect explicit operator choice rather than hidden preload state.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Summary-first heavy diagnostics with explicit reveal, authority separation, selection-first mode guidance, and current build metadata verification.
+- Instrumented:
+  - Browser-agent verification now isolates a blank export control, a selection-state messaging seam, and Geometry reveal ergonomics as the remaining truth gaps.
+- Conceptual:
+  - None added in this bounded fix pass.
+- Unknown:
+  - Whether the blank Preview button comes from invisible export-format payload tokens or a nearby unlabeled control leaking into the agent’s region scan; safest fix is stricter export-label sanitization plus one more browser proof.
+Risks / invariants:
+Do not regress the now-working JSON reveal gating or the sample-layout flow. Keep geometry reveal explicit without reintroducing eager heavy serialization. Preserve the distinction between default assembly context and explicit graph selection.
+Evidence plan:
+Patch the remaining App surfaces and tests, rebuild the checked-in observatory bundle, rerun frontend tests plus build-metadata check, then rerun full repo pytest so the handoff can distinguish observatory proof from the unrelated ingest-fixture failure.
+Shortest proof path:
+Append this PRE-FLIGHT note, patch the export-label sanitization, inspector/overview selection messaging, and Geometry reveal preparation state, run `npm --prefix web/observatory test`, `npm --prefix web/observatory run build`, `./.venv/bin/python scripts/check_observatory_build_meta.py`, then `./.venv/bin/pytest -q`, and finish with POST-FLIGHT plus the remaining live-browser unknowns.
+## [2026-03-24 18:38:10 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/components/TanakhPanel.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/web/observatory/src/components/TanakhPanel.test.tsx`; `/Users/brianray/Adam/eden/observatory/frontend_assets.py`; `/Users/brianray/Adam/tests/test_frontend_assets.py`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/style.css`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the observatory as a bounded browser observability instrument with browser-local state outside the evidence path and preview / commit / revert as the only attributable mutation route. Revised the heavy-panel contract so raw JSON is fully hidden until explicit reveal rather than mounted as a bounded excerpt, preserved Tanakh as a separate derived-tool surface with the same instruction grammar as other heavy panels, and tightened operator-facing frontend-build warning wording so the shell names the actual shell-metadata state.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now keeps Inspector / Runtime / Geometry / preview diff JSON fully hidden behind explicit reveal actions, removes duplicated Geometry metric summaries, deduplicates Payloads explanatory copy, and filters export-action labels so blank preview export buttons do not render. `renderTanakhDockPanel()` now carries the same compact instruction grammar/boundary copy as the other heavy panels. `/Users/brianray/Adam/web/observatory/src/components/TanakhPanel.tsx` now presents a safer run label (`Run Tanakh analysis` or `Live server required`), concise operator guidance, and explicit-reveal debug JSON instead of a default raw dump. `/Users/brianray/Adam/eden/observatory/frontend_assets.py` now reports missing/stale frontend-shell metadata with more operator-legible wording.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix /Users/brianray/Adam/web/observatory test` -> `24 passed`; `npm --prefix /Users/brianray/Adam/web/observatory run build` -> success, refreshed checked-in bundle and `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `{"ok": true, "warning": false, "state": "ok"}` with matching source/built hash `1cddd9939ada1943`; `./.venv/bin/pytest -q` -> `125 passed, 1 failed`, where the lone failure remains `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing on disk.
+Status register changes:
+- Implemented:
+  - Heavy-panel raw JSON now stays fully hidden until explicit reveal across Inspector, Runtime, Geometry, preview diff, and Tanakh debug surfaces; Preview export actions no longer render blank-label buttons; Tanakh now participates in the same instruction/gating grammar as the other heavy panels.
+- Instrumented:
+  - Frontend shell/build metadata remains the active proof surface for whether the checked-in observatory bundle matches the current source tree.
+- Conceptual:
+  - None added in this corrective pass.
+- Unknown:
+  - No post-fix browser-agent rerun was executed in this turn, so live headed-browser proof for the eliminated JSON leaks and new Tanakh operator copy remains indirect through tests plus the rebuilt bundle.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md` to replace the stale bounded-excerpt wording with the explicit hidden-state contract, `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` to record Tanakh’s instruction/gating and explicit-reveal JSON behavior, and `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md` to include Tanakh in the heavy-debug-payload caveat.
+Remaining uncertainties:
+The stale-build warning seen by the browser agent was not reproved in a headed browser after this rebuild, even though the build-metadata checker now reports `warning: false` with matching hashes. Live Tanakh run-button readability and heavy-panel ergonomics were not re-audited by an agent after the patch.
+Next shortest proof path:
+Run one more browser-agent journey against the rebuilt shell to confirm there is no stale build warning on load, Preview export actions all have visible labels, Inspector / Runtime / Geometry / Tanakh keep raw JSON hidden until reveal, and the Tanakh instruction/gating copy reads clearly in the live headed UI.
+## [2026-03-24 19:20:09 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+None in this follow-up turn. The changes are implementation-level affordance corrections inside the existing observatory contract.
+Natural-language contracts added/revised/preserved:
+Preserved the contract that startup assembly context is not itself a graph selection, that visible export actions must present readable labels, and that heavy raw payloads remain hidden until the operator explicitly reveals them.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now rejects blank or invisible export-format tokens more aggressively, gives rendered export buttons explicit `aria-label`s, and gives the Inspector tab buttons explicit accessible names (`Inspector cards`, `Inspector raw JSON`). No raw-payload contract was broadened: Geometry still reveals the raw payload only after explicit operator action.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix /Users/brianray/Adam/web/observatory test` -> `25 passed`; `npm --prefix /Users/brianray/Adam/web/observatory run build` -> success, refreshed checked-in bundle and `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `{"ok": true, "warning": false, "state": "ok"}` with matching source/built hash `d35735657d526378`; `./.venv/bin/pytest -q` -> `125 passed, 1 failed`, where the lone failure remains `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing on disk.
+Status register changes:
+- Implemented:
+  - Blank export-token filtering plus explicit accessible labels for observatory export buttons and Inspector tabs.
+- Instrumented:
+  - Build metadata remains the proof surface that the checked-in observatory bundle matches source after the rebuild.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - Live headed-browser confirmation is still needed for the removed blank Preview export button because the latest proof is test/build-led rather than a fresh post-build browser capture.
+Truth-table / limitations updates:
+None. No feature-status category changed in this bounded follow-up.
+Remaining uncertainties:
+The Geometry raw payload can still contain large narrative fields after explicit reveal. Under the current contract that is acceptable because the operator explicitly requested raw JSON, but a separate redaction policy would be required if those fields should be suppressed.
+Next shortest proof path:
+Run one more focused browser-agent pass to verify that Preview export actions no longer show a blank control and that Geometry still shows summary-first state followed by explicit raw JSON after reveal in the refreshed bundle.

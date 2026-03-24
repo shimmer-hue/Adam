@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_SOURCE_ROOT = REPO_ROOT / "web" / "observatory"
 FRONTEND_STATIC_ROOT = Path(__file__).resolve().parent / "static" / "observatory_app"
 BUILD_META_NAME = "build-meta.json"
+CANONICAL_BUILD_COMMAND = "npm --prefix web/observatory run build"
 
 
 def frontend_asset_root() -> Path:
@@ -60,28 +61,41 @@ def build_status() -> dict[str, Any]:
     asset_root = frontend_asset_root()
     manifest_path = frontend_asset_manifest()
     source_hash = frontend_source_hash()
-    if not asset_root.exists() or not manifest_path.exists():
+    if not asset_root.exists():
         return {
             "available": False,
             "warning": True,
-            "reason": "frontend assets missing",
+            "state": "bundle_missing",
+            "reason": f"frontend shell bundle missing; run {CANONICAL_BUILD_COMMAND}",
             "source_hash": source_hash,
+        }
+    if not manifest_path.exists():
+        return {
+            "available": True,
+            "warning": True,
+            "state": "metadata_missing",
+            "reason": f"frontend shell metadata missing; run {CANONICAL_BUILD_COMMAND}",
+            "source_hash": source_hash,
+            "asset_root": str(asset_root),
         }
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {
-            "available": False,
+            "available": True,
             "warning": True,
-            "reason": "invalid build metadata",
+            "state": "metadata_invalid",
+            "reason": f"frontend shell metadata is invalid; run {CANONICAL_BUILD_COMMAND}",
             "source_hash": source_hash,
+            "asset_root": str(asset_root),
         }
     built_hash = str(manifest.get("source_hash") or "")
     stale = built_hash != source_hash
     return {
         "available": True,
         "warning": stale,
-        "reason": "stale build" if stale else "ok",
+        "state": "stale" if stale else "ok",
+        "reason": f"frontend shell is older than the current source tree; run {CANONICAL_BUILD_COMMAND}" if stale else "ok",
         "source_hash": source_hash,
         "built_hash": built_hash,
         "manifest": manifest,

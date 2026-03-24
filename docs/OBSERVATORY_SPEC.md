@@ -54,11 +54,12 @@ Generated per experiment under `exports/<experiment_id>/`:
 - `Overview` is the default graph-exploration cockpit
 - `Data Laboratory` is the spreadsheet audit surface for nodes and edges
 - `Preview` is a separate final-render/export stage whose settings affect export appearance rather than graph semantics
+- each workspace and major dock panel now carries a compact persistent instruction block that states what the area is for, what state it reflects, what the next safe action is, and what remains browser-local or gated
 - the browser workbench uses a deterministic dock grammar rather than arbitrary drag docking:
   - left dock for `Appearance` and `Layout`
   - center graph canvas with the graph-mode strip, tool rail, and fold-out render tray
   - right dock for `Statistics`, `Filters`, `Context`, `Inspector`, `Queries`, `Memode Audit`, action/ledger/runtime adjuncts, and payload diagnostics
-- the workbench exposes collapse/expand and `Reset layout`; dock proportions and collapse state are browser-local and resettable
+- the workbench exposes collapse/expand and one global `Reset layout`; dock proportions and collapse state are browser-local and resettable
 - selection synchronizes across graph, inspector, Data Laboratory rows, and preview-oriented compare surfaces without silently mutating the graph
 
 ## Status row and continuity strip
@@ -114,7 +115,7 @@ Generated per experiment under `exports/<experiment_id>/`:
   - selected / pinned / high-centrality meme labels next
   - edge labels only on focus or selection
 - inspector surfaces structured cards for identity, ontology, domain, provenance, evidence/confidence, cluster membership, memode membership, supporting relations, active-set presence, measurement history, and preview delta
-- raw JSON survives only as a debug tab
+- raw JSON survives only as a debug tab with explicit reveal; cards mode must not leak raw JSON content
 - coordinate modes remain explicit view modes, not evidence claims
 - `memode_audit` is a derived audit plane over the full meme/edge graph. It keeps materialized memode support edges distinct from unmaterialized support candidates and informational knowledge relations that remain non-memetic.
 
@@ -127,24 +128,22 @@ Generated per experiment under `exports/<experiment_id>/`:
   - `Active Set`
   - `Compare`
 - `Overview` exposes explicit interaction controls for `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, and `COMPARE`
+- startup always normalizes the browser shell to `INSPECT`; persisted browser-local view state may restore dock widths, graph mode, filters, and appearance, but not the last interaction mode
 - the left dock organizes browser-local `Appearance` and `Layout` controls in Gephi-style operator grammar:
   - appearance changes color, size, captions, and label behavior without mutating graph facts
+  - the primary browser surface uses explicit `Nodes` / `Edges` subject toggles with direct mapping controls for the implemented channels; unsupported Gephi-like preset families must be disabled or explained rather than rendered as clickable no-ops
   - layout runs worker-backed browser layouts with run/pause/cancel/reset/snapshot controls while remaining non-evidentiary
 - the center graph canvas includes:
   - a left tool rail for select, pan, box-select, pin, recenter/fit, and graph-to-table handoff
+  - a visible tool-status chip that names the current canvas tool instead of leaving mode state implicit
   - a fold-out bottom render tray for label, overlay, and coordinate rendering controls
   - reset-camera and fit-graph actions
+- safe graph interaction controls and authoritative mutation controls are visually separated: `Preview` / `Commit` live in a distinct `Authority actions` region with explicit live-only/gated copy rather than sharing the same chrome row as inspection modes
 - the right dock hosts:
-  - `Statistics`
-  - `Filters`
-  - `Context`
-  - `Inspector`
-  - `Queries`
-  - `Memode Audit`
-  - action / precision-drawer controls
-  - measurement ledger
-  - runtime trace
-  - basin/geometry/tanakh/payload diagnostics when requested
+  - one fixed top `Context` panel
+  - one switchable tabbed surface for `Statistics`, `Filters`, `Inspector`, `Queries`, `Memode Audit`, action / precision-drawer controls, measurement ledger, runtime trace, and basin/geometry/tanakh/payload diagnostics
+  - one small footer/shortcut region for workbench launchers such as `Open Queries` and `Open Data Laboratory`
+  - tabs own their content exclusively; payload diagnostics must not recursively embed broader overview cards or duplicate query workbenches
 - compare mode renders baseline vs modified state from preview responses without committing mutation
 - local layout execution is browser-only:
   - layouts run through a worker-backed `LayoutRunner`
@@ -159,7 +158,8 @@ Generated per experiment under `exports/<experiment_id>/`:
 - appearance controls can style node / edge color, size, label visibility, and opacity from EDEN attributes such as kind, domain, cluster, evidence label, active-set presence, degree, weight, and regard/reward/risk where present
 - node appearance/filter metadata now also carries `entity_type`, `speech_act_mode`, and `storage_kind` so browser/export surfaces can distinguish projected ontology from compatibility-table storage
 - filter controls are organized around attribute/topology-style workbench filters and can constrain text, attribute/range slices, connected components, isolated-node visibility, and ego neighborhoods without mutating graph facts
-- the `Context` panel is the aperture/active-set summary surface: it reports visible node/edge counts, domain and memode counts, active document count, active filters, and current scope while deeper evidence drill-down remains separate
+- the `Context` panel is the aperture/active-set summary surface: it reports visible node/edge counts, graph mode, current plane, export scope, active filters, and only the mode-specific counts that are meaningful for the current graph slice while deeper evidence drill-down remains separate
+- lower context-domain callouts must be labeled as a visible-domain composition/breakdown, not presented as competing totals alongside `Visible nodes`
 - the Data Laboratory provides:
   - `Nodes` and `Edges` sub-tabs
   - sortable columns
@@ -167,6 +167,9 @@ Generated per experiment under `exports/<experiment_id>/`:
   - show/hide columns
   - safe bulk selection/export actions
   - graph-to-table and table-to-graph selection synchronization
+  - table-kind-aware selection wording so node-row and relation-row selection are not conflated
+  - separate `Table selection` and `Graph selection` summaries plus a compact explanation of how they differ
+  - bounded initial row rendering with explicit `show more` expansion instead of pretending the browser is rendering the full table for free
   - explicit `export scope` controls alongside stable ids, `export_label`, ontology, provenance, evidence/confidence, memode membership, and measurement-history summaries where present
 - the Data Lab export surface preserves the existing `current view` workflow and also exposes explicit ontology export scopes:
   - `current view`
@@ -178,6 +181,7 @@ Generated per experiment under `exports/<experiment_id>/`:
   - preview settings alter label, edge-opacity, curvature, background, caption, legend, and export-scope presentation
   - preview settings stay browser-local and require explicit `Refresh preview`
   - preview styling never mutates topology, semantic state, or measurement events
+  - persistent workspace copy must keep final render/export styling distinct from the attributable preview / commit mutation path
 - the `Memode Audit` workbench provides:
   - per-memode admissibility status
   - member meme inspection
@@ -287,6 +291,8 @@ Layout, styling, filter presets, table sort state, and coordinate-mode choices r
   - same ref + params produce hash-stable scene JSON
   - `sceneNodeId -> citation span` linkage is exported in the scene payload
 - Tanakh runs are surfaced in observatory sidecar artifacts and overview badges; they are not silently promoted to first-class measurement events
+- the Tanakh dock/tab should use the same compact instruction grammar as the other heavy panels, including an explicit boundary that live reruns are separate derived tools rather than preview / commit mutations
+- Tanakh debug JSON remains available for provenance, but it stays hidden until the operator explicitly reveals it
 
 ## Local observatory server
 
@@ -337,7 +343,7 @@ TUI behavior:
 - repeated use is safe and does not create ghost server state
 - observatory-originated edits are logged back into the runtime trace surfaces
 - static exports must be HTTP-served, either by the EDEN observatory server or another static file server; direct `file://` opening is not a supported runtime path for the v1 bundle
-- runtime status exposes frontend build freshness so stale checked-in assets can warn at runtime and fail CI/release checks
+- runtime status exposes frontend build freshness so stale checked-in assets can warn at runtime and fail CI/release checks; the canonical recovery path is `npm --prefix web/observatory run build`
 
 ## Validation
 

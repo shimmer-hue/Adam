@@ -11,9 +11,11 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
 - `Overview` uses a deterministic dock layout with:
   - left dock for `Appearance` and `Layout`
   - center graph canvas with graph-mode strip, tool rail, and render tray
-  - right dock for `Statistics`, `Filters`, `Context`, `Inspector`, `Queries`, `Memode Audit`, action controls, ledger, and runtime adjuncts
+  - right dock with one fixed `Context` panel, one switchable tabbed content pane (`Statistics`, `Filters`, `Inspector`, `Queries`, `Memode Audit`, action controls, ledger, runtime, and heavy diagnostics), and one small shortcut footer
+- each workspace and major panel exposes compact persistent instruction copy describing purpose, current state, next safe action, and any browser-local or gated boundary
 - workspace layout, dock collapse state, appearance presets, filters, table sort state, and preview settings are browser-local view state only
-- `Reset layout` restores the default dock arrangement and does not touch graph authority or measurement history
+- startup always enters `INSPECT` even if browser-local storage captured a prior interaction mode
+- one global `Reset layout` restores the default dock arrangement and does not touch graph authority or measurement history
 
 ## Interaction modes
 
@@ -26,10 +28,13 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
 
 ### `MEASURE`
 
-- select nodes
+- select nodes or a relation
 - compute local geometry
 - inspect before/after deltas without committing topology changes
 - preview compare state through `preview_graph_patch`
+- `MEASURE` must remain visibly blocked until a node or relation is selected
+- the selected `MEASURE` mode must change visible operator guidance immediately: it should name prerequisites, point to the next safe dock/action surface, and state that authoritative change still routes through preview / commit
+- operator-facing copy should speak in terms of `selection`, not vague `focus`, unless the UI is explicitly talking about camera/view centering
 
 ### `EDIT`
 
@@ -60,9 +65,12 @@ EDEN v1.2 treats the observatory as a constructive measurement instrument. Obser
   - `Commit`
   - `Revert`
   - action-specific fields such as rationale, evidence label, confidence, operator label, edge parameters, memode details, ablation relation masks, and motif annotation fields
+- `Preview` / `Commit` must render in a distinct authority region with explicit live-only/gated copy rather than reading like ordinary safe interaction toggles
 - `Statistics`, `Filters`, `Context`, `Inspector`, `Queries`, `Memode Audit`, the measurement ledger, and runtime trace remain switchable beside the graph instead of replacing it
 - the graph canvas itself exposes a tool rail for direct interaction plus a bottom render tray for labels/overlay/render settings
+- the graph chrome should name the current canvas tool explicitly rather than using ambiguous text such as a bare `Dragging` label
 - static exports retain the same visible controls but disable mutation actions with explicit copy instead of hiding them
+- raw JSON remains available as a debug surface, but large diagnostics should default to summary-first rendering with explicit expand actions instead of mounting large preformatted blobs immediately
 
 ## Preview / commit / revert flow
 
@@ -113,6 +121,8 @@ Known memodes are operator-facing structured claims about reusable motifs. They 
 - show or hide audit columns while keeping stable ids and `export_label` available
 - row selection highlights the corresponding graph entity
 - graph selection highlights the corresponding row
+- node-row and relation-row selection copy must stay distinct so the active table never reports edge selection as `nodes selected`
+- the table surface should show `Table selection` and `Graph selection` as parallel summaries and explain that they are related but not identical
 - `Select in Graph` and workspace-tab handoff keep graph/table navigation explicit
 - export-scope controls remain visible in Data Laboratory because operators often choose slices from the table view
 
@@ -142,7 +152,10 @@ Known memodes are operator-facing structured claims about reusable motifs. They 
 Inspector workflow:
 
 - cards first
+- a default assembly context may preload for observatory summaries, but it does not count as graph selection until the operator explicitly selects an assembly
 - raw JSON only as a debug tab
+- the `Cards` state must never leak raw JSON
+- even inside the `Raw JSON` tab, full JSON remains behind an explicit reveal control; the default state is summary metrics plus explicit hidden-state copy rather than a mounted excerpt
 - view presets stay browser-local and never enter the measurement ledger
 - layout presets, styling, filter presets, and table sorting stay browser-local and never enter the measurement ledger
 

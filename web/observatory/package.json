@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:app": "vite build",
+    "build:app": "node ./scripts/build.mjs",
+    "build:bundle": "vite build",
     "build": "node ./scripts/build.mjs",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test"

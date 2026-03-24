@@ -57,6 +57,7 @@ type Workspace = "overview" | "data_laboratory" | "preview";
 type AssemblyRenderMode = "hulls" | "collapsed-meta-node" | "hidden";
 type LiftMode = "flat" | "time_lift" | "density_lift" | "session_offset";
 type InspectorTab = "cards" | "json";
+type AppearanceSubject = "nodes" | "edges";
 type ReasoningLens = "reasoning" | "chain_like" | "hum_live";
 type InteractionMode = "INSPECT" | "MEASURE" | "EDIT" | "ABLATE" | "COMPARE";
 type PayloadKey = "overview" | "measurements" | "basin" | "graph" | "geometry" | "tanakh" | "transcript" | "trace" | "runtimeStatus" | "runtimeModel";
@@ -100,6 +101,45 @@ type PreviewSettings = {
 type SortState = {
   key: string;
   direction: SortDirection;
+};
+
+type InstructionTone = "neutral" | "ready" | "blocked" | "authority" | "informational";
+
+type InstructionDescriptor = {
+  eyebrow?: string;
+  title: string;
+  purpose: string;
+  stateText?: string;
+  nextStep: string;
+  boundary?: string;
+  tone?: InstructionTone;
+};
+
+type ContextSummary = {
+  accent: string;
+  items: Array<[string, unknown]>;
+  calloutTitle: string;
+  callouts: Array<[string, unknown]>;
+  note: string;
+  nextStep: string;
+};
+
+type RightDockTabSpec = {
+  id: RightDockTab;
+  label: string;
+  detail: string;
+};
+
+type DataLabSelectionSummary = {
+  tableSelection: string;
+  graphSelection: string;
+  note: string;
+};
+
+type InteractionModeDescriptor = InstructionDescriptor & {
+  status: "ready" | "blocked" | "informational";
+  primaryTab: RightDockTab;
+  secondaryTab?: RightDockTab;
 };
 
 type Bootstrap = {
@@ -429,6 +469,7 @@ const DEFAULT_LIFT_MODE: LiftMode = "flat";
 const DEFAULT_INTERACTION_MODE: InteractionMode = "INSPECT";
 const DEFAULT_RIGHT_DOCK_TAB: RightDockTab = "filters";
 const LAYOUT_VISIBLE_SAMPLE_SIZE = 25;
+const DATA_LAB_ROW_CHUNK = 250;
 const DEFAULT_DOCK_STATE: DockState = {
   leftWidth: 288,
   rightWidth: 236,
@@ -453,21 +494,91 @@ const DEFAULT_EDGE_SORT: SortState = { key: "type", direction: "asc" };
 const TEXT_ACCESS_LIMIT = 12;
 const ESSENTIAL_PAYLOADS: PayloadKey[] = ["overview", "measurements", "basin"];
 const PAYLOAD_ORDER: PayloadKey[] = ["overview", "measurements", "basin", "graph", "geometry", "tanakh", "transcript", "trace", "runtimeStatus", "runtimeModel"];
-const RIGHT_DOCK_TABS: Array<[RightDockTab, string]> = [
-  ["statistics", "Statistics"],
-  ["filters", "Filters"],
-  ["context", "Context"],
-  ["inspector", "Inspector"],
-  ["queries", "Queries"],
-  ["memode_audit", "Memode Audit"],
-  ["actions", "Actions"],
-  ["ledger", "Ledger"],
-  ["runtime", "Runtime"],
-  ["basin", "Basin"],
-  ["geometry", "Geometry"],
-  ["tanakh", "Tanakh"],
-  ["payloads", "Payloads"],
+const RIGHT_DOCK_TABS: RightDockTabSpec[] = [
+  { id: "statistics", label: "Statistics", detail: "Browser-local metrics and rankings" },
+  { id: "filters", label: "Filters", detail: "Browser-local graph slicing" },
+  { id: "inspector", label: "Inspector", detail: "Cards and raw debug JSON" },
+  { id: "queries", label: "Queries", detail: "Selection + drill-down launchers" },
+  { id: "memode_audit", label: "Memode Audit", detail: "Admissibility and support edges" },
+  { id: "actions", label: "Actions", detail: "Preview / commit / revert surface" },
+  { id: "ledger", label: "Ledger", detail: "Measurement event history" },
+  { id: "runtime", label: "Runtime", detail: "Read-only runtime causality" },
+  { id: "basin", label: "Basin", detail: "Trajectory and attractor playback" },
+  { id: "geometry", label: "Geometry", detail: "Large diagnostics bundle" },
+  { id: "tanakh", label: "Tanakh", detail: "Canonical text and sidecars" },
+  { id: "payloads", label: "Payloads", detail: "Live/static bundle diagnostics" },
 ];
+const VISIBLE_RIGHT_DOCK_TABS = RIGHT_DOCK_TABS.filter((tab) => tab.id !== "context");
+const WORKSPACE_INSTRUCTIONS: Record<Workspace, InstructionDescriptor> = {
+  overview: {
+    eyebrow: "Overview",
+    title: "Browser-local graph workbench",
+    purpose: "Explore the current graph slice with local layout, appearance, and drill-down surfaces.",
+    nextStep: "Use the left dock to shape the current view, the center graph to select targets, and the right dock to inspect evidence-bearing detail.",
+    boundary: "View state stays browser-local until you enter the preview / commit / revert path.",
+    tone: "neutral",
+  },
+  data_laboratory: {
+    eyebrow: "Data Laboratory",
+    title: "Bounded audit tables",
+    purpose: "Review node and relation rows for the current export scope without leaving the observatory shell.",
+    nextStep: "Search, sort, and select rows, then hand off back to the graph or Preview as needed.",
+    boundary: "Table state is browser-local and bounded; it does not mutate graph facts.",
+    tone: "neutral",
+  },
+  preview: {
+    eyebrow: "Preview",
+    title: "Final render workspace",
+    purpose: "Adjust export/render styling separately from graph mutation or measurement events.",
+    nextStep: "Tune render settings, refresh the preview, and export once the presentation matches your intent.",
+    boundary: "Preview styling stays local to the rendered/export surface and never rewrites topology.",
+    tone: "neutral",
+  },
+};
+const PANEL_INSTRUCTIONS = {
+  context: {
+    title: "Aperture summary",
+    purpose: "Track the current graph slice, plane, export scope, and filter state at a glance.",
+    nextStep: "Use Inspector, Queries, Runtime, or the measurement ledger when you need evidence-bearing drill-down.",
+    boundary: "This panel summarizes the current view; it does not certify evidence by itself.",
+    tone: "informational",
+  } satisfies InstructionDescriptor,
+  inspector: {
+    title: "Cards first, JSON on reveal",
+    purpose: "Inspect the currently selected node, relation, assembly, or turn before opening raw diagnostics.",
+    nextStep: "Use the cards view for summary fields, then reveal raw JSON only when you need the exact payload.",
+    boundary: "Inspector is read-only and browser-visible; authoritative change still routes through Actions.",
+    tone: "informational",
+  } satisfies InstructionDescriptor,
+  runtime: {
+    title: "Read-only causality",
+    purpose: "Review runtime trace and membrane events without turning observatory navigation into mutation.",
+    nextStep: "Read the recent event list first, then expand trace JSON only when you need the exact payload.",
+    boundary: "Runtime is an evidence surface, not a mutation surface.",
+    tone: "informational",
+  } satisfies InstructionDescriptor,
+  geometry: {
+    title: "Summary-first diagnostics",
+    purpose: "Inspect large geometry diagnostics without forcing the dock to mount the whole payload immediately.",
+    nextStep: "Use the summary metrics first, then expand raw geometry JSON only if you need the full bundle.",
+    boundary: "Geometry remains a derived diagnostic surface, not graph authority.",
+    tone: "informational",
+  } satisfies InstructionDescriptor,
+  payloads: {
+    title: "Bundle diagnostics",
+    purpose: "Check whether the shell is reading live APIs or adjacent static sidecars and whether heavy payloads are ready.",
+    nextStep: "Use this tab to verify bundle state, then return to graph or query surfaces for actual exploration.",
+    boundary: "Payload readiness explains shell state; it is not itself graph evidence.",
+    tone: "informational",
+  } satisfies InstructionDescriptor,
+  authority: {
+    title: "Authority actions",
+    purpose: "Stage attributable preview and commit steps separately from safe browser-local exploration.",
+    nextStep: "Open the Actions dock to configure a mutation, then use Preview before any Commit.",
+    boundary: "This is the only authoritative mutation path; layout, styling, and filters stay outside the measurement ledger.",
+    tone: "authority",
+  } satisfies InstructionDescriptor,
+} as const;
 
 const EMPTY_DATA: DataBundle = {
   graph: null,
@@ -551,8 +662,30 @@ function rightDockTabForSurface(surface: Surface): RightDockTab {
   if (surface === "geometry") return "geometry";
   if (surface === "tanakh") return "tanakh";
   if (surface === "measurements") return "ledger";
-  if (surface === "overview") return "context";
   return DEFAULT_RIGHT_DOCK_TAB;
+}
+
+function normalizeRightDockTab(tab: RightDockTab): RightDockTab {
+  if (tab === "context") return DEFAULT_RIGHT_DOCK_TAB;
+  return RIGHT_DOCK_TABS.some((spec) => spec.id === tab) ? tab : DEFAULT_RIGHT_DOCK_TAB;
+}
+
+function graphPlaneLabel(mode: GraphMode): string {
+  if (mode === "Semantic Map") return "Semantic meme-support slice";
+  if (mode === "Assemblies") return "Assemblies plane";
+  if (mode === "Runtime") return "Runtime provenance slice";
+  if (mode === "Active Set") return "Latest active-set slice";
+  return "Preview compare slice";
+}
+
+function summarizeJsonValue(value: unknown): Array<[string, unknown]> {
+  if (Array.isArray(value)) return [["Rows", value.length]];
+  if (!value || typeof value !== "object") return [["Value", value]];
+  const record = value as Record<string, unknown>;
+  return [
+    ["Top-level keys", Object.keys(record).length],
+    ["Array fields", Object.values(record).filter(Array.isArray).length],
+  ];
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -639,6 +772,16 @@ function payloadModeCopy(liveEnabled: boolean, hybridMode: boolean, detailed = f
   return "Live mode prefers API payloads and refresh invalidations.";
 }
 
+function humanTokenLabel(value: string): string {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function humanGraphToolLabel(tool: GraphTool): string {
+  return humanTokenLabel(tool);
+}
+
 function MetricList({ items }: { items: Array<[string, unknown]> }) {
   return (
     <dl className="metric-list">
@@ -649,6 +792,27 @@ function MetricList({ items }: { items: Array<[string, unknown]> }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+function InstructionCallout({
+  descriptor,
+  compact = false,
+  className = "",
+}: {
+  descriptor: InstructionDescriptor;
+  compact?: boolean;
+  className?: string;
+}) {
+  return (
+    <section className={`instruction-callout instruction-${descriptor.tone ?? "neutral"}${compact ? " instruction-callout-compact" : ""}${className ? ` ${className}` : ""}`}>
+      {descriptor.eyebrow ? <p className="eyebrow">{descriptor.eyebrow}</p> : null}
+      <h3>{descriptor.title}</h3>
+      <p className="instruction-line"><strong>For:</strong> {descriptor.purpose}</p>
+      {descriptor.stateText ? <p className="instruction-line"><strong>State:</strong> {descriptor.stateText}</p> : null}
+      <p className="instruction-line"><strong>Next:</strong> {descriptor.nextStep}</p>
+      {descriptor.boundary ? <p className="placeholder-copy"><strong>Boundary:</strong> {descriptor.boundary}</p> : null}
+    </section>
   );
 }
 
@@ -664,10 +828,75 @@ function Card({ title, children, accent }: { title: string; children: ReactNode;
   );
 }
 
+function JsonPreview({
+  expanded,
+  title,
+  value,
+  onToggle,
+  collapsedText,
+  showMetrics = true,
+}: {
+  expanded: boolean;
+  title: string;
+  value: unknown;
+  onToggle: () => void;
+  collapsedText?: string;
+  showMetrics?: boolean;
+}) {
+  const summaryItems = useMemo(() => summarizeJsonValue(value), [value]);
+  const [serialized, setSerialized] = useState<string | null>(null);
+  const [serializing, setSerializing] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) {
+      setSerialized(null);
+      setSerializing(false);
+      return;
+    }
+    setSerializing(true);
+    const timer = window.setTimeout(() => {
+      setSerialized(JSON.stringify(value ?? {}, null, 2));
+      setSerializing(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [expanded, value]);
+
+  return (
+    <div className="json-preview">
+      <div className="json-preview-toolbar">
+        {showMetrics ? <MetricList items={summaryItems} /> : null}
+        <button className="toolbar-button" onClick={onToggle} type="button">
+          {expanded ? `Hide ${title}` : `Show ${title}`}
+        </button>
+      </div>
+      {expanded ? (
+        serializing ? (
+          <p className="placeholder-copy">{`Preparing ${title.toLowerCase()}…`}</p>
+        ) : (
+          <pre className="debug-json">{serialized ?? "{}"}</pre>
+        )
+      ) : (
+        <p className="placeholder-copy">{collapsedText ?? `${title} stays hidden until you explicitly reveal it.`}</p>
+      )}
+    </div>
+  );
+}
+
 function formatValue(value: unknown): string {
   if (value == null || value === "") return "—";
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    if (!value.length) return "—";
+    if (value.every((entry) => entry == null || ["string", "number", "boolean"].includes(typeof entry))) {
+      return value.map((entry) => formatValue(entry)).join(", ");
+    }
+    return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  }
+  if (typeof value === "object") {
+    const summary = summarizeJsonValue(value)
+      .map(([label, detail]) => `${label} ${formatValue(detail)}`)
+      .join(", ");
+    return excerptText(summary || JSON.stringify(value), 160);
+  }
   return String(value);
 }
 
@@ -738,6 +967,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const [graphTool, setGraphTool] = useState<GraphTool>("select");
   const [dataLabTab, setDataLabTab] = useState<DataLabTab>("nodes");
   const [dataLabSearch, setDataLabSearch] = useState("");
+  const [dataLabRowLimit, setDataLabRowLimit] = useState(DATA_LAB_ROW_CHUNK);
   const [nodeSort, setNodeSort] = useState<SortState>(DEFAULT_NODE_SORT);
   const [edgeSort, setEdgeSort] = useState<SortState>(DEFAULT_EDGE_SORT);
   const [nodeColumnVisibility, setNodeColumnVisibility] = useState<Record<string, boolean>>({
@@ -776,6 +1006,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const [assemblyRenderMode, setAssemblyRenderMode] = useState<AssemblyRenderMode>(DEFAULT_ASSEMBLY_RENDER_MODE);
   const [liftMode, setLiftMode] = useState<LiftMode>(DEFAULT_LIFT_MODE);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("cards");
+  const [appearanceSubject, setAppearanceSubject] = useState<AppearanceSubject>("nodes");
   const [reasoningLens, setReasoningLens] = useState<ReasoningLens>("reasoning");
   const [interactionMode, setInteractionMode] = useState<InteractionMode>(DEFAULT_INTERACTION_MODE);
   const [coordinateMode, setCoordinateMode] = useState<string>("force");
@@ -784,6 +1015,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [selectedAssemblyId, setSelectedAssemblyId] = useState<string | null>(null);
+  const [selectedAssemblyPinned, setSelectedAssemblyPinned] = useState(false);
   const [selectedTurnId, setSelectedTurnId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(defaultFilterState());
   const [appearance, setAppearance] = useState<AppearanceState>(defaultAppearanceState());
@@ -805,6 +1037,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   const [tanakhRunPending, setTanakhRunPending] = useState(false);
   const [lastExportMessage, setLastExportMessage] = useState<string>("");
   const [exportScope, setExportScope] = useState<ExportScope>("current");
+  const [expandedJsonPanels, setExpandedJsonPanels] = useState<Record<string, boolean>>({});
 
   const layoutWorkerRef = useRef<Worker | null>(null);
   const statsWorkerRef = useRef<Worker | null>(null);
@@ -952,13 +1185,176 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     const latestActive = data.graph?.active_set_slices?.at?.(-1);
     return Number(latestActive?.document_count ?? latestActive?.documents ?? 0);
   }, [data.graph]);
+  const contextSummary = useMemo<ContextSummary>(() => {
+    const items: Array<[string, unknown]> = [
+      ["Visible nodes", filteredBaseline.nodes.length],
+      ["Visible edges", filteredBaseline.edges.length],
+      ["Graph mode", graphMode],
+      ["Current plane", graphPlaneLabel(graphMode)],
+      ["Export scope", humanExportScopeLabel(exportScope)],
+      ["Filters", activeFilterTags.length ? activeFilterTags.join(", ") : "none"],
+    ];
+    if (graphMode === "Semantic Map") {
+      items.push(["Clusters", data.graph?.cluster_summaries?.length ?? 0], ["Memodes loaded", memodeAudit.summary?.memodes ?? 0]);
+    } else if (graphMode === "Assemblies") {
+      items.push(["Assemblies loaded", data.graph?.assemblies?.length ?? 0], ["Memodes", memodeAudit.summary?.memodes ?? 0]);
+    } else if (graphMode === "Runtime") {
+      items.push(["Runtime nodes", baseGraph.nodes.length], ["Runtime edges", baseGraph.edges.length]);
+    } else if (graphMode === "Active Set") {
+      items.push(["Active-set documents", activeDocumentCount], ["Turn-bounded nodes", filteredBaseline.nodes.length]);
+    } else {
+      items.push(
+        ["Baseline nodes", filteredBaseline.nodes.length],
+        ["Modified nodes", filteredModified.nodes.length],
+        ["Preview patch", preview?.preview_graph_patch?.graph_changed ? "present" : "view only"],
+      );
+    }
+    return {
+      accent: `${filteredBaseline.nodes.length.toLocaleString("en-US")} nodes visible`,
+      calloutTitle: "Visible node domains",
+      items,
+      callouts: domainCounts.slice(0, 4).map(([label, value]) => [`${humanTokenLabel(label)} nodes`, value]),
+      note: "Context reflects the current plane, export scope, and active filters. Domain callouts are a breakdown of the visible node mix, not alternate global totals.",
+      nextStep: "Use Inspector, Queries, Runtime, or the measurement ledger when you need evidence-bearing drill-down.",
+    };
+  }, [
+    activeDocumentCount,
+    activeFilterTags,
+    baseGraph.edges.length,
+    baseGraph.nodes.length,
+    data.graph?.assemblies?.length,
+    data.graph?.cluster_summaries?.length,
+    domainCounts,
+    exportScope,
+    filteredBaseline.edges.length,
+    filteredBaseline.nodes.length,
+    filteredModified.nodes.length,
+    graphMode,
+    memodeAudit.summary?.memodes,
+    preview?.preview_graph_patch?.graph_changed,
+  ]);
+  const dataLabSelectionSummary = useMemo<DataLabSelectionSummary>(() => {
+    const tableSelection =
+      dataLabTab === "edges"
+        ? `${selectedEdgeId ? 1 : 0} relation row${selectedEdgeId ? "" : "s"} selected`
+        : `${selectedNodeIds.length} node row${selectedNodeIds.length === 1 ? "" : "s"} selected`;
+    const graphSelection = selectedEdgeId
+      ? "1 relation selected in graph"
+      : selectedNodeIds.length
+        ? `${selectedNodeIds.length} node${selectedNodeIds.length === 1 ? "" : "s"} selected in graph`
+        : "No current graph selection";
+    const note =
+      dataLabTab === "edges"
+        ? "Table selection tracks visible relation rows. Graph selection tracks the relation currently highlighted in the graph workbench."
+        : "Table selection tracks visible node rows. Graph selection tracks the nodes currently highlighted in the graph workbench.";
+    return { tableSelection, graphSelection, note };
+  }, [dataLabTab, selectedEdgeId, selectedNodeIds.length]);
+  const canMutate = Boolean(data.liveEnabled && bootstrap.live_api?.preview && bootstrap.live_api?.commit);
+  const interactionModeDescriptor = useMemo<InteractionModeDescriptor>(() => {
+    const liveMutationCopy = canMutate
+      ? "Preview remains the next attributable step; commit is still explicit and reversible."
+      : "Static export mode keeps the chrome visible, but preview / commit stays disabled until the live observatory server is available.";
+    if (interactionMode === "MEASURE") {
+      const hasMeasureTarget = Boolean(selectedEdgeId || selectedNodeIds.length);
+      const selectionState = selectedEdgeId ? "1 relation selected." : `${selectedNodeIds.length}-node selection active.`;
+      return {
+        eyebrow: "Measurement guide",
+        title: "Measure mode",
+        purpose: "Compute local geometry or compare deltas without silently mutating topology.",
+        stateText: hasMeasureTarget ? selectionState : "No graph selection yet.",
+        nextStep: hasMeasureTarget
+          ? "Open Actions to run Preview and inspect the measurement delta."
+          : "Select nodes or a relation, then open Actions to preview a measurement run.",
+        boundary: liveMutationCopy,
+        tone: hasMeasureTarget && canMutate ? "ready" : "blocked",
+        status: hasMeasureTarget && canMutate ? "ready" : "blocked",
+        primaryTab: "actions",
+        secondaryTab: "geometry",
+      };
+    }
+    if (interactionMode === "COMPARE") {
+      const hasCompareState = Boolean(preview?.preview_graph_patch);
+      return {
+        eyebrow: "Compare guide",
+        title: "Compare mode",
+        purpose: "Read baseline vs modified state without treating coordinate changes as evidence.",
+        stateText: hasCompareState ? "Preview compare state is present." : "No preview compare state is loaded yet.",
+        nextStep: hasCompareState
+          ? "Inspect baseline vs modified state in the graph view, then use Ledger if you need attributable history."
+          : "Run Preview from Actions to materialize a baseline vs modified compare state.",
+        boundary: "Compare keeps browser-local coordinate reading separate from authoritative mutation history.",
+        tone: hasCompareState ? "ready" : "informational",
+        status: hasCompareState ? "ready" : "informational",
+        primaryTab: "actions",
+        secondaryTab: "ledger",
+      };
+    }
+    if (interactionMode === "EDIT") {
+      const hasEditTarget = Boolean(selectedEdgeId || selectedNodeIds.length >= 2);
+      return {
+        eyebrow: "Edit guide",
+        title: "Edit mode",
+        purpose: "Configure attributable graph edits without hiding the preview / commit boundary.",
+        stateText: hasEditTarget
+          ? selectedEdgeId
+            ? "One relation selected for an edit preview."
+            : `${selectedNodeIds.length}-node selection is sufficient for edit preview.`
+          : "Selection is not yet sufficient for an edit preview.",
+        nextStep: hasEditTarget
+          ? "Open Actions to stage the change, then use Preview before any Commit."
+          : "Select two nodes or an existing relation before staging an edit.",
+        boundary: liveMutationCopy,
+        tone: hasEditTarget && canMutate ? "ready" : "blocked",
+        status: hasEditTarget && canMutate ? "ready" : "blocked",
+        primaryTab: "actions",
+        secondaryTab: "inspector",
+      };
+    }
+    if (interactionMode === "ABLATE") {
+      const hasAblationTarget = Boolean(selectedEdgeId || selectedNodeIds.length);
+      return {
+        eyebrow: "Ablation guide",
+        title: "Ablate mode",
+        purpose: "Preview masked-edge or relation-class perturbations without silently rewriting the graph.",
+        stateText: hasAblationTarget
+          ? selectedEdgeId
+            ? "One relation selected for ablation preview."
+            : `${selectedNodeIds.length}-node selection is sufficient for ablation preview.`
+          : "No graph selection yet.",
+        nextStep: hasAblationTarget
+          ? "Open Actions to configure the relation mask, then use Preview to compare the perturbation."
+          : "Select nodes or a relation before previewing an ablation.",
+        boundary: liveMutationCopy,
+        tone: hasAblationTarget && canMutate ? "ready" : "blocked",
+        status: hasAblationTarget && canMutate ? "ready" : "blocked",
+        primaryTab: "actions",
+        secondaryTab: "geometry",
+      };
+    }
+    return {
+      eyebrow: "Inspect guide",
+      title: "Inspect mode",
+      purpose: "Inspect provenance, measurement history, and current selection without mutating topology.",
+      stateText: selectedEdgeId
+        ? "One relation selected for inspection."
+        : selectedNodeIds.length
+          ? `${selectedNodeIds.length}-node selection active for inspection.`
+          : "No graph selection yet.",
+      nextStep: selectedEdgeId || selectedNodeIds.length
+        ? "Open Inspector for cards-first detail or Queries to pivot to related entities."
+        : "Select nodes or a relation to make inspector and query drill-down more specific.",
+      boundary: "Inspect stays read-only; preview / commit / revert remain the attributable mutation path.",
+      tone: "informational",
+      status: "informational",
+      primaryTab: "inspector",
+      secondaryTab: "queries",
+    };
+  }, [canMutate, interactionMode, preview?.preview_graph_patch, selectedEdgeId, selectedNodeIds.length]);
   const workspaceArtifactLabel = useMemo(() => {
     const baseLabel = bootstrap.experiment_id || bootstrap.session_id || "eden-graph";
     const nodeCount = data.graph?.nodes?.length ?? data.graph?.semantic_nodes?.length ?? data.graph?.counts?.memes ?? 0;
     return `${baseLabel}${nodeCount ? ` (${nodeCount})` : ""}`;
   }, [bootstrap.experiment_id, bootstrap.session_id, data.graph]);
-
-  const canMutate = Boolean(data.liveEnabled && bootstrap.live_api?.preview && bootstrap.live_api?.commit);
   const interactionModes = (data.graph?.interaction_modes ?? ["INSPECT", "MEASURE", "EDIT", "ABLATE", "COMPARE"]) as InteractionMode[];
   const graphModes = (data.graph?.graph_modes ?? [DEFAULT_GRAPH_MODE]) as GraphMode[];
   const renderModes = (data.graph?.assembly_render_modes ?? [DEFAULT_ASSEMBLY_RENDER_MODE]) as AssemblyRenderMode[];
@@ -1086,7 +1482,6 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     let nextGraphMode = DEFAULT_GRAPH_MODE;
     let nextAssemblyRenderMode = DEFAULT_ASSEMBLY_RENDER_MODE;
     let nextLiftMode = DEFAULT_LIFT_MODE;
-    let nextInteractionMode = DEFAULT_INTERACTION_MODE;
     let nextCoordinateMode = layoutDefaults.coordinate_mode ?? "force";
     let nextFilters = defaultFilterState();
     let nextAppearance = defaultAppearanceState();
@@ -1114,7 +1509,6 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         nextGraphMode = preset.graphMode ?? nextGraphMode;
         nextAssemblyRenderMode = preset.assemblyRenderMode ?? nextAssemblyRenderMode;
         nextLiftMode = preset.liftMode ?? nextLiftMode;
-        nextInteractionMode = preset.interactionMode ?? nextInteractionMode;
         nextCoordinateMode = preset.coordinateMode ?? nextCoordinateMode;
         nextFilters = { ...nextFilters, ...(preset.filters ?? {}) };
         nextAppearance = { ...nextAppearance, ...(preset.appearance ?? {}) };
@@ -1125,7 +1519,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     setGraphMode(nextGraphMode);
     setAssemblyRenderMode(nextAssemblyRenderMode);
     setLiftMode(nextLiftMode);
-    setInteractionMode(nextInteractionMode);
+    setInteractionMode(DEFAULT_INTERACTION_MODE);
     setCoordinateMode(nextCoordinateMode);
     setFilters(nextFilters);
     setAppearance(nextAppearance);
@@ -1143,7 +1537,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           edgeColumnVisibility: Record<string, boolean>;
           previewSettings: PreviewSettings;
         }>;
-        setRightDockTab(preset.rightDockTab ?? rightDockTabForSurface(initialSurface));
+        setRightDockTab(normalizeRightDockTab(preset.rightDockTab ?? rightDockTabForSurface(initialSurface)));
         setDockState({ ...DEFAULT_DOCK_STATE, ...(preset.dockState ?? {}) });
         setGraphTool(preset.graphTool ?? "select");
         setDataLabTab(preset.dataLabTab ?? "nodes");
@@ -1153,7 +1547,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         setEdgeColumnVisibility((current) => ({ ...current, ...(preset.edgeColumnVisibility ?? {}) }));
         setPreviewSettings({ ...DEFAULT_PREVIEW_SETTINGS, ...(preset.previewSettings ?? {}) });
       } else {
-        setRightDockTab(rightDockTabForSurface(initialSurface));
+        setRightDockTab(normalizeRightDockTab(rightDockTabForSurface(initialSurface)));
         setDockState(DEFAULT_DOCK_STATE);
         setGraphTool("select");
         setDataLabTab("nodes");
@@ -1162,7 +1556,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         setPreviewSettings(DEFAULT_PREVIEW_SETTINGS);
       }
     } catch {
-      setRightDockTab(rightDockTabForSurface(initialSurface));
+      setRightDockTab(normalizeRightDockTab(rightDockTabForSurface(initialSurface)));
       setDockState(DEFAULT_DOCK_STATE);
       setGraphTool("select");
       setDataLabTab("nodes");
@@ -1179,7 +1573,6 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
       graphMode,
       assemblyRenderMode,
       liftMode,
-      interactionMode,
       coordinateMode,
       filters,
       appearance,
@@ -1205,7 +1598,6 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     filters,
     graphMode,
     graphTool,
-    interactionMode,
     liftMode,
     loadedPresetKey,
     nodeColumnVisibility,
@@ -1214,6 +1606,10 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     previewSettings,
     rightDockTab,
   ]);
+
+  useEffect(() => {
+    setDataLabRowLimit(DATA_LAB_ROW_CHUNK);
+  }, [dataLabSearch, dataLabTab, filteredBaseline.edges.length, filteredBaseline.nodes.length]);
 
   useEffect(() => {
     try {
@@ -1340,6 +1736,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             setData((current) => ({ ...current, graph }));
             if (!selectedAssemblyId && graph.assemblies?.length) {
               setSelectedAssemblyId(graph.assemblies[0].id);
+              setSelectedAssemblyPinned(false);
             }
           });
         }
@@ -1504,6 +1901,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     setDockState(DEFAULT_DOCK_STATE);
     setRightDockTab(DEFAULT_RIGHT_DOCK_TAB);
     setGraphTool("select");
+    setAppearanceSubject("nodes");
+    setExpandedJsonPanels({});
     setShowKeyboardHelp(false);
   }, []);
 
@@ -1540,6 +1939,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
 
   function handleSelectNode(nodeId: string, additive: boolean) {
     setSelectedEdgeId(null);
+    setSelectedAssemblyPinned(false);
     if (!nodeId) {
       setSelectedNodeIds([]);
       return;
@@ -1554,11 +1954,14 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     setLayoutIsolatedNodeIds([]);
     setSelectedNodeIds([]);
     setSelectedEdgeId(null);
+    setSelectedAssemblyId(null);
+    setSelectedAssemblyPinned(false);
   }
 
   function handleSelectAssembly(assemblyId: string) {
     setLayoutIsolatedNodeIds([]);
     setSelectedAssemblyId(assemblyId);
+    setSelectedAssemblyPinned(true);
     setSelectedEdgeId(null);
     setSelectedNodeIds([]);
   }
@@ -1566,6 +1969,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   function handleSelectEdge(edgeId: string) {
     setLayoutIsolatedNodeIds([]);
     setSelectedEdgeId(edgeId);
+    setSelectedAssemblyId(null);
+    setSelectedAssemblyPinned(false);
     setSelectedNodeIds([]);
   }
 
@@ -1573,6 +1978,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     setLayoutIsolatedNodeIds([]);
     setSelectedTurnId(turnId);
     setSelectedAssemblyId(null);
+    setSelectedAssemblyPinned(false);
     setSelectedEdgeId(null);
     setSelectedNodeIds([]);
   }
@@ -1581,6 +1987,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     setLayoutIsolatedNodeIds([]);
     setSelectedNodeIds([nodeId]);
     setSelectedEdgeId(null);
+    setSelectedAssemblyId(null);
+    setSelectedAssemblyPinned(false);
   }
 
   async function handleRunTanakh(request: any) {
@@ -1628,6 +2036,10 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
 
   function updateAppearance<K extends keyof AppearanceState>(key: K, value: AppearanceState[K]) {
     setAppearance((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleJsonPanel(panelId: string) {
+    setExpandedJsonPanels((current) => ({ ...current, [panelId]: !current[panelId] }));
   }
 
   function updatePreviewSetting<K extends keyof PreviewSettings>(key: K, value: PreviewSettings[K]) {
@@ -1945,6 +2357,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     setSelectedNodeIds(layoutVisibleSampleNodeIds);
     setSelectedEdgeId(null);
     setSelectedAssemblyId(null);
+    setSelectedAssemblyPinned(false);
     setGraphTool("select");
     setGraphFocusNodeIds(layoutVisibleSampleNodeIds);
     setGraphFocusToken((current) => current + 1);
@@ -2078,9 +2491,9 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           <strong>Selection</strong>
           <span>
             {selectedEdgeId
-              ? `edge:${selectedEdgeId}`
+              ? "1 relation selected"
               : selectedNodeIds.length
-                ? `${selectedNodeIds.length} node${selectedNodeIds.length === 1 ? "" : "s"}`
+                ? `${selectedNodeIds.length} node${selectedNodeIds.length === 1 ? "" : "s"} selected`
                 : "none"}
           </span>
         </div>
@@ -2089,82 +2502,125 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function renderAppearancePanel() {
+    const nodeColorOptions = data.graph?.appearance_dimensions?.node_color ?? ["kind", "domain", "cluster", "evidence_label"];
+    const nodeSizeOptions = data.graph?.appearance_dimensions?.node_size ?? ["uniform", "degree"];
+    const edgeColorOptions = data.graph?.appearance_dimensions?.edge_color ?? ["type", "evidence_label"];
+    const edgeOpacityOptions = data.graph?.appearance_dimensions?.edge_opacity ?? ["weight"];
+    const labelModeOptions = data.graph?.appearance_dimensions?.label_modes ?? ["selection", "all", "none"];
+    const appearanceInstruction: InstructionDescriptor =
+      appearanceSubject === "nodes"
+        ? {
+            title: "Node styling",
+            purpose: "Map browser-local node color, size, and labels from exported EDEN attributes.",
+            stateText: `Node channels available: color (${nodeColorOptions.join(", ")}) and size (${nodeSizeOptions.join(", ")}).`,
+            nextStep: "Choose the channels that make the current graph slice easier to inspect, then verify the result on the canvas.",
+            boundary: "Node styling is browser-local and does not mutate graph facts.",
+            tone: "informational",
+          }
+        : {
+            title: "Relation styling",
+            purpose: "Map browser-local relation color, opacity, and label visibility from exported EDEN attributes.",
+            stateText: `Relation channels available: color (${edgeColorOptions.join(", ")}) and opacity (${edgeOpacityOptions.join(", ")}).`,
+            nextStep: "Adjust the visible relation channels, then confirm readability on the canvas or in Preview.",
+            boundary: "Relation styling is browser-local and does not mutate graph facts.",
+            tone: "informational",
+          };
     return (
       <DockPanel title="Appearance" accent="browser-local">
+        <InstructionCallout compact descriptor={appearanceInstruction} />
         <div className="module-tab-strip">
-          <button className="toolbar-button is-active" type="button">
+          <button
+            aria-pressed={appearanceSubject === "nodes"}
+            className={appearanceSubject === "nodes" ? "toolbar-button is-active" : "toolbar-button"}
+            onClick={() => setAppearanceSubject("nodes")}
+            type="button"
+          >
             Nodes
           </button>
-          <button className="toolbar-button" type="button">
+          <button
+            aria-pressed={appearanceSubject === "edges"}
+            className={appearanceSubject === "edges" ? "toolbar-button is-active" : "toolbar-button"}
+            onClick={() => setAppearanceSubject("edges")}
+            type="button"
+          >
             Edges
           </button>
         </div>
-        <div className="module-tab-strip module-tab-strip-secondary">
-          <button className="toolbar-button" type="button">
-            Unique
-          </button>
-          <button className="toolbar-button is-active" type="button">
-            Partition
-          </button>
-          <button className="toolbar-button" type="button">
-            Ranking
-          </button>
-        </div>
+        <p className="placeholder-copy gephi-panel-note">
+          Direct browser-local mappings only. Gephi-style `Unique` / `Partition` / `Ranking` presets are not separate modes in this build.
+        </p>
         <div className="form-grid">
-          <label>
-            <span>Node color</span>
-            <select aria-label="Node color by" value={appearance.nodeColorBy} onChange={(event) => updateAppearance("nodeColorBy", event.target.value)}>
-              {(data.graph?.appearance_dimensions?.node_color ?? ["kind", "domain", "cluster", "evidence_label"]).map((value: string) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Node size</span>
-            <select aria-label="Node size by" value={appearance.nodeSizeBy} onChange={(event) => updateAppearance("nodeSizeBy", event.target.value)}>
-              {(data.graph?.appearance_dimensions?.node_size ?? ["uniform", "degree"]).map((value: string) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Edge color</span>
-            <select aria-label="Edge color by" value={appearance.edgeColorBy} onChange={(event) => updateAppearance("edgeColorBy", event.target.value)}>
-              {(data.graph?.appearance_dimensions?.edge_color ?? ["type", "evidence_label"]).map((value: string) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Edge opacity</span>
-            <select aria-label="Edge opacity by" value={appearance.edgeOpacityBy} onChange={(event) => updateAppearance("edgeOpacityBy", event.target.value)}>
-              {(data.graph?.appearance_dimensions?.edge_opacity ?? ["weight"]).map((value: string) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Label mode</span>
-            <select aria-label="Label mode" value={appearance.labelMode} onChange={(event) => updateAppearance("labelMode", event.target.value as AppearanceState["labelMode"])}>
-              {(data.graph?.appearance_dimensions?.label_modes ?? ["selection", "all", "none"]).map((value: string) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="toggle-line">
-            <input aria-label="Show edge labels" checked={appearance.showEdgeLabels} onChange={(event) => updateAppearance("showEdgeLabels", event.target.checked)} type="checkbox" />
-            <span>Show edge labels</span>
-          </label>
+          {appearanceSubject === "nodes" ? (
+            <>
+              <label>
+                <span>Node color</span>
+                <select aria-label="Node color by" value={appearance.nodeColorBy} onChange={(event) => updateAppearance("nodeColorBy", event.target.value)}>
+                  {nodeColorOptions.map((value: string) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Node size</span>
+                <select aria-label="Node size by" value={appearance.nodeSizeBy} onChange={(event) => updateAppearance("nodeSizeBy", event.target.value)}>
+                  {nodeSizeOptions.map((value: string) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Label mode</span>
+                <select aria-label="Label mode" value={appearance.labelMode} onChange={(event) => updateAppearance("labelMode", event.target.value as AppearanceState["labelMode"])}>
+                  {labelModeOptions.map((value: string) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="appearance-note">
+                <strong>Available node channels</strong>
+                <span>{`Color: ${nodeColorOptions.join(", ")}`}</span>
+                <span>{`Size: ${nodeSizeOptions.join(", ")}`}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <label>
+                <span>Edge color</span>
+                <select aria-label="Edge color by" value={appearance.edgeColorBy} onChange={(event) => updateAppearance("edgeColorBy", event.target.value)}>
+                  {edgeColorOptions.map((value: string) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Edge opacity</span>
+                <select aria-label="Edge opacity by" value={appearance.edgeOpacityBy} onChange={(event) => updateAppearance("edgeOpacityBy", event.target.value)}>
+                  {edgeOpacityOptions.map((value: string) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="toggle-line">
+                <input aria-label="Show edge labels" checked={appearance.showEdgeLabels} onChange={(event) => updateAppearance("showEdgeLabels", event.target.checked)} type="checkbox" />
+                <span>Show edge labels</span>
+              </label>
+              <div className="appearance-note">
+                <strong>Available edge channels</strong>
+                <span>{`Color: ${edgeColorOptions.join(", ")}`}</span>
+                <span>{`Opacity: ${edgeOpacityOptions.join(", ")}`}</span>
+              </div>
+            </>
+          )}
         </div>
         <p className="placeholder-copy gephi-panel-note">Visual mappings are browser-local. They can mirror EDEN attributes without mutating graph facts.</p>
       </DockPanel>
@@ -2214,39 +2670,52 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function renderContextPanel() {
+    const contextInstruction: InstructionDescriptor = {
+      ...PANEL_INSTRUCTIONS.context,
+      stateText: `${graphMode} on ${humanExportScopeLabel(exportScope)} with ${filteredBaseline.nodes.length.toLocaleString("en-US")} visible nodes and ${filteredBaseline.edges.length.toLocaleString("en-US")} visible edges.`,
+    };
     return (
-      <DockPanel title="Context" accent={`${filteredBaseline.nodes.length} nodes visible`}>
-        <MetricList
-          items={[
-            ["Visible nodes", filteredBaseline.nodes.length],
-            ["Visible edges", filteredBaseline.edges.length],
-            ["Graph mode", graphMode],
-            ["Export scope", humanExportScopeLabel(exportScope)],
-            ["Assemblies", data.graph?.assemblies?.length ?? 0],
-            ["Memodes", memodeAudit.summary?.memodes ?? 0],
-            ["Active-set documents", activeDocumentCount],
-            ["Filters", activeFilterTags.length ? activeFilterTags.join(", ") : "none"],
-          ]}
-        />
-        <div className="context-stat-grid">
-          {domainCounts.map(([domain, count]) => (
-            <div key={domain} className="metric-callout">
-              <strong>{domain}</strong>
-              <span>{count}</span>
+      <DockPanel title="Context" accent={contextSummary.accent}>
+        <InstructionCallout compact descriptor={contextInstruction} />
+        <MetricList items={contextSummary.items} />
+        {contextSummary.callouts.length ? (
+          <>
+            <p className="placeholder-copy context-callout-heading">{contextSummary.calloutTitle}</p>
+            <div className="context-stat-grid">
+              {contextSummary.callouts.map(([label, value]) => (
+                <div key={label} className="metric-callout">
+                  <strong>{label}</strong>
+                  <span>{formatValue(value)}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="placeholder-copy">
-          Aperture / active-set summary lives here as a bounded context window. Drill-down remains available through Queries, Inspector, Runtime, and the measurement ledger.
-        </p>
+          </>
+        ) : null}
+        <p className="placeholder-copy">{contextSummary.note}</p>
+        <p className="placeholder-copy">{contextSummary.nextStep}</p>
       </DockPanel>
     );
   }
 
   function renderInspectorDockPanel() {
     const rawTarget = selectedEdge ?? selectedNode ?? selectedAssembly ?? selectedTurn ?? data.overview ?? {};
+    const inspectorInstruction: InstructionDescriptor = {
+      ...PANEL_INSTRUCTIONS.inspector,
+      stateText: selectedEdge
+        ? "Inspecting 1 selected relation."
+        : selectedNode
+          ? "Inspecting 1 selected node."
+          : selectedAssembly && selectedAssemblyPinned
+            ? "Inspecting 1 selected assembly."
+            : selectedAssembly
+              ? "No graph selection yet; inspector is showing the current assembly context."
+            : selectedTurn
+              ? "Inspecting 1 selected turn."
+              : "No specific graph selection yet; inspector is showing the broader overview/session payload.",
+    };
     return (
       <DockPanel title="Inspector" accent={selectedEdge ? "edge" : selectedNode ? "node" : selectedAssembly ? "memode" : "session"}>
+        <InstructionCallout compact descriptor={inspectorInstruction} />
         <div className="toolbar">
           <button
             className="toolbar-button"
@@ -2264,6 +2733,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         </div>
         <div aria-label="Inspector view" className="inspector-tabs" role="tablist">
           <button
+            aria-label="Inspector cards"
             aria-controls="observatory-inspector-panel"
             aria-selected={inspectorTab === "cards"}
             className={inspectorTab === "cards" ? "toolbar-button is-active" : "toolbar-button"}
@@ -2275,6 +2745,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             Cards
           </button>
           <button
+            aria-label="Inspector raw JSON"
             aria-controls="observatory-inspector-panel"
             aria-selected={inspectorTab === "json"}
             className={inspectorTab === "json" ? "toolbar-button is-active" : "toolbar-button"}
@@ -2287,7 +2758,17 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           </button>
         </div>
         <div aria-labelledby={inspectorTab === "json" ? "observatory-inspector-tab-json" : "observatory-inspector-tab-cards"} id="observatory-inspector-panel" role="tabpanel">
-          {inspectorTab === "json" ? <pre className="debug-json">{JSON.stringify(rawTarget, null, 2)}</pre> : renderInspectorCards()}
+          {inspectorTab === "json" ? (
+            <JsonPreview
+              expanded={Boolean(expandedJsonPanels["inspector-dock-json"])}
+              onToggle={() => toggleJsonPanel("inspector-dock-json")}
+              collapsedText="Cards-first inspection stays active until you explicitly reveal the raw JSON payload."
+              title="Raw JSON"
+              value={rawTarget}
+            />
+          ) : (
+            renderInspectorCards()
+          )}
         </div>
       </DockPanel>
     );
@@ -2406,9 +2887,17 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function renderActionsDockPanel() {
+    const authorityInstruction: InstructionDescriptor = {
+      ...PANEL_INSTRUCTIONS.authority,
+      stateText: selectedEdgeId
+        ? "One relation selected for attributable preview."
+        : selectedNodeIds.length
+          ? `${selectedNodeIds.length}-node selection active for attributable preview.`
+          : "No graph selection yet.",
+    };
     return (
-      <DockPanel title="Actions" accent={interactionMode}>
-        <p className="placeholder-copy">Preview/commit/revert remains the only mutation path. View state and layout state never enter the measurement ledger.</p>
+      <DockPanel title="Authority Actions" accent={interactionMode}>
+        <InstructionCallout compact descriptor={authorityInstruction} />
         <div className="toolbar">
           <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handlePreview()} type="button">
             Preview
@@ -2479,7 +2968,13 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           {preview?.error ? (
             <p className="status-error">{preview.error}</p>
           ) : preview ? (
-            <pre className="debug-json">{JSON.stringify(preview, null, 2)}</pre>
+            <JsonPreview
+              expanded={Boolean(expandedJsonPanels["preview-diff"])}
+              onToggle={() => toggleJsonPanel("preview-diff")}
+              collapsedText="Preview diff JSON stays hidden until you explicitly reveal the attributable patch payload."
+              title="Preview JSON"
+              value={preview}
+            />
           ) : (
             <p className="placeholder-copy">No preview yet. Run preview before commit to keep topology and measurement deltas explicit.</p>
           )}
@@ -2511,11 +3006,19 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function renderRuntimeDockPanel() {
+    const runtimeInstruction: InstructionDescriptor = {
+      ...PANEL_INSTRUCTIONS.runtime,
+      stateText: data.trace
+        ? `${data.trace.trace_events?.length ?? 0} runtime events loaded in the current trace payload.`
+        : data.liveEnabled
+          ? `Runtime trace payload ${payloadStatuses.trace.status}.`
+          : "Runtime trace is unavailable in static export mode.",
+    };
     return (
       <DockPanel title="Runtime Trace" accent={String(data.trace?.trace_events?.length ?? 0)}>
+        <InstructionCallout compact descriptor={runtimeInstruction} />
         {data.trace ? (
           <>
-            <p className="placeholder-copy">Trace and membrane causality remain read-only. Observatory commits still route through preview / commit / revert only.</p>
             <div className="history-list">
               {(data.trace.trace_events ?? []).slice(0, 8).map((event: any) => (
                 <div className="history-item" key={event.id}>
@@ -2526,7 +3029,15 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
                 </div>
               ))}
             </div>
-            {data.trace.latest_turn_trace?.length ? <pre className="debug-json">{JSON.stringify(data.trace.latest_turn_trace.slice(0, 6), null, 2)}</pre> : null}
+            {data.trace.latest_turn_trace?.length ? (
+              <JsonPreview
+                expanded={Boolean(expandedJsonPanels["runtime-trace-json"])}
+                onToggle={() => toggleJsonPanel("runtime-trace-json")}
+                collapsedText="Trace JSON stays hidden until you explicitly reveal the latest runtime payload."
+                title="Trace JSON"
+                value={data.trace.latest_turn_trace.slice(0, 6)}
+              />
+            ) : null}
           </>
         ) : (
           <p className="placeholder-copy">{data.liveEnabled ? `Runtime trace payload ${payloadStatuses.trace.status}.` : "Runtime trace is live-only."}</p>
@@ -2558,8 +3069,17 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function renderGeometryDockPanel() {
+    const geometryInstruction: InstructionDescriptor = {
+      ...PANEL_INSTRUCTIONS.geometry,
+      stateText: data.geometry
+        ? "Geometry payload loaded and summarized."
+        : payloadStatuses.geometry.status === "error"
+          ? "Geometry diagnostics are unavailable for this surface."
+          : "Geometry bundle is deferred until this panel opens.",
+    };
     return (
       <DockPanel title="Geometry" accent={payloadStatuses.geometry.status}>
+        <InstructionCallout compact descriptor={geometryInstruction} />
         {!data.geometry ? (
           <div className="empty-state">
             <h2>Geometry payload {payloadStatuses.geometry.status}</h2>
@@ -2571,15 +3091,42 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             {payloadStatuses.geometry.error ? <p>{payloadStatuses.geometry.error}</p> : null}
           </div>
         ) : (
-          <pre className="debug-json">{JSON.stringify(data.geometry ?? {}, null, 2)}</pre>
+          <>
+            <MetricList items={summarizeJsonValue(data.geometry)} />
+            <JsonPreview
+              expanded={Boolean(expandedJsonPanels["geometry-json"])}
+              onToggle={() => toggleJsonPanel("geometry-json")}
+              collapsedText="Geometry JSON stays hidden until you explicitly reveal the heavy diagnostics payload."
+              showMetrics={false}
+              title="Geometry JSON"
+              value={data.geometry ?? {}}
+            />
+          </>
         )}
       </DockPanel>
     );
   }
 
   function renderTanakhDockPanel() {
+    const tanakhInstruction: InstructionDescriptor = {
+      title: "Canonical text and derived sidecars",
+      purpose: "Inspect Tanakh reader output, derived analyzers, and merkavah scene sidecars without treating the browser render as evidence.",
+      stateText: data.tanakh
+        ? data.liveEnabled && bootstrap.live_api?.tanakh_run
+          ? "Live Tanakh runs are available from this panel."
+          : "Static export only; derived artifacts are read-only in this shell."
+        : payloadStatuses.tanakh.status === "error"
+          ? "Tanakh artifacts are unavailable for this panel."
+          : "The Tanakh bundle is deferred until this panel opens.",
+      nextStep: data.tanakh
+        ? "Read the canonical and derived cards first, then reveal debug JSON only if you need artifact-level provenance."
+        : "Open this tab when you need the canonical text plus derived sidecars; the bundle stays deferred until then.",
+      boundary: "Tanakh runs are separate derived tools and do not participate in preview / commit / revert semantics.",
+      tone: data.tanakh ? "informational" : payloadStatuses.tanakh.status === "error" ? "blocked" : "informational",
+    };
     return (
       <DockPanel title="Tanakh" accent={payloadStatuses.tanakh.status}>
+        <InstructionCallout compact descriptor={tanakhInstruction} />
         {!data.tanakh ? (
           <div className="empty-state">
             <h2>Tanakh payload {payloadStatuses.tanakh.status}</h2>
@@ -2604,16 +3151,20 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
   }
 
   function renderPayloadDockPanel() {
+    const payloadInstruction: InstructionDescriptor = {
+      ...PANEL_INSTRUCTIONS.payloads,
+      stateText: payloadModeCopy(data.liveEnabled, Boolean(hybridMode), true),
+    };
     return (
-      <div className="dock-stack">
+      <div className="dock-stack dock-stack-payloads">
+        <InstructionCallout compact descriptor={payloadInstruction} />
         {renderPayloadStatus()}
-        {renderOverview()}
       </div>
     );
   }
 
   function renderOverviewRightRail() {
-    const dockTabs = RIGHT_DOCK_TABS.filter(([tabId]) => tabId !== "context");
+    const activeDockTab = normalizeRightDockTab(rightDockTab);
     return (
       <div className="dock-stack dock-stack-overview-right">
         <div className="dock-toolbar dock-toolbar-right">
@@ -2625,50 +3176,101 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         {renderContextPanel()}
         <div className="dock-tabbed-surface">
           <div className="dock-tab-strip" role="tablist" aria-label="Overview side panels">
-            {dockTabs.map(([tabId, label]) => (
+            {VISIBLE_RIGHT_DOCK_TABS.map((tab) => (
               <button
-                aria-selected={rightDockTab === tabId}
-                className={rightDockTab === tabId ? "toolbar-button is-active" : "toolbar-button"}
-                key={tabId}
-                onClick={() => setRightDockTab(tabId)}
+                aria-selected={activeDockTab === tab.id}
+                className={activeDockTab === tab.id ? "toolbar-button is-active" : "toolbar-button"}
+                key={tab.id}
+                onClick={() => setRightDockTab(tab.id)}
                 role="tab"
+                title={tab.detail}
                 type="button"
               >
-                {label}
+                {tab.label}
               </button>
             ))}
           </div>
-          <div className="dock-tabbed-body">{rightDockTab === "context" ? renderStatisticsPanel() : renderRightDockContent()}</div>
+          <div className="dock-tabbed-body">{renderRightDockContent(activeDockTab)}</div>
         </div>
-        <DockPanel title="Queries" accent="drag filter here">
-          <p className="placeholder-copy gephi-panel-note">Keep the full queries workbench docked without replacing the graph.</p>
+        <div className="dock-shortcuts" aria-label="Overview shortcuts">
+          <span className="dock-toolbar-caption">Shortcuts</span>
           <div className="toolbar">
             <button className="toolbar-button" onClick={() => setRightDockTab("queries")} type="button">
               Open Queries
+            </button>
+            <button className="toolbar-button" onClick={() => setRightDockTab("actions")} type="button">
+              Open Actions
             </button>
             <button className="toolbar-button" onClick={() => setWorkspace("data_laboratory")} type="button">
               Open Data Laboratory
             </button>
           </div>
-        </DockPanel>
+        </div>
       </div>
     );
   }
 
-  function renderRightDockContent() {
-    if (rightDockTab === "statistics") return renderStatisticsPanel();
-    if (rightDockTab === "filters") return renderFilterRail();
-    if (rightDockTab === "context") return renderContextPanel();
-    if (rightDockTab === "queries") return renderQueriesPanel();
-    if (rightDockTab === "memode_audit") return renderMemodeAuditPanel();
-    if (rightDockTab === "actions") return renderActionsDockPanel();
-    if (rightDockTab === "ledger") return renderLedgerDockPanel();
-    if (rightDockTab === "runtime") return renderRuntimeDockPanel();
-    if (rightDockTab === "basin") return renderBasinDockPanel();
-    if (rightDockTab === "geometry") return renderGeometryDockPanel();
-    if (rightDockTab === "tanakh") return renderTanakhDockPanel();
-    if (rightDockTab === "payloads") return renderPayloadDockPanel();
+  function renderRightDockContent(activeTab = normalizeRightDockTab(rightDockTab)) {
+    if (activeTab === "statistics") return renderStatisticsPanel();
+    if (activeTab === "filters") return renderFilterRail();
+    if (activeTab === "queries") return renderQueriesPanel();
+    if (activeTab === "memode_audit") return renderMemodeAuditPanel();
+    if (activeTab === "actions") return renderActionsDockPanel();
+    if (activeTab === "ledger") return renderLedgerDockPanel();
+    if (activeTab === "runtime") return renderRuntimeDockPanel();
+    if (activeTab === "basin") return renderBasinDockPanel();
+    if (activeTab === "geometry") return renderGeometryDockPanel();
+    if (activeTab === "tanakh") return renderTanakhDockPanel();
+    if (activeTab === "payloads") return renderPayloadDockPanel();
     return renderInspectorDockPanel();
+  }
+
+  function renderInteractionModeGuide() {
+    return (
+      <section className={`mode-guide mode-guide-${interactionModeDescriptor.status}`}>
+        <div className="mode-guide-copy">
+          <p className="eyebrow">{interactionModeDescriptor.eyebrow}</p>
+          <h2>{interactionModeDescriptor.title}</h2>
+          <p>{interactionModeDescriptor.purpose}</p>
+          {interactionModeDescriptor.stateText ? <p className="placeholder-copy"><strong>State:</strong> {interactionModeDescriptor.stateText}</p> : null}
+          <p className="placeholder-copy"><strong>Next:</strong> {interactionModeDescriptor.nextStep}</p>
+          {interactionModeDescriptor.boundary ? <p className="placeholder-copy"><strong>Boundary:</strong> {interactionModeDescriptor.boundary}</p> : null}
+        </div>
+        <div className="toolbar">
+          <button className="toolbar-button" onClick={() => setRightDockTab(interactionModeDescriptor.primaryTab)} type="button">
+            {`Open ${RIGHT_DOCK_TABS.find((tab) => tab.id === interactionModeDescriptor.primaryTab)?.label ?? interactionModeDescriptor.primaryTab}`}
+          </button>
+          {interactionModeDescriptor.secondaryTab ? (
+            <button className="toolbar-button" onClick={() => setRightDockTab(interactionModeDescriptor.secondaryTab as RightDockTab)} type="button">
+              {`Open ${RIGHT_DOCK_TABS.find((tab) => tab.id === interactionModeDescriptor.secondaryTab)?.label ?? interactionModeDescriptor.secondaryTab}`}
+            </button>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
+  function renderAuthorityActionsRegion() {
+    const authorityInstruction: InstructionDescriptor = {
+      ...PANEL_INSTRUCTIONS.authority,
+      stateText: canMutate ? "Live mutation routes are available." : "Static export mode keeps preview / commit visible but disabled.",
+    };
+    return (
+      <section className="authority-actions">
+        <InstructionCallout compact descriptor={authorityInstruction} />
+        <div className="toolbar">
+          <button className="toolbar-button" onClick={() => setRightDockTab("actions")} type="button">
+            Open Actions
+          </button>
+          <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handlePreview()} type="button">
+            Preview
+          </button>
+          <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handleCommit()} type="button">
+            Commit
+          </button>
+        </div>
+      </section>
+    );
   }
 
   function renderGraphWorkbenchCenter() {
@@ -2721,17 +3323,33 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
         focusVersion={graphFocusToken}
       />
     );
+    const graphToolInstruction: InstructionDescriptor = {
+      title: "Canvas tool",
+      purpose: "Use the tool rail to switch how the graph canvas responds to clicks and drags.",
+      stateText: `Current tool: ${humanGraphToolLabel(graphTool)}.`,
+      nextStep: graphTool === "neighbors" ? "Click a node to expose its local neighborhood." : "Select nodes or a relation, then use the mode guide or right dock for the next safe step.",
+      boundary: "Canvas tools affect browser-local view state only.",
+      tone: "informational",
+    };
 
     return (
       <div className="graph-workbench">
+        <InstructionCallout
+          className="workspace-instruction workspace-instruction-overview"
+          compact
+          descriptor={{
+            ...WORKSPACE_INSTRUCTIONS.overview,
+            stateText: `${graphMode} on ${humanExportScopeLabel(exportScope)}; ${selectedEdgeId ? "1 relation selected." : selectedNodeIds.length ? `${selectedNodeIds.length}-node selection active.` : selectedAssemblyPinned ? "1 assembly selected." : "No graph selection yet."}`,
+          }}
+        />
         <div className="graph-window-tabs">
           <button className="graph-window-tab graph-window-tab-active" type="button">
             Graph
           </button>
           <div className="graph-window-toolbar">
-            <span>Dragging</span>
+            <span className="graph-window-status">{`Canvas tool: ${humanGraphToolLabel(graphTool)}`}</span>
             <button className="toolbar-button" onClick={() => setRightDockTab("actions")} type="button">
-              Configure
+              Open Actions
             </button>
           </div>
         </div>
@@ -2765,25 +3383,27 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             ))}
           </div>
           <div className="toolbar-group">
-            <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handlePreview()} type="button">
-              Preview
-            </button>
-            <button className="primary-button" disabled={!canMutate || mutationPending} onClick={() => void handleCommit()} type="button">
-              Commit
-            </button>
             <button className="toolbar-button" onClick={() => setWorkspace("data_laboratory")} type="button">
               Select in Data Laboratory
             </button>
+            <button className="toolbar-button" onClick={handleClearSelection} type="button">
+              Clear Selection
+            </button>
           </div>
         </div>
+        {renderInteractionModeGuide()}
+        {renderAuthorityActionsRegion()}
         <div className="graph-stage-shell">
-          <GraphToolRail
-            activeTool={graphTool}
-            onSelectTool={setGraphTool}
-            onFitGraph={() => setCameraResetToken((current) => current + 1)}
-            onResetCamera={() => setCameraResetToken((current) => current + 1)}
-            onOpenDataLab={() => setWorkspace("data_laboratory")}
-          />
+          <div className="graph-tool-column">
+            <GraphToolRail
+              activeTool={graphTool}
+              onSelectTool={setGraphTool}
+              onFitGraph={() => setCameraResetToken((current) => current + 1)}
+              onResetCamera={() => setCameraResetToken((current) => current + 1)}
+              onOpenDataLab={() => setWorkspace("data_laboratory")}
+            />
+            <InstructionCallout className="graph-tool-instruction" compact descriptor={graphToolInstruction} />
+          </div>
           <div className={`graph-stage graph-stage-${graphMode === "Compare" ? "compare" : "single"}`}>
             {graphMode === "Compare" ? (
               <div className="compare-grid">
@@ -2851,9 +3471,6 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
               <button className="toolbar-button" onClick={() => setDockState((current) => ({ ...current, leftCollapsed: true }))} type="button">
                 Collapse Left Dock
               </button>
-              <button className="toolbar-button" onClick={handleResetWorkbenchLayout} type="button">
-                Reset layout
-              </button>
             </div>
             {renderAppearancePanel()}
             {renderLayoutWorkbench()}
@@ -2904,6 +3521,9 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           edgeSort.direction,
         ),
       );
+    const visibleNodeRows = nodeRows.slice(0, dataLabRowLimit);
+    const visibleEdgeRows = edgeRows.slice(0, dataLabRowLimit);
+    const dataLabRowsCapped = (dataLabTab === "nodes" ? nodeRows.length : edgeRows.length) > dataLabRowLimit;
 
     const nodeColumns: Array<[string, string]> = [
       ["label", "Label"],
@@ -2971,6 +3591,14 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             Open Preview
           </button>
         </div>
+        <InstructionCallout
+          className="workspace-instruction"
+          compact
+          descriptor={{
+            ...WORKSPACE_INSTRUCTIONS.data_laboratory,
+            stateText: `${humanExportScopeLabel(exportScope)} with ${dataLabTab === "nodes" ? nodeRows.length.toLocaleString("en-US") : edgeRows.length.toLocaleString("en-US")} matching ${dataLabTab === "nodes" ? "node" : "relation"} rows.`,
+          }}
+        />
         <div className="data-lab-meta">
           <div className="metric-callout">
             <strong>Visible graph slice</strong>
@@ -2981,10 +3609,15 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             <span>{humanExportScopeLabel(exportScope)} · {exportGraph.nodes.length} nodes · {exportGraph.edges.length} edges</span>
           </div>
           <div className="metric-callout">
-            <strong>Selection sync</strong>
-            <span>{selectedEdgeId ? "relation selected" : `${selectedNodeIds.length} node${selectedNodeIds.length === 1 ? "" : "s"} selected`}</span>
+            <strong>Table selection</strong>
+            <span>{dataLabSelectionSummary.tableSelection}</span>
+          </div>
+          <div className="metric-callout">
+            <strong>Graph selection</strong>
+            <span>{dataLabSelectionSummary.graphSelection}</span>
           </div>
         </div>
+        <p className="placeholder-copy data-lab-selection-note">{dataLabSelectionSummary.note}</p>
         <div className="data-lab-layout">
           <aside className="data-lab-controls">
             <DockPanel title="Columns" accent={dataLabTab === "nodes" ? `${Object.values(nodeColumnVisibility).filter(Boolean).length} shown` : `${Object.values(edgeColumnVisibility).filter(Boolean).length} shown`}>
@@ -3004,7 +3637,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             <DockPanel title="Bulk Operations" accent="safe only">
               {dataLabTab === "nodes" ? (
                 <div className="toolbar toolbar-vertical">
-                  <button className="toolbar-button" onClick={() => setSelectedNodeIds(nodeRows.slice(0, 25).map((node) => node.id))} type="button">
+                  <button className="toolbar-button" onClick={() => setSelectedNodeIds(visibleNodeRows.slice(0, 25).map((node) => node.id))} type="button">
                     Select visible nodes
                   </button>
                   <button className="toolbar-button" onClick={handleClearSelection} type="button">
@@ -3016,8 +3649,8 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
                 </div>
               ) : (
                 <div className="toolbar toolbar-vertical">
-                  <button className="toolbar-button" disabled={!edgeRows.length} onClick={() => edgeRows[0] && handleSelectEdge(edgeRows[0].id)} type="button">
-                    Focus first visible relation
+                  <button className="toolbar-button" disabled={!visibleEdgeRows.length} onClick={() => visibleEdgeRows[0] && handleSelectEdge(visibleEdgeRows[0].id)} type="button">
+                    Select first visible relation
                   </button>
                   <button className="toolbar-button" onClick={handleClearSelection} type="button">
                     Clear selection
@@ -3030,15 +3663,26 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             </DockPanel>
             <DockPanel title="Export Actions" accent={lastExportMessage || "Preview retains final styling"}>
               <div className="toolbar toolbar-vertical">
-                {(data.graph?.export_formats ?? DEFAULT_EXPORT_FORMATS).map((format: string) => (
-                  <button key={format} className="toolbar-button" onClick={() => handleExport(format)} type="button">
-                    {humanExportLabel(format)}
+                {availableExportFormats(data.graph?.export_formats as readonly string[] | undefined).map(({ value, label }) => (
+                  <button aria-label={label} key={value} className="toolbar-button" onClick={() => handleExport(value)} type="button">
+                    {label}
                   </button>
                 ))}
               </div>
             </DockPanel>
           </aside>
           <section className="data-lab-table-panel">
+            {dataLabRowsCapped ? (
+              <div className="status-banner">
+                <strong>{`Showing first ${dataLabRowLimit.toLocaleString("en-US")} rows`}</strong>
+                <span>{` of ${(dataLabTab === "nodes" ? nodeRows.length : edgeRows.length).toLocaleString("en-US")} matching ${dataLabTab === "nodes" ? "node" : "relation"} rows.`}</span>
+                <div className="toolbar">
+                  <button className="toolbar-button" onClick={() => setDataLabRowLimit((current) => current + DATA_LAB_ROW_CHUNK)} type="button">
+                    {`Show ${DATA_LAB_ROW_CHUNK.toLocaleString("en-US")} more`}
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <div className="table-scroll">
               {dataLabTab === "nodes" ? (
                 <table className="data-table data-lab-table">
@@ -3057,7 +3701,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
                     </tr>
                   </thead>
                   <tbody>
-                    {nodeRows.map((node) => (
+                    {visibleNodeRows.map((node) => (
                       <tr className={selectedNodeIds.includes(node.id) ? "is-selected" : ""} key={node.id}>
                         {nodeColumns.filter(([column]) => nodeColumnVisibility[column]).map(([column]) => (
                           <td key={`${node.id}-${column}`}>{formatValue(nodeColumnValue(node, column, stats))}</td>
@@ -3088,7 +3732,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
                     </tr>
                   </thead>
                   <tbody>
-                    {edgeRows.map((edge) => (
+                    {visibleEdgeRows.map((edge) => (
                       <tr className={selectedEdgeId === edge.id ? "is-selected" : ""} key={edge.id}>
                         {edgeColumns.filter(([column]) => edgeColumnVisibility[column]).map(([column]) => (
                           <td key={`${edge.id}-${column}`}>{formatValue(edgeColumnValue(edge, column, nodeLookup))}</td>
@@ -3127,6 +3771,14 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             </button>
           </div>
         </div>
+        <InstructionCallout
+          className="workspace-instruction"
+          compact
+          descriptor={{
+            ...WORKSPACE_INSTRUCTIONS.preview,
+            stateText: `${humanExportScopeLabel(exportScope)} with ${previewSettings.dirty ? "staged browser-local changes pending refresh." : "preview settings aligned with the current render."}`,
+          }}
+        />
         <div className="preview-layout">
           <aside className="preview-settings-panel">
             <DockPanel title="Preview Settings" accent={previewSettings.dirty ? "staged changes" : previewSettings.refreshedAt ?? "current"}>
@@ -3187,9 +3839,9 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
                 </select>
               </label>
               <div className="toolbar toolbar-vertical">
-                {(data.graph?.export_formats ?? DEFAULT_EXPORT_FORMATS).map((format: string) => (
-                  <button key={format} className="toolbar-button" onClick={() => handleExport(format)} type="button">
-                    {humanExportLabel(format)}
+                {availableExportFormats(data.graph?.export_formats as readonly string[] | undefined).map(({ value, label }) => (
+                  <button aria-label={label} key={value} className="toolbar-button" onClick={() => handleExport(value)} type="button">
+                    {label}
                   </button>
                 ))}
               </div>
@@ -3339,9 +3991,6 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
       <section className="status-panel">
         <div className="status-panel-copy">
           <strong>{loading ? "Loading observatory payloads" : activeLoads ? "Background payload activity" : "Payload status"}</strong>
-          <span>
-            {payloadModeCopy(data.liveEnabled, Boolean(hybridMode), true)}
-          </span>
           <span>
             {activeLoads
               ? `${activeLoads} payload${activeLoads === 1 ? "" : "s"} still loading.`
@@ -3758,9 +4407,9 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
               <option value="information">Information only</option>
             </select>
           </label>
-          {(data.graph.export_formats ?? DEFAULT_EXPORT_FORMATS).map((format: string) => (
-            <button key={format} className="toolbar-button" onClick={() => handleExport(format)} type="button">
-              {humanExportLabel(format)}
+          {availableExportFormats(data.graph?.export_formats as readonly string[] | undefined).map(({ value, label }) => (
+            <button aria-label={label} key={value} className="toolbar-button" onClick={() => handleExport(value)} type="button">
+              {label}
             </button>
           ))}
         </div>
@@ -4148,8 +4797,25 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
     const layoutStatusId = "layout-workbench-status";
     const showSelectVisibleSample = layoutRunContext.scope === "blocked" && filteredBaselineFull.nodes.length > heavyLayoutNodeCap && layoutVisibleSampleNodeIds.length >= 2;
     const showRestoreFullView = layoutIsolatedNodeIds.length >= 2;
+    const layoutInstruction: InstructionDescriptor = {
+      title: "Browser-local layout guidance",
+      purpose: "Run a bounded local layout or inspect reference terrain entries without mutating graph facts.",
+      stateText:
+        layoutStatusCopy ||
+        (selectedLayoutMeta?.status === "runnable"
+          ? `${humanLayoutLabel(layoutTarget, layoutCatalog)} is ready on the current browser-local slice.`
+          : `${humanLayoutLabel(layoutTarget, layoutCatalog)} is a reference terrain item only.`),
+      nextStep: showSelectVisibleSample
+        ? `Use Select Visible Sample (${layoutVisibleSampleNodeIds.length.toLocaleString("en-US")}) to isolate a bounded neighborhood before running a layout.`
+        : selectedLayoutMeta?.status === "runnable"
+          ? "Tune the algorithm settings, then run the selected layout or save a browser-local snapshot."
+          : "Browse the terrain explanation or switch to a runnable layout.",
+      boundary: "Coordinates, snapshots, and layout presets remain browser-local until exported.",
+      tone: layoutRunContext.scope === "blocked" ? "blocked" : "informational",
+    };
     return (
       <Card title="Layout Workbench" accent={layoutRunState.lastMessage || humanLayoutLabel(layoutTarget, layoutCatalog)}>
+        <InstructionCallout compact descriptor={layoutInstruction} />
         <div className="layout-compact-toolbar">
           <label className="layout-inline-field">
             <span>Algorithm</span>
@@ -4794,11 +5460,27 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
 
   function renderInspector() {
     const rawTarget = selectedEdge ?? selectedNode ?? selectedAssembly ?? selectedTurn ?? data.overview ?? {};
+    const inspectorInstruction: InstructionDescriptor = {
+      ...PANEL_INSTRUCTIONS.inspector,
+      stateText: selectedEdge
+        ? "Inspecting 1 selected relation."
+        : selectedNode
+          ? "Inspecting 1 selected node."
+          : selectedAssembly && selectedAssemblyPinned
+            ? "Inspecting 1 selected assembly."
+            : selectedAssembly
+              ? "No graph selection yet; inspector is showing the current assembly context."
+            : selectedTurn
+              ? "Inspecting 1 selected turn."
+              : "No specific graph selection yet; inspector is showing the broader overview/session payload.",
+    };
     return (
       <aside className="inspector">
         {renderPrecisionDrawer()}
+        <InstructionCallout compact descriptor={inspectorInstruction} />
         <div aria-label="Inspector view" className="inspector-tabs" role="tablist">
           <button
+            aria-label="Inspector cards"
             aria-controls="observatory-inspector-panel"
             aria-selected={inspectorTab === "cards"}
             className={inspectorTab === "cards" ? "toolbar-button is-active" : "toolbar-button"}
@@ -4810,6 +5492,7 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
             Cards
           </button>
           <button
+            aria-label="Inspector raw JSON"
             aria-controls="observatory-inspector-panel"
             aria-selected={inspectorTab === "json"}
             className={inspectorTab === "json" ? "toolbar-button is-active" : "toolbar-button"}
@@ -4822,7 +5505,17 @@ export default function App({ bootstrap: rawBootstrap }: { bootstrap: Bootstrap 
           </button>
         </div>
         <div aria-labelledby={inspectorTab === "json" ? "observatory-inspector-tab-json" : "observatory-inspector-tab-cards"} id="observatory-inspector-panel" role="tabpanel">
-          {inspectorTab === "json" ? <pre className="debug-json">{JSON.stringify(rawTarget, null, 2)}</pre> : renderInspectorCards()}
+          {inspectorTab === "json" ? (
+            <JsonPreview
+              expanded={Boolean(expandedJsonPanels["inspector-panel-json"])}
+              onToggle={() => toggleJsonPanel("inspector-panel-json")}
+              collapsedText="Cards-first inspection stays active until you explicitly reveal the raw JSON payload."
+              title="Raw JSON"
+              value={rawTarget}
+            />
+          ) : (
+            renderInspectorCards()
+          )}
         </div>
       </aside>
     );
@@ -5340,19 +6033,42 @@ function coordinateModeLabel(modeId: string, snapshots: LayoutSnapshot[], catalo
   return humanLayoutLabel(modeId, catalog);
 }
 
+function normalizeExportToken(format: string): string {
+  return String(format ?? "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+}
+
 function humanExportLabel(format: string): string {
-  if (format === "gdf") return "GDF";
-  if (format === "gml") return "GML";
-  if (format === "graphviz_dot") return "GraphViz DOT";
-  if (format === "pajek_net") return "Pajek NET";
-  if (format === "netdraw_vna") return "Netdraw VNA";
-  if (format === "ucinet_dl") return "UCINET DL";
-  if (format === "tulip_tlp") return "Tulip TLP";
-  if (format === "tgf") return "TGF";
-  if (format === "nodes_csv") return "Nodes CSV";
-  if (format === "edges_csv") return "Edges CSV";
-  if (format === "selection_json") return "Selection JSON";
-  return format.toUpperCase();
+  const normalized = normalizeExportToken(format);
+  if (!normalized) return "";
+  if (normalized === "gexf") return "GEXF";
+  if (normalized === "graphml") return "GraphML";
+  if (normalized === "gdf") return "GDF";
+  if (normalized === "gml") return "GML";
+  if (normalized === "graphviz_dot") return "GraphViz DOT";
+  if (normalized === "pajek_net") return "Pajek NET";
+  if (normalized === "netdraw_vna") return "Netdraw VNA";
+  if (normalized === "ucinet_dl") return "UCINET DL";
+  if (normalized === "tulip_tlp") return "Tulip TLP";
+  if (normalized === "tgf") return "TGF";
+  if (normalized === "nodes_csv") return "Nodes CSV";
+  if (normalized === "edges_csv") return "Edges CSV";
+  if (normalized === "selection_json") return "Selection JSON";
+  return normalized.toUpperCase();
+}
+
+function availableExportFormats(formats: readonly string[] | undefined): Array<{ value: string; label: string }> {
+  const seen = new Set<string>();
+  const next: Array<{ value: string; label: string }> = [];
+  for (const raw of formats ?? DEFAULT_EXPORT_FORMATS) {
+    const value = normalizeExportToken(String(raw ?? ""));
+    const label = humanExportLabel(value);
+    if (!value || !label || !/[A-Za-z0-9]/.test(label) || seen.has(value)) continue;
+    seen.add(value);
+    next.push({ value, label });
+  }
+  return next;
 }
 
 function humanExportScopeLabel(scope: ExportScope): string {

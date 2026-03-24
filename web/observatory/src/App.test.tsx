@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
@@ -142,7 +142,7 @@ function graphPayload() {
       verdicts: ["accept"],
     },
     statistics_capabilities: { heavy_graph_node_cap: 320, rankings: ["degree", "pagerank"] },
-    export_formats: ["gexf", "graphml", "nodes_csv", "edges_csv", "selection_json"],
+    export_formats: ["gexf", "graphml", "\u200b", "nodes_csv", "edges_csv", "selection_json"],
     nodes: [
       { id: "meme-1", label: "Persistence", kind: "meme", domain: "knowledge", degree: 1, render_coords: { force: { x: 0, y: 0 } }, export_label: "Persistence" },
       { id: "meme-2", label: "Retrieval", kind: "meme", domain: "behavior", degree: 2, render_coords: { force: { x: 1, y: 1 } }, export_label: "Retrieval", memode_membership: ["memode-1"] },
@@ -362,10 +362,13 @@ describe("EDEN Observatory App", () => {
     expect(screen.getByRole("tab", { name: "Data Laboratory" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Preview" })).toBeTruthy();
     expect(screen.getByText(/Static export mode reads adjacent JSON artifacts/)).toBeTruthy();
+    expect(screen.getByText("Browser-local graph workbench")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Reset layout" })).toHaveLength(1);
     expect(screen.getByText("Appearance")).toBeTruthy();
     expect(screen.getByText("Layout Workbench")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Filters" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Memode Audit" })).toBeTruthy();
+    expect(screen.getByText("Authority actions")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: "Memode Audit" }));
     expect(screen.getByText("Memode Audit Summary")).toBeTruthy();
@@ -402,9 +405,49 @@ describe("EDEN Observatory App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Collapse Left Dock" }));
     expect(screen.getByRole("button", { name: "Appearance / Layout" })).toBeTruthy();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Reset layout" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Reset layout" }));
     expect(screen.queryByRole("button", { name: "Appearance / Layout" })).toBeNull();
     expect(screen.getByText("Appearance")).toBeTruthy();
+  });
+
+  it("always normalizes startup interaction mode to INSPECT even when saved presets requested MEASURE", async () => {
+    window.localStorage.setItem(
+      "eden.observatory.view_presets.v2::exp-startup::overview::manifest-startup",
+      JSON.stringify({
+        interactionMode: "MEASURE",
+        graphMode: "Semantic Map",
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("graph.json")) return response(graphPayload());
+        if (url.endsWith("overview.json")) return response(overviewPayload());
+        if (url.endsWith("measurements.json")) return response(measurementsPayload());
+        if (url.endsWith("basin.json")) return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "overview",
+          experiment_id: "exp-startup",
+          export_manifest_id: "manifest-startup",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "INSPECT" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Semantic Map" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("defers geometry loading until the Geometry dock tab opens", async () => {
@@ -449,6 +492,11 @@ describe("EDEN Observatory App", () => {
     await waitFor(() => {
       expect(geometryRequests).toBe(1);
     });
+    expect(screen.getByText("Summary-first diagnostics")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show Geometry JSON" })).toBeTruthy();
+    expect(screen.queryByText(/"slice_count": 3/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show Geometry JSON" }));
+    expect(screen.getByText(/Preparing geometry json/i)).toBeTruthy();
     expect(await screen.findByText(/"slice_count": 3/)).toBeTruthy();
   });
 
@@ -457,7 +505,7 @@ describe("EDEN Observatory App", () => {
       "fetch",
       vi.fn((url: string) => {
         if (url === "/api/status") {
-          return response({ status: { frontend_build: { warning: true, reason: "stale build" } } });
+          return response({ status: { frontend_build: { warning: true, reason: "frontend shell is older than the current source tree; run npm --prefix web/observatory run build" } } });
         }
         if (url === "/api/graph") return response(graphPayload());
         if (url === "/api/basin") {
@@ -498,8 +546,183 @@ describe("EDEN Observatory App", () => {
     );
 
     expect(await screen.findByText("Sparse basin data")).toBeTruthy();
-    expect(screen.getByText(/Build warning: stale build/)).toBeTruthy();
+    expect(screen.getByText(/Build warning: frontend shell is older than the current source tree; run npm --prefix web\/observatory run build/)).toBeTruthy();
     expect(screen.getByText(/Not enough turns with non-empty active sets/)).toBeTruthy();
+  });
+
+  it("keeps overview context truthful and payload diagnostics separate from overview content", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("graph.json")) return response(graphPayload());
+        if (url.endsWith("overview.json")) return response(overviewPayload());
+        if (url.endsWith("measurements.json")) return response(measurementsPayload());
+        if (url.endsWith("basin.json")) return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "overview",
+          experiment_id: "exp-context",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    expect(screen.getByText("Current plane")).toBeTruthy();
+    expect(screen.getByText("Assemblies plane")).toBeTruthy();
+    expect(screen.getByText("Assemblies loaded")).toBeTruthy();
+    expect(screen.getByText("Visible node domains")).toBeTruthy();
+    expect(screen.getByText("Knowledge nodes")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Semantic Map" }));
+    expect(screen.getByText("Semantic meme-support slice")).toBeTruthy();
+    expect(screen.queryByText("Assemblies loaded")).toBeNull();
+    expect(screen.getByText("Clusters")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Payloads" }));
+    expect(screen.getByText("Bundle diagnostics")).toBeTruthy();
+    expect(screen.queryByText("Experiment")).toBeNull();
+  });
+
+  it("simplifies appearance controls to subject-specific browser-local mappings", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("graph.json")) return response(graphPayload());
+        if (url.endsWith("overview.json")) return response(overviewPayload());
+        if (url.endsWith("measurements.json")) return response(measurementsPayload());
+        if (url.endsWith("basin.json")) return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "overview",
+          experiment_id: "exp-appearance",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Unique" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Partition" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ranking" })).toBeNull();
+    expect(screen.getByLabelText("Node color by")).toBeTruthy();
+    expect(screen.queryByLabelText("Edge color by")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edges" }));
+    expect(screen.getByLabelText("Edge color by")).toBeTruthy();
+    expect(screen.queryByLabelText("Node color by")).toBeNull();
+  });
+
+  it("makes measure mode visibly instructive instead of inert", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/status") return response({ status: { frontend_build: { warning: false } } });
+        if (url === "/api/graph") return response(graphPayload());
+        if (url === "/api/basin") return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+        if (url === "/api/overview") return response(overviewPayload());
+        if (url === "/api/measurements") return response(measurementsPayload());
+        if (url === "/api/runtime/status") return response({ available: true });
+        if (url === "/api/runtime/model") return response({ available: true, backend: "mock" });
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "overview",
+          experiment_id: "exp-measure",
+          live_api: {
+            status: "/api/status",
+            graph: "/api/graph",
+            basin: "/api/basin",
+            overview: "/api/overview",
+            measurements: "/api/measurements",
+            runtime_status: "/api/runtime/status",
+            runtime_model: "/api/runtime/model",
+            preview: "/api/preview",
+            commit: "/api/commit",
+            events: "/api/events",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "MEASURE" }));
+    expect(screen.getByText("Measure mode")).toBeTruthy();
+    expect(screen.getByText("No graph selection yet.")).toBeTruthy();
+    expect(screen.getByText(/Select nodes or a relation, then open Actions to preview a measurement run/)).toBeTruthy();
+    expect(screen.getByText(/Preview remains the next attributable step; commit is still explicit and reversible/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "select-meme-1" }));
+    expect(await screen.findByText("1-node selection active.")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Open Actions" }).length).toBeGreaterThan(0);
+  });
+
+  it("does not describe the default assembly context as a graph selection", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/status") return response({ status: { frontend_build: { warning: false } } });
+        if (url === "/graph.json") return response(graphPayload());
+        if (url === "/overview.json") return response(overviewPayload());
+        if (url === "/measurements.json") return response(measurementsPayload());
+        if (url === "/basin.json") return response(basinPayload());
+        if (url === "/api/sessions/session-1/turns") return response(transcriptPayload());
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          mode: "hybrid",
+          initial_surface: "overview",
+          session_id: "session-1",
+          live_api: {
+            status: "/api/status",
+            sessions: "/api/sessions",
+            events: "/api/events",
+          },
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    expect(screen.getByText("No graph selection yet.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Inspector" }));
+    expect(screen.getByRole("tab", { name: "Inspector cards" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Inspector raw JSON" })).toBeTruthy();
+    expect(screen.getByText("No graph selection yet; inspector is showing the current assembly context.")).toBeTruthy();
+    expect(screen.queryByText("Inspecting 1 selected assembly.")).toBeNull();
   });
 
   it("loads heavy payloads from static sidecars in hybrid mode without waiting for stalled live overview requests", async () => {
@@ -578,7 +801,7 @@ describe("EDEN Observatory App", () => {
     );
 
     expect(await screen.findByTestId("graph-panel")).toBeTruthy();
-    expect(screen.getByText(/Current filtered view has 330 nodes, above the browser layout cap of 320\./)).toBeTruthy();
+    expect(screen.getAllByText(/Current filtered view has 330 nodes, above the browser layout cap of 320\./).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Select Nodes to Run" })[0].hasAttribute("disabled")).toBe(true);
     expect(screen.getByRole("button", { name: "Select Visible Sample (25)" })).toBeTruthy();
   });
@@ -729,6 +952,7 @@ describe("EDEN Observatory App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Graph entity Persistence" }));
 
     fireEvent.click(screen.getByRole("tab", { name: "Data Laboratory" }));
+    expect(screen.getByText("Bounded audit tables")).toBeTruthy();
     const selectedRow = screen.getAllByText("Persistence")[0].closest("tr");
     expect(selectedRow?.className).toContain("is-selected");
 
@@ -741,8 +965,141 @@ describe("EDEN Observatory App", () => {
     expect(screen.getByText(/Full ontology · 3 nodes · 2 edges/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: "Preview" }));
+    expect(screen.getByText("Final render workspace")).toBeTruthy();
     expect(screen.getByText("Preview Settings")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Refresh preview" })).toBeTruthy();
+    const previewExportActions = screen.getByText("Export Actions").closest("section");
+    expect(previewExportActions).toBeTruthy();
+    const exportButtons = within(previewExportActions as HTMLElement)
+      .getAllByRole("button")
+      .map((button) => button.textContent?.trim() ?? "");
+    expect(exportButtons.every((label) => label.length > 0)).toBe(true);
+    expect(within(previewExportActions as HTMLElement).getByRole("button", { name: "Selection JSON" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Commit" })).toBeNull();
+  });
+
+  it("uses relation-aware Data Laboratory selection wording in Edges view", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("graph.json")) return response(graphPayload());
+        if (url.endsWith("overview.json")) return response(overviewPayload());
+        if (url.endsWith("measurements.json")) return response(measurementsPayload());
+        if (url.endsWith("basin.json")) return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "overview",
+          experiment_id: "exp-data-lab-edges",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Data Laboratory" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edges" }));
+    expect(screen.getByText("0 relation rows selected")).toBeTruthy();
+    expect(screen.getByText("No current graph selection")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select first visible relation" }));
+    expect(screen.getByText("1 relation row selected")).toBeTruthy();
+    expect(screen.getByText("1 relation selected in graph")).toBeTruthy();
+  });
+
+  it("keeps inspector raw JSON collapsed until explicitly revealed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("graph.json")) return response(graphPayload());
+        if (url.endsWith("overview.json")) return response(overviewPayload());
+        if (url.endsWith("measurements.json")) return response(measurementsPayload());
+        if (url.endsWith("basin.json")) return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    render(
+      <App
+        bootstrap={{
+          initial_surface: "overview",
+          experiment_id: "exp-inspector-json",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    expect(await screen.findByText("Current plane")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Inspector" }));
+    expect(screen.getByText("Cards first, JSON on reveal")).toBeTruthy();
+    expect(screen.queryByText(/"graph_counts"/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Inspector raw JSON" }));
+    expect(screen.getByRole("button", { name: "Show Raw JSON" })).toBeTruthy();
+    expect(screen.queryByText(/"graph_counts"/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show Raw JSON" }));
+    const inspectorPanel = screen.getByRole("tabpanel", { name: "Inspector raw JSON" });
+    await waitFor(() => {
+      const rawJson = inspectorPanel.querySelector("pre.debug-json");
+      expect(rawJson?.textContent).toContain('"member_meme_ids"');
+    });
+  });
+
+  it("adds guidance to the Tanakh tab and avoids duplicating payload mode copy", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/status") return response({ status: { frontend_build: { warning: false } } });
+      if (url === "/graph.json") return response(graphPayload());
+      if (url === "/overview.json") return response(overviewPayload());
+      if (url === "/measurements.json") return response(measurementsPayload());
+      if (url === "/basin.json") return response({ turns: [], attractors: [], filtered_turn_count: 0, source_turn_count: 0, diagnostics: { empty_state: true } });
+      if (url === "/tanakh.json") return response({ current_ref: "Ezek 1", bundle_hash: "bundle-1", bundle: { manifest: { dataset_id: "uxlc-test" } } });
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <App
+        bootstrap={{
+          mode: "hybrid",
+          initial_surface: "overview",
+          experiment_id: "exp-tanakh-audit",
+          payload_urls: {
+            graph: "/graph.json",
+            basin: "/basin.json",
+            overview: "/overview.json",
+            measurements: "/measurements.json",
+            tanakh: "/tanakh.json",
+          },
+          live_api: {
+            status: "/api/status",
+            events: "/api/events",
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId("graph-panel")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Tanakh" }));
+    expect(screen.getByText("Canonical text and derived sidecars")).toBeTruthy();
+    expect(screen.getByText(/Tanakh runs are separate derived tools and do not participate in preview \/ commit \/ revert semantics/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Payloads" }));
+    expect(screen.getAllByText(/Hybrid mode loads heavy graph\/basin\/overview bundles from adjacent JSON sidecars/).length).toBe(1);
   });
 });

@@ -31,6 +31,7 @@ export default function TanakhPanel({ payload, liveEnabled, canRun, running, onR
   const [wordRadius, setWordRadius] = useState(String(bundle.params?.scene?.word_radius ?? 0.22));
   const [verseHeight, setVerseHeight] = useState(String(bundle.params?.scene?.verse_height ?? 1.1));
   const [oscillationAmplitude, setOscillationAmplitude] = useState(String(bundle.params?.scene?.oscillation_amplitude ?? 0.18));
+  const [showDebugJson, setShowDebugJson] = useState(false);
 
   useEffect(() => {
     setRef(payload?.current_ref ?? "Ezek 1");
@@ -43,6 +44,7 @@ export default function TanakhPanel({ payload, liveEnabled, canRun, running, onR
     setWordRadius(String(bundle.params?.scene?.word_radius ?? 0.22));
     setVerseHeight(String(bundle.params?.scene?.verse_height ?? 1.1));
     setOscillationAmplitude(String(bundle.params?.scene?.oscillation_amplitude ?? 0.18));
+    setShowDebugJson(false);
   }, [bundle.params, payload?.current_ref]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -125,9 +127,14 @@ export default function TanakhPanel({ payload, liveEnabled, canRun, running, onR
           <input onChange={(event) => setOscillationAmplitude(event.target.value)} value={oscillationAmplitude} />
         </label>
         <button className="toolbar-button is-active" disabled={!canRun || running} type="submit">
-          {running ? "Running..." : liveEnabled ? "Run Tanakh tool" : "Static export"}
+          {running ? "Running..." : canRun ? "Run Tanakh analysis" : "Live server required"}
         </button>
       </form>
+      <p className="placeholder-copy">
+        {canRun
+          ? "Running Tanakh analysis refreshes derived sidecars only. It does not write measurement events or commit graph mutation."
+          : "Static export keeps the Tanakh reader and derived artifacts visible, but live re-runs are disabled without the observatory server."}
+      </p>
 
       <div className="toolbar toolbar-badges">
         <span className="badge badge-observed">Canonical text</span>
@@ -196,7 +203,7 @@ export default function TanakhPanel({ payload, liveEnabled, canRun, running, onR
         <section className="tanakh-card tanakh-debug-card">
           <header>
             <h2>Provenance and debug</h2>
-            <p>Static files are the audit surface; no UI-only truth.</p>
+            <p>Static files are the audit surface; reveal full JSON only when artifact-level provenance is needed.</p>
           </header>
           <dl className="metric-list">
             <div className="metric-row">
@@ -216,7 +223,28 @@ export default function TanakhPanel({ payload, liveEnabled, canRun, running, onR
               <dd>{bundle.manifest?.build ?? "—"}</dd>
             </div>
           </dl>
-          <pre className="debug-json">{JSON.stringify({ artifacts: payload?.artifacts, validation: validation.cases }, null, 2)}</pre>
+          <div className="json-preview">
+            <div className="json-preview-toolbar">
+              <dl className="metric-list">
+                <div className="metric-row">
+                  <dt>Artifact entries</dt>
+                  <dd>{Array.isArray(payload?.artifacts) ? payload.artifacts.length : payload?.artifacts ? Object.keys(payload.artifacts).length : 0}</dd>
+                </div>
+                <div className="metric-row">
+                  <dt>Validation cases</dt>
+                  <dd>{Array.isArray(validation.cases) ? validation.cases.length : validation.cases ? Object.keys(validation.cases).length : 0}</dd>
+                </div>
+              </dl>
+              <button className="toolbar-button" onClick={() => setShowDebugJson((current) => !current)} type="button">
+                {showDebugJson ? "Hide Debug JSON" : "Show Debug JSON"}
+              </button>
+            </div>
+            {showDebugJson ? (
+              <pre className="debug-json">{JSON.stringify({ artifacts: payload?.artifacts, validation: validation.cases }, null, 2)}</pre>
+            ) : (
+              <p className="placeholder-copy">Debug JSON stays hidden until you explicitly reveal the Tanakh artifact payload.</p>
+            )}
+          </div>
         </section>
       </div>
     </div>
