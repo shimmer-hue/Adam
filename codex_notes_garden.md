@@ -8331,3 +8331,61 @@ Remaining uncertainties:
 The live MLX path was not exercised end-to-end against a real large dissertation document in this turn; proof is currently monkeypatched/regression-level plus compile/test coverage. The full suite still is not green because the memoir PDF fixture is missing, and there is an unrelated Textual coroutine warning in `tests/test_tui_smoke.py::test_tui_conversation_atlas_saves_taxonomy_and_resumes_session`.
 Next shortest proof path:
 Run one real MLX ingest of `/Users/brianray/Adam/assets/cannonical_secondary_sources/A_Bad_Trip_in_Difference_Neo-.md` or its PDF on the operator machine, inspect the resulting `INGEST_CONTEXTUALIZATION` trace plus `CONTEXTUALIZES_DOCUMENT` edges in `data/eden.db`, then restore or retire the missing memoir PDF fixture so the repo-wide suite is fully green.
+## [2026-03-24 12:50:21 EDT] PRE-FLIGHT
+Operator task:
+Fix the observatory/browser regression where the new Gephi-style GUI renders but the graph material does not load and the workbench reports `Graph payload not ready` with graph status `idle`.
+Task checksum:
+`ac4036e023d5d79d`
+Repo situation:
+Working tree is dirty only in `.DS_Store`. Runtime evidence points at experiment `bb298723-5fbf-4554-bf6b-ec5f4d336fbd`; its export payload JSON refreshed on 2026-03-24 while `observatory_index.html` remained older. Older legacy `observatory_index.html` shells still exist under `exports/` for some experiments.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/AGENTS.md`; `/Users/brianray/.codex/skills/playwright/SKILL.md`.
+Natural-language contracts in force:
+Observatory launch should open the browser immediately when an existing shell is usable, but the browser shell must truthfully progressive-load graph payloads and preserve session scope. Browser workbench remains observability/export work, not the primary runtime. Claims need proof by code plus test/runtime evidence from this turn.
+Files/modules likely in scope:
+`/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/eden/observatory/exporters.py`; `/Users/brianray/Adam/eden/observatory/frontend_assets.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; possibly `/Users/brianray/Adam/tests/test_observatory_server.py`.
+Status register:
+- Implemented:
+  - React observatory shell expects graph source in bootstrap and background-loads it after overview/measurements/basin.
+  - TUI observatory action can early-open an existing `observatory_index.html` before background export refresh completes.
+- Instrumented:
+  - `/api/status` exposes frontend build freshness.
+  - Runtime logs record observatory export/open events.
+- Conceptual:
+  - Whether browser cache busting is sufficient without stricter shell validation is not yet proved.
+- Unknown:
+  - Whether the operator is seeing a stale cached HTML shell, a stale cached `index.js`, or a genuine missing-source bootstrap at launch time.
+Risks / invariants:
+Do not break the fast-open observatory contract or session-scoped browser URL behavior. Preserve the Gephi-style workbench shell. Avoid overclaiming a loader fix unless the launch path and tests prove stale-shell/cache behavior is actually blocked.
+Evidence plan:
+Patch observatory launch/export to validate early-open shells and add deterministic cache-busting for the browser shell/assets, then run targeted TUI observatory tests and a browser-level check if needed.
+Shortest proof path:
+Add shell-readiness + version query handling in the TUI launch path, version the exported shell asset URLs from frontend build metadata, update observatory launch tests to assert the cache-busting/session behavior, and run targeted pytest on the observatory/TUI path.
+## [2026-03-24 13:00:18 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/eden/observatory/frontend_assets.py`; `/Users/brianray/Adam/eden/observatory/exporters.py`; `/Users/brianray/Adam/eden/tui/app.py`; `/Users/brianray/Adam/tests/test_runtime_e2e.py`; `/Users/brianray/Adam/tests/test_tui_smoke.py`; `/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+`/Users/brianray/Adam/docs/TUI_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`.
+Natural-language contracts added/revised/preserved:
+Preserved the fast-open observatory contract, but revised it so the TUI only reuses an existing browser shell when that shell still exposes the current React bootstrap contract, including a graph source and asset-version marker. Revised the browser-shell contract so exported `observatory_index.html` now versions its frontend asset URLs and immediate browser launches append a shell cache-busting token while preserving session scope.
+Behavior implemented or modified:
+Added frontend asset-version derivation from observatory build metadata in `/Users/brianray/Adam/eden/observatory/frontend_assets.py`. Updated `/Users/brianray/Adam/eden/observatory/exporters.py` so shell bootstrap includes `asset_version` and the generated HTML references `style.css` and `index.js` with version query strings. In `/Users/brianray/Adam/eden/tui/app.py`, added shell-bootstrap parsing/readiness checks, rejected legacy/non-bootstrap shells from early-open reuse, and added a `shell_v` launch token to browser URLs so the operator does not stay pinned to a stale cached shell.
+Evidence produced (tests / traces / commands / exports):
+Ran `./.venv/bin/python -m py_compile eden/observatory/frontend_assets.py eden/observatory/exporters.py eden/tui/app.py tests/test_runtime_e2e.py tests/test_tui_smoke.py` successfully. Ran `./.venv/bin/pytest -q tests/test_runtime_e2e.py -k single_graph_bootstrap_chat_feedback_and_exports` and got `1 passed, 14 deselected`. Ran `./.venv/bin/pytest -q tests/test_tui_smoke.py -k 'open_browser_observatory_refreshes_current_export_and_targets_index or runtime_action_menu_selection_executes_observatory or runtime_action_menu_digit_shortcut_opens_existing_observatory_shell_before_slow_export or runtime_action_menu_digit_shortcut_waits_for_export_when_existing_shell_is_legacy'` and got `4 passed, 22 deselected`. Ran full `./.venv/bin/pytest -q`; result was `122 passed, 1 failed, 3 warnings` in `97.71s`. The single failure remains `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing.
+Status register changes:
+- Implemented:
+  - Exported observatory shells now carry `asset_version` and versioned asset URLs.
+  - TUI observatory fast-open now rejects legacy/incompatible shells instead of opening a shell that cannot load graph material.
+  - Browser observatory launches now append a `shell_v` cache-busting token alongside session scope.
+- Instrumented:
+  - TUI logs now differentiate incompatible early-open shells from compatible ones when deciding whether to wait for export refresh.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - Whether the operator's already-open browser tab needs one manual refresh if that tab still holds a stale document instance from before this patch.
+Truth-table / limitations updates:
+Updated `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md` so the observatory fast-open row now explicitly states that only compatible React shells are reused and that launch URLs carry cache-busting tokens. No limitation contract was changed in this turn.
+Remaining uncertainties:
+No headed browser/manual validation was run against the operator's exact stale GUI tab in this turn; proof is code-path and regression-test level. Repo-wide `pytest -q` is still not fully green because of the unrelated missing memoir PDF fixture and the existing Textual coroutine warning.
+Next shortest proof path:
+Re-open Browser Observatory from the TUI on the operator machine and confirm the graph status leaves `idle` and materializes graph content under the new shell. Separately, restore or retire `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` so the full suite can go green.

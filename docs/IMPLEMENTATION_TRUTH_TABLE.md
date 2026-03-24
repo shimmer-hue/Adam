@@ -71,7 +71,7 @@
 | Observatory browser E2E audit | Implemented | Playwright Chromium full battery plus Firefox/WebKit smoke proofs captured under `web/observatory/test-results/chromium-final` and `cross-browser-smoke`; every journey now fails if screenshot/DOM/JSON evidence artifacts are missing or empty |
 | Frontend build freshness guard | Implemented | `build-meta.json` emitted at build time, runtime warning via `/api/status`, CI check script in `scripts/check_observatory_build_meta.py` |
 | Robust observatory server lifecycle | Implemented | host/port args, reuse, free-port fallback, tests |
-| Observatory open without forced synchronous export | Implemented | TUI observatory actions now start/open the server immediately and reuse existing artifacts when present |
+| Observatory open without forced synchronous export | Implemented | TUI observatory actions now start/open the server immediately, reuse only compatible React observatory shells for early-open, and append shell/cache-busting query tokens so browser relaunches do not silently reuse stale HTML or bundle assets |
 | TUI observatory action progress surface | Implemented | the top action shelf separates selected action from active observatory work and shows phase-progress plus accurate elapsed time while the strip remains directly repeatable |
 | Export location feedback | Implemented | TUI export action reports the artifact directory path in the session feedback surface after generation |
 | Geometry diagnostics | Implemented | ringness, radiality, linearity, communities, triadic closure, spectral summaries, mirror/chirality/translation proxies |

@@ -6,7 +6,7 @@ import math
 import re
 import urllib.parse
 from collections import deque
-from time import monotonic
+from time import monotonic, time_ns
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -213,17 +213,55 @@ def _observatory_export_index_path(runtime: EdenRuntime, experiment_id: str | No
     return runtime.export_dir_for_experiment(experiment_id) / "observatory_index.html"
 
 
+_OBSERVATORY_BOOTSTRAP_RE = re.compile(r"window\.__EDEN_BOOTSTRAP__ = (\{.*?\});</script>", re.S)
+
+
+def _observatory_shell_bootstrap(index_path: Path | None) -> dict[str, Any] | None:
+    if index_path is None or not index_path.exists():
+        return None
+    try:
+        text = index_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = _OBSERVATORY_BOOTSTRAP_RE.search(text)
+    if not match:
+        return None
+    try:
+        bootstrap = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
+    return bootstrap if isinstance(bootstrap, dict) else None
+
+
+def _observatory_shell_ready(index_path: Path | None) -> bool:
+    bootstrap = _observatory_shell_bootstrap(index_path)
+    if bootstrap is None:
+        return False
+    payload_urls = bootstrap.get("payload_urls") or {}
+    live_api = bootstrap.get("live_api") or {}
+    graph_source = payload_urls.get("graph") or live_api.get("graph")
+    asset_version = bootstrap.get("asset_version")
+    return bool(graph_source and asset_version)
+
+
 def _observatory_target_url(
     runtime: EdenRuntime,
     status: dict[str, Any],
     experiment_id: str | None,
     session_id: str | None = None,
+    launch_token: str | None = None,
 ) -> str:
     if not experiment_id:
-        return status["url"]
-    target = status["url"] + f"{experiment_id}/observatory_index.html"
+        target = status["url"]
+    else:
+        target = status["url"] + f"{experiment_id}/observatory_index.html"
+    params: dict[str, str] = {}
     if session_id:
-        target += "?" + urllib.parse.urlencode({"session_id": session_id})
+        params["session_id"] = session_id
+    if launch_token:
+        params["shell_v"] = launch_token
+    if params:
+        target += "?" + urllib.parse.urlencode(params)
     return target
 
 
@@ -4564,11 +4602,17 @@ class ChatScreen(Screen):
                 experiment_id = app.runtime.primary_experiment()["id"]
                 session_id = None
 
-            target_url = _observatory_target_url(app.runtime, status, experiment_id, session_id)
             existing_export = _observatory_export_index_path(app.runtime, experiment_id)
-            export_exists = bool(existing_export and existing_export.exists())
+            launch_token = str(time_ns())
+            target_url = _observatory_target_url(app.runtime, status, experiment_id, session_id, launch_token=launch_token)
+            shell_ready = _observatory_shell_ready(existing_export)
 
-            if export_exists:
+            if existing_export and existing_export.exists() and not shell_ready:
+                self._write_forensic(
+                    f"[INFO] Observatory early-open skipped :: incompatible shell at {existing_export}"
+                )
+
+            if shell_ready:
                 self._set_runtime_action_progress(
                     action="observatory",
                     label="Open Browser Observatory",
@@ -4599,8 +4643,8 @@ class ChatScreen(Screen):
                 action="observatory",
                 label="Open Browser Observatory",
                 phase="Exporting observatory payloads",
-                step=3 if export_exists else 2,
-                total=4 if export_exists else 3,
+                step=3 if shell_ready else 2,
+                total=4 if shell_ready else 3,
                 detail=export_detail,
                 feedback=(
                     f"Observatory: refreshing payloads for graph {safe_excerpt(experiment_id, limit=20)}."
@@ -4616,8 +4660,8 @@ class ChatScreen(Screen):
                     action="observatory",
                     label="Open Browser Observatory",
                     phase="Opening browser",
-                    step=4 if export_exists else 3,
-                    total=4 if export_exists else 3,
+                    step=4 if shell_ready else 3,
+                    total=4 if shell_ready else 3,
                     detail=f"Launching the system browser for {safe_excerpt(target_url, limit=88)}.",
                     feedback="Observatory: launching the browser.",
                 )

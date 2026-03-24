@@ -20,6 +20,22 @@ def frontend_asset_manifest() -> Path:
     return frontend_asset_root() / BUILD_META_NAME
 
 
+def frontend_asset_version() -> str:
+    manifest_path = frontend_asset_manifest()
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            manifest = {}
+        version = str(manifest.get("source_hash") or manifest.get("built_at") or "").strip()
+        if version:
+            return "".join(char if char.isalnum() else "-" for char in version).strip("-") or "observatory"
+    asset_root = frontend_asset_root()
+    if asset_root.exists():
+        return str(int(asset_root.stat().st_mtime))
+    return "missing"
+
+
 def frontend_source_hash() -> str:
     files: list[Path] = []
     for relative in ("package.json", "package-lock.json", "vite.config.ts", "tsconfig.json"):

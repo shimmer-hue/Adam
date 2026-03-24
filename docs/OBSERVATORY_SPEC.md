@@ -187,6 +187,7 @@ Generated per experiment under `exports/<experiment_id>/`:
 ## Public browser payload contract
 
 - graph payloads expose layout, appearance, filter, statistics, and export capability metadata so the React shell can stay declarative instead of hard-coding instrument assumptions
+- the exported React shell bootstrap includes an `asset_version` token, and the shell references `style.css` / `index.js` with versioned query strings so browser reopens do not silently reuse stale frontend bundle assets after a local rebuild
 - graph payload nodes and edges can expose `export_label` alongside stable internal ids so graph-document downloads can carry semantic labels into Gephi without sacrificing referential identity
 - graph payloads expose `assembly_nodes` and `assembly_edges` as a distinct second-order plane so `Assemblies` mode can show/export memode topology without collapsing it into the meme-only semantic slice
 - graph payload nodes expose projected ontology fields: `kind`, `entity_type`, `speech_act_mode`, and `storage_kind`

@@ -21,7 +21,7 @@ from .contracts import (
     OBSERVATORY_BASIN_SCHEMA_VERSION,
     OBSERVATORY_GRAPH_SCHEMA_VERSION,
 )
-from .frontend_assets import copy_frontend_assets
+from .frontend_assets import copy_frontend_assets, frontend_asset_version
 from .geometry import compute_ablation_report, compute_coordinate_sets, compute_geometry_metrics, compute_selection_geometry
 from .graph_planes import build_graph_planes
 
@@ -2181,18 +2181,21 @@ class ObservatoryExporter:
 
     def _shell_html(self, *, title: str, bootstrap: dict[str, Any]) -> str:
         bootstrap_json = json.dumps(bootstrap, ensure_ascii=True)
+        asset_base = bootstrap.get("asset_base", "./_observatory_app")
+        asset_version = str(bootstrap.get("asset_version") or "").strip()
+        asset_suffix = f"?v={asset_version}" if asset_version else ""
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{title}</title>
-  <link rel="stylesheet" href="{bootstrap.get('asset_base', './_observatory_app')}/style.css" />
+  <link rel="stylesheet" href="{asset_base}/style.css{asset_suffix}" />
 </head>
 <body>
   <div id="observatory-root"></div>
   <script>window.__EDEN_BOOTSTRAP__ = {bootstrap_json};</script>
-  <script type="module" src="{bootstrap.get('asset_base', './_observatory_app')}/index.js"></script>
+  <script type="module" src="{asset_base}/index.js{asset_suffix}"></script>
 </body>
 </html>"""
 
@@ -2227,6 +2230,7 @@ class ObservatoryExporter:
         return {
             "mode": "hybrid",
             "asset_base": "./_observatory_app",
+            "asset_version": frontend_asset_version(),
             "initial_surface": initial_surface,
             "experiment_id": experiment_id,
             "session_id": session_id,

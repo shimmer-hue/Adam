@@ -62,6 +62,10 @@ def test_single_graph_bootstrap_chat_feedback_and_exports(runtime, tmp_path) -> 
     assert (tmp_path / "exports" / "tanakh_surface.json").exists()
     assert (tmp_path / "exports" / "tanakh_render_validation.json").exists()
     assert export_paths["graph_html"].endswith(".html")
+    observatory_shell = (tmp_path / "exports" / "observatory_index.html").read_text(encoding="utf-8")
+    assert '"asset_version":' in observatory_shell
+    assert "style.css?v=" in observatory_shell
+    assert "index.js?v=" in observatory_shell
     graph_payload = json.loads((tmp_path / "exports" / "graph_knowledge_base.json").read_text())
     assert graph_payload["semantic_nodes"]
     assert any(
