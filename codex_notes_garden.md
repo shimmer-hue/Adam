@@ -8102,3 +8102,58 @@ Remaining uncertainties:
 There is an unrelated modified `/Users/brianray/Adam/.DS_Store` in the working tree that I did not touch. Also, the staged `git rm --cached` cleanup removes export artifacts from the next commit onward, but does not erase already-pushed history.
 Next shortest proof path:
 Commit and push this staged cleanup if branch-tip removal is sufficient. If the operator needs the old export artifacts removed from GitHub history as well, perform an explicit history-rewrite pass with `git filter-repo` or equivalent in a separate, deliberate step.
+## [2026-03-23 22:32:54 EDT] PRE-FLIGHT
+Operator task:
+Create a repo-root `requirements.txt` that preserves the current dependency source of truth and collaborator install path.
+Task checksum:
+`5d5f08a8b9e44bf4d88007efef3ff7f0a0f4cd1a26aa10e86d9589b0793f9034`
+Repo situation:
+Working tree is already dirty from the staged `exports/` untracking cleanup and related doc updates. Do not disturb those changes. No existing `requirements.txt` is present at repo root.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/docs/PROJECT_CHARTER.md`; `/Users/brianray/Adam/README.md`.
+Natural-language contracts in force:
+Real runtime backend remains MLX-only and the repo-local `.venv` flow is canonical. Dependency truth currently lives in `/Users/brianray/Adam/pyproject.toml`, while README install instructions point to editable install with `.[dev,mlx]`.
+Files/modules likely in scope:
+`/Users/brianray/Adam/requirements.txt`; `/Users/brianray/Adam/README.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Base, dev, and MLX dependencies are declared in `/Users/brianray/Adam/pyproject.toml`.
+  - README install flow uses `.venv/bin/python -m pip install -e '.[dev,mlx]'`.
+- Instrumented:
+  - README documents the repo-local Python 3.12 environment.
+- Conceptual:
+  - A dedicated `requirements.txt` convenience entrypoint does not yet exist.
+- Unknown:
+  - Whether the collaborator expects a pinned lock-style requirements file or a thin wrapper over the pyproject extras.
+Risks / invariants:
+Do not duplicate dependency lists if a thin wrapper can preserve a single source of truth. Preserve MLX in the default collaborator install path. Avoid introducing drift between `pyproject.toml`, README, and the new requirements file.
+Evidence plan:
+Create a minimal `requirements.txt` that installs the package with `dev` and `mlx` extras, update README to mention it, and verify the file contents plus staged diff.
+Shortest proof path:
+Add `/Users/brianray/Adam/requirements.txt` containing the editable extras install line, patch README to mention `pip install -r requirements.txt`, then inspect the diff and file contents.
+## [2026-03-23 22:37:45 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/requirements.txt`; `/Users/brianray/Adam/README.md`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+None. This turn added an installation convenience surface and synced the operator README.
+Natural-language contracts added/revised/preserved:
+Preserved `pyproject.toml` as the dependency source of truth while adding a `requirements.txt` entrypoint that resolves to the same editable `dev` + `mlx` install path documented in README. Preserved the MLX-only runtime boundary from the charter.
+Behavior implemented or modified:
+Added a repo-root `requirements.txt` wrapper with `-e .[dev,mlx]` and documented the corresponding `pip install -r requirements.txt` command in `/Users/brianray/Adam/README.md`.
+Evidence produced (tests / traces / commands / exports):
+Verified `/Users/brianray/Adam/requirements.txt` contents with `nl -ba`. Verified the README install note with `nl -ba /Users/brianray/Adam/README.md | sed -n '24,38p'`. Ran `cd /Users/brianray/Adam && ./.venv/bin/python -m pip install --dry-run -r requirements.txt`, which completed successfully and resolved the local editable package plus the base, dev, and MLX dependencies without install errors. Reverted generated `eden_adam.egg-info` metadata changes caused by that validation step so they do not leak into the working tree.
+Status register changes:
+- Implemented:
+  - Repo-root `requirements.txt` now exists and resolves to the same dependency set as `-e '.[dev,mlx]'`.
+- Instrumented:
+  - README now exposes the `requirements.txt` install path explicitly for collaborators.
+- Conceptual:
+  - A pinned lockfile for reproducible collaborator installs was not introduced.
+- Unknown:
+  - Whether the collaborator wants a separate non-MLX requirements variant for non-Apple-Silicon review workflows.
+Truth-table / limitations updates:
+None. Capability status did not change.
+Remaining uncertainties:
+There is still an unrelated modified `/Users/brianray/Adam/.DS_Store` in the working tree that I did not touch. The new `requirements.txt` is intentionally a thin wrapper, not a pinned dependency lock.
+Next shortest proof path:
+If reproducible collaborator installs become necessary, add a separate lock-generation workflow or pinned requirements artifact instead of flattening `pyproject.toml` by hand.

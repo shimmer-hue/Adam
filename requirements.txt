@@ -1,0 +1,2 @@
+# Keep dependency truth in pyproject.toml while offering a pip -r entrypoint.
+-e .[dev,mlx]

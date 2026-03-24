@@ -29,6 +29,12 @@ cd /Users/brianray/Adam
 .venv/bin/python -m pip install -e '.[dev,mlx]'
 ```
 
+If you want a `requirements.txt` entrypoint that resolves to the same editable install:
+
+```bash
+.venv/bin/python -m pip install -r requirements.txt
+```
+
 If you already created `.venv` and only need the MLX extras:
 
 ```bash
