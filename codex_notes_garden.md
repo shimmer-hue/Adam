@@ -9162,3 +9162,57 @@ Remaining uncertainties:
 The Geometry raw payload can still contain large narrative fields after explicit reveal. Under the current contract that is acceptable because the operator explicitly requested raw JSON, but a separate redaction policy would be required if those fields should be suppressed.
 Next shortest proof path:
 Run one more focused browser-agent pass to verify that Preview export actions no longer show a blank control and that Geometry still shows summary-first state followed by explicit raw JSON after reveal in the refreshed bundle.
+## [2026-03-24 19:47:07 EDT] PRE-FLIGHT
+Operator task:
+Eliminate the remaining blank Preview export control reported by the latest browser-agent pass while preserving the already-fixed Inspector tab labels and startup selection-state consistency.
+Task checksum:
+`observatory-preview-export-blank-button-followup-v1`
+Repo situation:
+Working tree remains dirty from the observatory refactor and successive agent-audit follow-ups. The latest live agent pass proves Inspector tabs are labeled and startup selection state is consistent, but Preview still shows one blank export button after `Nodes CSV`.
+Relevant spec surfaces read:
+`/Users/brianray/Adam/AGENTS.md`; `/Users/brianray/Adam/docs/OBSERVATORY_SPEC.md`; `/Users/brianray/Adam/docs/OBSERVATORY_INTERACTION_SPEC.md`; `/Users/brianray/Adam/docs/IMPLEMENTATION_TRUTH_TABLE.md`; `/Users/brianray/Adam/docs/KNOWN_LIMITATIONS.md`.
+Natural-language contracts in force:
+Preview is a final-render/export stage whose visible export actions must be operator-readable and truthful. Browser-local observatory chrome is not evidence. Heavy raw JSON gating is unrelated to this export-action correction and should not change in this bounded pass.
+Files/modules likely in scope:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Status register:
+- Implemented:
+  - Inspector tabs carry explicit labels, startup selection messaging is aligned, and Preview/Data Lab export renderers already filter simple blank tokens.
+- Instrumented:
+  - Browser-agent evidence now isolates one residual live blank export button in Preview.
+- Conceptual:
+  - None added in this pass.
+- Unknown:
+  - The live blank button likely comes from hidden/bidi characters in a backend export token that the current normalizer does not yet canonicalize.
+Risks / invariants:
+Do not regress valid export labels or remove legitimate formats. Keep the fix bounded to export-token canonicalization and proof surfaces. Do not alter heavy-panel or authority-action semantics.
+Evidence plan:
+Harden export-token normalization against invisible/bidi control characters and loose separators, extend the frontend regression to cover the live-symptom token shape, rebuild the checked-in bundle, rerun frontend tests, rerun the build-metadata checker, and finish with full repo pytest so the handoff can separate observatory proof from the standing ingest-fixture failure.
+Shortest proof path:
+Patch `normalizeExportToken()` and the focused Preview export test, run `npm --prefix web/observatory test`, `npm --prefix web/observatory run build`, `./.venv/bin/python scripts/check_observatory_build_meta.py`, then `./.venv/bin/pytest -q`.
+## [2026-03-24 19:50:14 EDT] POST-FLIGHT
+Files changed:
+`/Users/brianray/Adam/web/observatory/src/App.tsx`; `/Users/brianray/Adam/web/observatory/src/App.test.tsx`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/index.js`; `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `/Users/brianray/Adam/codex_notes_garden.md`.
+Specs changed:
+None in this bounded follow-up. The existing observatory contract already required readable export actions; this turn restores implementation to that contract.
+Natural-language contracts added/revised/preserved:
+Preserved the Preview/export contract that visible export controls must be operator-readable and truthful. Preserved the distinction between explicit graph selection and default context preload, and preserved the separate heavy raw-payload reveal contract.
+Behavior implemented or modified:
+`/Users/brianray/Adam/web/observatory/src/App.tsx` now canonicalizes export-format tokens more aggressively by normalizing case, collapsing separator variants, and stripping bidi/control characters before label mapping. This allows live payload values like `edges csv`, `selection-json`, or tokens wrapped in hidden directional markers to resolve to `Edges CSV` / `Selection JSON` instead of rendering a blank button. The Inspector tab accessible labels remain intact. `/Users/brianray/Adam/web/observatory/src/App.test.tsx` now proves the Preview export list stays fully labeled under dirty live-style export tokens.
+Evidence produced (tests / traces / commands / exports):
+`npm --prefix /Users/brianray/Adam/web/observatory test` -> `25 passed`; `npm --prefix /Users/brianray/Adam/web/observatory run build` -> success, refreshed checked-in bundle and `/Users/brianray/Adam/eden/observatory/static/observatory_app/build-meta.json`; `./.venv/bin/python /Users/brianray/Adam/scripts/check_observatory_build_meta.py` -> `{"ok": true, "warning": false, "state": "ok"}` with matching source/built hash `66eae380fe33ee1c`; `./.venv/bin/pytest -q` -> `125 passed, 1 failed`, where the lone failure remains `tests/test_ingest.py::test_pages_pdf_fixture_extracts_readable_text` because `/Users/brianray/Adam/assets/cannonical_secondary_sources/bad_trip_with_jesus_theory_memoir.pdf` is missing on disk.
+Status register changes:
+- Implemented:
+  - Export-token canonicalization now tolerates dirty live payload spellings and hidden control markers without rendering a blank Preview export control.
+- Instrumented:
+  - Build metadata remains the proof surface that the checked-in observatory bundle matches source after the rebuild.
+- Conceptual:
+  - None added in this turn.
+- Unknown:
+  - Fresh live-browser confirmation is still pending; the new proof is code/test/build-led rather than another headed browser capture.
+Truth-table / limitations updates:
+None. No status category changed; this was a corrective implementation patch within the already documented observatory behavior.
+Remaining uncertainties:
+The patch now covers the most likely live cause for the blank button, but the latest headed-browser proof is still the pre-patch agent report. A fresh focused live pass is still the shortest direct confirmation.
+Next shortest proof path:
+Run one more minimal browser-agent check against Preview export actions only and confirm the visible button labels now read `GEXF`, `GraphML`, `GDF`, `GML`, `GraphViz DOT`, `Pajek NET`, `Netdraw VNA`, `UCINET DL`, `Tulip TLP`, `TGF`, `Nodes CSV`, `Edges CSV`, `Selection JSON` with no blank control.

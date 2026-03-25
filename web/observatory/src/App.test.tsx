@@ -142,7 +142,7 @@ function graphPayload() {
       verdicts: ["accept"],
     },
     statistics_capabilities: { heavy_graph_node_cap: 320, rankings: ["degree", "pagerank"] },
-    export_formats: ["gexf", "graphml", "\u200b", "nodes_csv", "edges_csv", "selection_json"],
+    export_formats: ["gexf", "graphml", "\u200b", "nodes_csv", "\u2066edges csv\u2069", "selection-json"],
     nodes: [
       { id: "meme-1", label: "Persistence", kind: "meme", domain: "knowledge", degree: 1, render_coords: { force: { x: 0, y: 0 } }, export_label: "Persistence" },
       { id: "meme-2", label: "Retrieval", kind: "meme", domain: "behavior", degree: 2, render_coords: { force: { x: 1, y: 1 } }, export_label: "Retrieval", memode_membership: ["memode-1"] },
@@ -974,6 +974,7 @@ describe("EDEN Observatory App", () => {
       .getAllByRole("button")
       .map((button) => button.textContent?.trim() ?? "");
     expect(exportButtons.every((label) => label.length > 0)).toBe(true);
+    expect(exportButtons).toEqual(["GEXF", "GraphML", "Nodes CSV", "Edges CSV", "Selection JSON"]);
     expect(within(previewExportActions as HTMLElement).getByRole("button", { name: "Selection JSON" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Commit" })).toBeNull();
   });

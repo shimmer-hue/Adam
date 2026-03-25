@@ -6035,8 +6035,12 @@ function coordinateModeLabel(modeId: string, snapshots: LayoutSnapshot[], catalo
 
 function normalizeExportToken(format: string): string {
   return String(format ?? "")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")
-    .trim();
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function humanExportLabel(format: string): string {
