@@ -518,16 +518,16 @@ class ActionStrip(Static):
         return max(len(self._button_label(value)) for _, value in ACTION_STRIP_OPTIONS) + 2
 
     def _column_count(self, available_width: int) -> int:
-        if available_width >= 132:
-            return 3
-        if available_width >= 82:
-            return 2
-        return 1
+        return 2
 
     def _button_rows(self, available_width: int) -> list[list[str]]:
         columns = self._column_count(available_width)
         values = [value for _, value in ACTION_STRIP_OPTIONS]
-        return [values[index : index + columns] for index in range(0, len(values), columns)]
+        rows_count = (len(values) + columns - 1) // columns
+        rows: list[list[str]] = [[] for _ in range(rows_count)]
+        for index, value in enumerate(values):
+            rows[index % rows_count].append(value)
+        return rows
 
     def preferred_height(self, available_width: int) -> int:
         return len(self._button_rows(available_width)) + self._status_line_count + 1

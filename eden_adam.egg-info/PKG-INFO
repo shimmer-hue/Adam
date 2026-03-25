@@ -48,6 +48,12 @@ cd /Users/brianray/Adam
 .venv/bin/python -m pip install -e '.[dev,mlx]'
 ```
 
+If you want a `requirements.txt` entrypoint that resolves to the same editable install:
+
+```bash
+.venv/bin/python -m pip install -r requirements.txt
+```
+
 If you already created `.venv` and only need the MLX extras:
 
 ```bash
@@ -79,9 +85,9 @@ Original module path from the repo root:
 
 `python3 app.py` is also valid, but only after you have already changed into `/Users/brianray/Adam`.
 
-The live cockpit boots directly into a real chat session on the repo-local runtime. The top action menu exposes review, profile, session, export, observatory, and model-prepare actions without dropping you onto a separate launcher. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
+The live dialogue surface boots directly into a real chat session on the repo-local runtime. The top action shelf exposes review, conversation-log, profile, session, export, observatory, model-prepare, ingest, aperture, and chyron actions as a multi-row button grid with integrated runtime/progress lines, without dropping you onto a separate launcher. The default MLX model is stored under `models/` inside the repo root rather than an external cache path.
 
-Use flags only when you want an explicit shell override. The normal path is the repo-local MLX default. The action menu can prepare the local Qwen model directly if it is not cached yet.
+Use flags only when you want an explicit shell override. The normal path is the repo-local MLX default. The action strip can prepare the local Qwen model directly if it is not cached yet.
 
 Advanced shell override example:
 
@@ -99,6 +105,7 @@ Ingest a document into an existing experiment:
 
 ```bash
 .venv/bin/python -m eden ingest <experiment_id> /absolute/path/to/file.pdf
+# also accepts: .md, .txt, .csv
 ```
 
 Export observability artifacts for an experiment:
@@ -126,20 +133,31 @@ Useful flags:
 1. Change into the repo root with `cd /Users/brianray/Adam`.
 2. Start EDEN with `.venv/bin/python app.py`.
 3. EDEN resumes the latest persisted session automatically. If none exists yet, it creates a blank live session automatically.
-4. If the local Qwen model is not cached yet, use the top action menu and run `Prepare Qwen`. EDEN stores it under `models/` in this repo.
-5. The top action menu is keyboard-first: `Tab` / `Shift+Tab` moves focus, arrow keys choose a menu item, and `Enter` executes it.
-6. The left bay shows the aperture, visible reasoning surface, and feedback/session state.
-7. The upper-right bay is the animated cockpit scope, dials, and live trace bus.
-8. The lower-right deck is the live Brian/Adam transcript and composer.
-9. Type into the lower-right chat deck and send with `Ctrl+S`.
-10. Open `Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
-11. Open `Review` when you want to apply `Accept`, `Edit`, `Reject`, or `Skip` feedback.
-12. Use `Adjust Profile` or `New Session` from the action menu when you want a bounded inference-profile change.
-13. Use `Export Latest` to write graph, basin, geometry, measurement, and index artifacts.
-14. Use `Open Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
-15. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
-16. Preview a change first, then commit it if the before/after metrics support the edit.
-17. Revert recent observatory-originated mutations from the measurement ledger when needed.
+4. If the local model is not cached yet, use the top action strip and run `Prepare Local Model`. EDEN stores it under `models/` in this repo.
+5. The top action strip is keyboard-first: `Tab` / `Shift+Tab` moves focus, `Left` / `Right` changes the selected action, typing digits jumps to an action number, and `Enter` executes it.
+6. If focus drifts away from the composer, press `Esc` to return to it. Printable keys typed outside editable widgets are routed back into the composer automatically.
+7. Press `F8` to pull down the full-width aperture drawer. It occupies the top band of the screen and renders a wider natural-language scan of the active set.
+8. The large left column is the Adam dialogue surface: scrolling Brian/Adam tape, inline reply-review strip, and always-visible composer.
+9. Transcript cards now use static chiaroscuro shading instead of animated decorative glyph bands inside the chat surface.
+10. On wide terminals the top row now pairs the action shelf with a live turn-status strip and `Aperture / Active Set`, while the right column keeps only the memgraph bus and the lower reasoning/feed surface.
+11. The memgraph bus includes a visible glyph legend so `D`, `o`, `^`, `M`, `@`, `R`, `*`, `!`, and `?` can be read directly on-screen.
+12. The runtime loop and session/event summary now ride in a merged bottom chyron instead of taking a full telemetry square.
+13. Type into the visible composer at the bottom of the left dialogue column and send with `Ctrl+S`.
+14. The prime screen now refreshes on state changes instead of a constant whole-screen repaint loop, which materially improves typing responsiveness.
+15. Start a conversation by asking Adam a question or pressing `F9` to ingest a document with a framing prompt. End a conversation by opening a new session with `F5`.
+16. The signal field is an orthographic operator slice of the live memgraph: `D` marks the latest ingested document root, `o` knowledge memes, `^` behavior memes, `M` memodes, `@` the session anchor, and `R` the high-regard recall bank. `*` marks turn pulses, `!` feedback sparks, and `?` a framing-brief lens. It is still not a hidden-activation visualizer.
+17. `F9` opens the ingest bay, where you provide a PDF/document path plus a short framing prompt. The document content and framing prompt are both indexed into the memgraph for later retrieval.
+18. Open `Utilities Deck` when you want detailed budget, thinking, history, ingest, and launch utilities.
+19. Review Adam inline: after each Adam reply, the reply-review strip appears directly under the transcript. Type `A`, `E`, `R`, or `S`, press `Enter` to move into the required field, then press `Enter` again in the last required field to commit. `A` / `R` require explanation; `E` requires explanation plus corrected text. Use `Shift+Enter` for a newline inside explanation or corrected text. Submitting there writes a feedback event and updates graph channels.
+20. Conversation logs are also written to `exports/conversations/<experiment-slug>/...md`. The merged bottom chyron shows the active transcript file, and `Open Conversation Log` in the action strip opens it directly.
+21. Adam's visible reply is now a clean operator-facing answer. Model thinking stays in the separate thinking surface instead of appearing as `Answer`, `Basis`, or `Next Step` scaffolding inside the dialogue.
+22. Use `Tune Session` or `Start New Session` from the action strip when you want a bounded inference-profile change.
+23. Use `Export Artifacts` to write graph, basin, geometry, measurement, and index artifacts.
+24. The `exports/` tree is runtime-generated local output. Share the repo without committed export artifacts and let Adam recreate them locally as needed.
+25. Use `Open Browser Observatory` to ensure the local server is running and open the current experiment's latest existing artifact without forcing a fresh export first.
+26. In the browser observatory use `INSPECT`, `MEASURE`, `EDIT`, `ABLATE`, or `COMPARE`.
+27. Preview a change first, then commit it if the before/after metrics support the edit.
+28. Revert recent observatory-originated mutations from the measurement ledger when needed.
 
 ## Inference notes
 
@@ -147,7 +165,7 @@ Useful flags:
 - `runtime_auto`: chooses a bounded preset per turn from transparent heuristics.
 - `adam_auto`: mock mode uses a bounded preset picker; MLX currently falls back to `runtime_auto` and logs that fact.
 - `temperature`, `top_p`, and `repetition_penalty` are passed through on the MLX path using local `mlx-lm` sampler/logits controls.
-- Qwen thinking is left enabled on the MLX path. EDEN separates model-emitted reasoning into its own TUI panel and keeps the final answer in the main response panel.
+- Qwen thinking is left enabled on the MLX path. EDEN keeps the final answer in the main response panel while the prime feed now suppresses prompt-mirror scaffolding and mixes response-first material, bounded visible reasoning/hum artifacts, runtime constraints, membrane behavior, continuity, and consideration telemetry; it still does not claim hidden reasoning access.
 - Prompt budget is an EDEN-side working budget estimate, not a claim about the model’s absolute maximum context window.
 - Token counts are exact when a tokenizer-backed counter is available; otherwise EDEN uses an explicit heuristic and labels it that way.
 

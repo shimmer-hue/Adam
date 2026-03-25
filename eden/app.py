@@ -219,12 +219,12 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     app_parser = subparsers.add_parser("app", help="Launch the Textual TUI.")
-    app_parser.add_argument("--backend", default=None, choices=["mock", "mlx"])
+    app_parser.add_argument("--backend", default=None, choices=["mock", "mlx", "claude"])
     app_parser.add_argument("--model-path", default=None, help=argparse.SUPPRESS)
     app_parser.set_defaults(func=cmd_app)
 
     demo_parser = subparsers.add_parser("demo", help="Run a one-turn demo and export observability artifacts.")
-    demo_parser.add_argument("--backend", default=None, choices=["mock", "mlx"])
+    demo_parser.add_argument("--backend", default=None, choices=["mock", "mlx", "claude"])
     demo_parser.add_argument("--model-path", default=None, help=argparse.SUPPRESS)
     demo_parser.add_argument("--mode", default="persistent", choices=["persistent", "blank", "seeded"])
     demo_parser.add_argument("--prompt", default="Explain how ADAM persists identity through the graph.")
@@ -234,21 +234,21 @@ def main(argv: list[str] | None = None) -> int:
     demo_parser.set_defaults(func=cmd_demo)
 
     ingest_parser = subparsers.add_parser("ingest", help="Ingest a document into the persistent graph.")
-    ingest_parser.add_argument("--backend", default=None, choices=["mock", "mlx"])
+    ingest_parser.add_argument("--backend", default=None, choices=["mock", "mlx", "claude"])
     ingest_parser.add_argument("--model-path", default=None, help=argparse.SUPPRESS)
     ingest_parser.add_argument("experiment_id", nargs="?")
     ingest_parser.add_argument("path")
     ingest_parser.set_defaults(func=cmd_ingest)
 
     export_parser = subparsers.add_parser("export", help="Export graph and basin artifacts for the persistent graph.")
-    export_parser.add_argument("--backend", default=None, choices=["mock", "mlx"])
+    export_parser.add_argument("--backend", default=None, choices=["mock", "mlx", "claude"])
     export_parser.add_argument("--model-path", default=None, help=argparse.SUPPRESS)
     export_parser.add_argument("experiment_id", nargs="?")
     export_parser.add_argument("--session-id", default=None)
     export_parser.set_defaults(func=cmd_export)
 
     observatory_parser = subparsers.add_parser("observatory", help="Serve the exports directory over HTTP.")
-    observatory_parser.add_argument("--backend", default=None, choices=["mock", "mlx"])
+    observatory_parser.add_argument("--backend", default=None, choices=["mock", "mlx", "claude"])
     observatory_parser.add_argument("--model-path", default=None, help=argparse.SUPPRESS)
     observatory_parser.add_argument("--host", default="127.0.0.1")
     observatory_parser.add_argument("--port", type=int, default=8741)
@@ -257,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     observatory_parser.set_defaults(func=cmd_observatory)
 
     feedback_parser = subparsers.add_parser("feedback", help="Open an interactive feedback popup for one turn.")
-    feedback_parser.add_argument("--backend", default=None, choices=["mock", "mlx"])
+    feedback_parser.add_argument("--backend", default=None, choices=["mock", "mlx", "claude"])
     feedback_parser.add_argument("--model-path", default=None, help=argparse.SUPPRESS)
     feedback_parser.add_argument("session_id")
     feedback_parser.add_argument("turn_id")

@@ -25,6 +25,7 @@ from .models.base import BaseModelAdapter
 from .models.base import split_model_output
 from .models.mlx_backend import MLXModelAdapter
 from .models.catalog import DEFAULT_LOCAL_MLX_MODEL, local_mlx_model_status, prepare_local_mlx_model
+from .models.claude_cli import ClaudeCLIAdapter
 from .models.mock import MockModelAdapter
 from .ontology_projection import memode_materialization_allowed
 from .observatory.exporters import ObservatoryExporter
@@ -194,6 +195,9 @@ class EdenRuntime:
                     status = self.prepare_default_mlx_model()
                 requested_model_path = status["local_dir"]
             self._model_adapter = MLXModelAdapter(requested_model_path)
+        elif backend == "claude":
+            model = self.settings.model_path or "sonnet"
+            self._model_adapter = ClaudeCLIAdapter(model=model)
         else:
             self._model_adapter = MockModelAdapter()
         return self._model_adapter
