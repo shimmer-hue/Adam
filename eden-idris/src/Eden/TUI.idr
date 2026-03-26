@@ -154,10 +154,19 @@ sectionTitle row col w title fg = do
 ------------------------------------------------------------------------
 -- Action strip
 ------------------------------------------------------------------------
-actionLine : Int -> Int -> Int -> Nat -> String -> IO ()
-actionLine row col maxW num label = do
+colActHi : RGB
+colActHi = MkRGB 152 244 255
+
+colActHiBg : RGB
+colActHiBg = MkRGB 4 22 27
+
+actionLine : Int -> Int -> Int -> Nat -> Bool -> String -> IO ()
+actionLine row col maxW num sel label = do
   let n = if num < 10 then "0" ++ show num else show num
-  putText row col colIce colActBg False maxW ("[ " ++ n ++ " " ++ label ++ " ]")
+  let fg = if sel then colActHi else colIce
+  let bg = if sel then colActHiBg else colActBg
+  clearRow row col maxW bg
+  putText row col fg bg sel maxW ("[ " ++ n ++ " " ++ label ++ " ]")
 
 drawActions : Int -> Int -> Int -> IO ()
 drawActions r c w = do
@@ -167,20 +176,23 @@ drawActions r c w = do
   boxTitle r c " Actions " colNeon
   let hw = (w - 4) `div` 2
   let rc = c + 2 + hw + 1
-  actionLine (r+1) (c+2) hw  1  "Review Last Reply"
-  actionLine (r+2) (c+2) hw  2  "Open Conversation Log"
-  actionLine (r+3) (c+2) hw  3  "Open Conversation Atlas"
-  actionLine (r+4) (c+2) hw  4  "Tune Session"
-  actionLine (r+5) (c+2) hw  5  "Start New Session"
-  actionLine (r+6) (c+2) hw  6  "Continue Latest"
-  actionLine (r+7) (c+2) hw  7  "Prepare Local Model"
-  actionLine (r+1) rc hw  8  "Open Browser Observatory"
-  actionLine (r+2) rc hw  9  "Export Artifacts"
-  actionLine (r+3) rc hw 10  "Open Utilities Deck"
-  actionLine (r+4) rc hw 11  "Help"
-  actionLine (r+5) rc hw 12  "Ingest PDF / Doc"
-  actionLine (r+6) rc hw 13  "Toggle Aperture Drawer"
-  actionLine (r+7) rc hw 14  "Toggle Runtime Chyron"
+  actionLine (r+1) (c+2) hw  1 True  "Review Last Reply"
+  actionLine (r+2) (c+2) hw  2 False "Open Conversation Log"
+  actionLine (r+3) (c+2) hw  3 False "Open Conversation Atlas"
+  actionLine (r+4) (c+2) hw  4 False "Tune Session"
+  actionLine (r+5) (c+2) hw  5 False "Start New Session"
+  actionLine (r+6) (c+2) hw  6 False "Continue Latest"
+  actionLine (r+7) (c+2) hw  7 False "Prepare Local Model"
+  actionLine (r+1) rc hw  8 False "Open Browser Observatory"
+  actionLine (r+2) rc hw  9 False "Export Artifacts"
+  actionLine (r+3) rc hw 10 False "Open Utilities Deck"
+  actionLine (r+4) rc hw 11 False "Help"
+  actionLine (r+5) rc hw 12 False "Ingest PDF / Doc"
+  actionLine (r+6) rc hw 13 False "Toggle Aperture Drawer"
+  actionLine (r+7) rc hw 14 False "Toggle Runtime Chyron"
+  -- Status hint line
+  clearRow (r+8) (c+1) (w-2) colActBg
+  putText (r+8) (c+2) colMuted colActBg False (w-4) "digits jump | left/right move | Enter runs"
 
 ------------------------------------------------------------------------
 -- Status panels (right of actions)
@@ -202,17 +214,22 @@ drawPanel r c w h title bc lns = do
 drawStatusPanels : UIState -> Int -> Int -> Int -> IO ()
 drawStatusPanels ui r c tw = do
   be <- readIORef gBackend
+  idx <- readIORef ui.uiTurnIdx
   counts <- runEden ui.uiEnv eGraphCounts
   active <- readIORef ui.uiLastActive
   let pw = tw `div` 3
   drawPanel r c pw 10 "Context" colAmber
-    ["No estimate yet", "Type to arm.", "Deck=F6"]
-  drawPanel r (c+pw) pw 10 "Turn Status" colAmber
-    ["Adam status", "phase=start", "model=" ++ show be, "memes=" ++ show counts.memeCount]
+    ["No estimate", "yet", "Type to arm.", "Deck=F6"]
+  drawPanel r (c+pw) pw 10 "Live Turn Status" colAmber
+    [ "Adam status", "phase=start"
+    , "Start here: type", "below, press Enter"
+    , "to send, or press F9"
+    , "model=" ++ show be, "reasoning=quiet"
+    , "items=" ++ show (length active) ++ " review=clear"]
   let aLns = case active of
-        [] => ["No active set.", "Type to arm scan."]
-        _  => map (\x => x.label ++ " " ++ showD x.regard) (take 3 active)
-  drawPanel r (c+pw+pw) (tw-pw-pw) 10 "Aperture" colAmber aLns
+        [] => ["Aperture snapshot", "No active set yet. Type in", "the compose or ingest a", "document to arm the scan.", "Press F8 for the wide", "aperture drawer."]
+        _  => map (\x => x.label ++ " " ++ showD x.regard) (take 6 active)
+  drawPanel r (c+pw+pw) (tw-pw-pw) 10 "Aperture / Active Set" colAmber aLns
 
 ------------------------------------------------------------------------
 -- Runtime status line
@@ -223,7 +240,7 @@ drawRuntimeLine ui row w = do
   idx <- readIORef ui.uiTurnIdx
   clearRow row 0 w colPanel
   putText row 1 colIce colPanel False (w-1)
-    ("runtime=Adam / " ++ show be ++ " T" ++ show idx ++ " session=live profile=active focus=composer")
+    ("runtime=Adam / " ++ show be ++ " stage=n/a session=arming profile=pending focus=compos...")
 
 ------------------------------------------------------------------------
 -- Dialogue tape (bordered)
@@ -301,7 +318,8 @@ drawTabBar : Int -> Int -> Int -> IO ()
 drawTabBar row col w = do
   clearRow row col w colPanel
   let tw = w `div` 3
-  putText row (col+1) colAmber colPanel True (tw-1) "* Reasoning"
+  screenSetCP row (col+1) 9679 colAmber colPanel False  -- ● bullet
+  putText row (col+3) colAmber colPanel True (tw-3) "Reasoning"
   putText row (col+tw) colMuted colPanel False tw "  Chain-Like"
   putText row (col+tw+tw) colMuted colPanel False (w-tw-tw) "  Hum Live"
 
@@ -317,15 +335,16 @@ drawReasoning ui r c w h = do
                             else pure ()
            else pure ()
   if h > 7 then do putText (r+7) (c+1) colIce colBg True (w-1) "Runtime condition"
-                   be <- readIORef gBackend
-                   if h > 8 then putText (r+8) (c+1) colMuted colBg False (w-1) ("- state=persisted profile=pending mode=pending -> pending")
+                   if h > 8 then putText (r+8) (c+1) colMuted colBg False (w-1) "- state=persisted profile=pending mode=pending -> pending"
                             else pure ()
-                   if h > 9 then putText (r+9) (c+1) colMuted colBg False (w-1) ("- lane=quiet focus=none yet reasoning_chars=0")
+                   if h > 9 then putText (r+9) (c+1) colMuted colBg False (w-1) "- pressure=n/a response_cap=n/a retrieval_depth=n/a"
                             else pure ()
-                   if h > 10 then putText (r+10) (c+1) colMuted colBg False (w-1) ("- feedback=no explicit feedback yet")
+                   if h > 10 then putText (r+10) (c+1) colMuted colBg False (w-1) "- lane=quiet focus=none yet reasoning_chars=0"
+                             else pure ()
+                   if h > 11 then putText (r+11) (c+1) colMuted colBg False (w-1) "- feedback=no explicit feedback yet"
                              else pure ()
            else pure ()
-  if h > 12 then putText (r+12) (c+1) colNeon colBg True (w-1) "Membrane record"
+  if h > 13 then putText (r+13) (c+1) colNeon colBg True (w-1) "Membrane record"
             else pure ()
 
 ------------------------------------------------------------------------
@@ -349,31 +368,25 @@ drawComposer ui r c w h = do
 ------------------------------------------------------------------------
 -- Footer
 ------------------------------------------------------------------------
+fItem : Int -> Int -> String -> String -> IO ()
+fItem row col key label = do
+  putText row col colAmber colPanel True (cast (length key)) key
+  putText row (col + cast (length key)) colText colPanel False (cast (length label)) label
+
 drawFooter : Int -> Int -> IO ()
 drawFooter row w = do
   clearRow row 0 w colPanel
-  putText row 1  colAmber colPanel True 2 "Aq"
-  putText row 3  colText colPanel False 5 " Quit"
-  putText row 9  colAmber colPanel True 2 "f1"
-  putText row 11 colText colPanel False 5 " Help"
-  putText row 17 colAmber colPanel True 2 "As"
-  putText row 19 colText colPanel False 5 " Send"
-  putText row 25 colAmber colPanel True 2 "f2"
-  putText row 27 colText colPanel False 8 " Export"
-  putText row 36 colAmber colPanel True 2 "f3"
-  putText row 38 colText colPanel False 13 " Observatory"
-  putText row 52 colAmber colPanel True 2 "f4"
-  putText row 54 colText colPanel False 8 " Motion"
-  putText row 63 colAmber colPanel True 2 "f5"
-  putText row 65 colText colPanel False 13 " New Session"
-  putText row 79 colAmber colPanel True 2 "f8"
-  putText row 81 colText colPanel False 10 " Aperture"
-  putText row 92  colAmber colPanel True 2 "f9"
-  putText row 94  colText colPanel False 8 " Ingest"
-  putText row 103 colAmber colPanel True 3 "f10"
-  putText row 106 colText colPanel False 9 " Archive"
-  putText row 116 colAmber colPanel True 3 "f11"
-  putText row 119 colText colPanel False 16 " Runtime Chyron"
+  fItem row 1 "Aq" " Quit  "
+  fItem row 9 "f1" " Help  "
+  fItem row 17 "As" " Send  "
+  fItem row 25 "f2" " Export  "
+  fItem row 35 "f3" " Observatory  "
+  fItem row 51 "f4" " Motion  "
+  fItem row 61 "f5" " New Session  "
+  fItem row 77 "f8" " Aperture  "
+  fItem row 89 "f9" " Ingest  "
+  fItem row 99 "f10" " Archive  "
+  fItem row 111 "f11" " Runtime Chyron"
 
 ------------------------------------------------------------------------
 -- Full frame render
@@ -395,7 +408,7 @@ renderFrame ui = do
   let rlRow = actH
   let bStart = actH + 1
   let fRow = h - 1
-  let compH = 3
+  let compH = 4
   let compRow = fRow - compH
   let bH = compRow - bStart
   let lW = (w * 60) `div` 100
