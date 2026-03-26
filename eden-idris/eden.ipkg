@@ -30,8 +30,8 @@ modules = Eden.Types
         , Eden.OntologyProjection
         , Eden.Monad
         , Eden.Pipeline
-        , Eden.Proofs
         , Eden.Loop
         , Eden.Term
         , Eden.TermIO
         , Eden.TUI
+        , Eden.Proofs

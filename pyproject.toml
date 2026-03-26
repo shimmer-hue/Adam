@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eden-adam"
+version = "0.1.0"
+description = "EDEN local-first memetic persona runtime with ADAM as the first agent."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "markdown>=3.6",
+  "networkx>=3.4",
+  "numpy>=2.0",
+  "pdfplumber>=0.11",
+  "pypdf>=5.3",
+  "rich>=13.9",
+  "textual>=0.58",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.25",
+]
+mlx = [
+  "mlx-lm>=0.20.0",
+]
+
+[project.scripts]
+eden = "eden.app:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["eden*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -17,6 +17,62 @@
 #include <signal.h>
 
 /* ================================================================== */
+/* Subprocess execution                                                */
+/* ================================================================== */
+
+/*
+ * Run a shell command and capture its stdout.
+ * Returns a malloc'd string with exit code on the first line,
+ * followed by a newline, then the command output.
+ * Format: "<exit_code>\n<output>"
+ * Caller must free the returned string.
+ */
+char *eden_run_cmd(const char *cmd) {
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        char *err = malloc(32);
+        if (err) strcpy(err, "-1\n(popen failed)");
+        return err ? err : "";
+    }
+
+    /* Reserve space for exit code prefix */
+    size_t cap = 4096, len = 0;
+    char *body = malloc(cap);
+    if (!body) { pclose(fp); return ""; }
+
+    char tmp[1024];
+    while (fgets(tmp, sizeof(tmp), fp)) {
+        size_t tl = strlen(tmp);
+        if (len + tl + 1 > cap) {
+            cap *= 2;
+            char *nb = realloc(body, cap);
+            if (!nb) break;
+            body = nb;
+        }
+        memcpy(body + len, tmp, tl);
+        len += tl;
+    }
+    body[len] = '\0';
+
+    int status = pclose(fp);
+#ifdef _WIN32
+    int code = status;
+#else
+    int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+#endif
+
+    /* Build result: "<code>\n<body>" */
+    char prefix[24];
+    int plen = snprintf(prefix, sizeof(prefix), "%d\n", code);
+    char *result = malloc(plen + len + 1);
+    if (!result) { free(body); return ""; }
+    memcpy(result, prefix, plen);
+    memcpy(result + plen, body, len + 1);
+    free(body);
+    return result;
+}
+
+/* ================================================================== */
 /* Layer 1: Platform-specific terminal I/O                            */
 /* ================================================================== */
 
@@ -89,6 +145,8 @@ static int            raw_active = 0;
 static int            is_console = 0;
 static HANDLE         hOut = INVALID_HANDLE_VALUE;
 static DWORD          orig_out_mode = 0;
+static UINT           orig_output_cp = 0;
+static UINT           orig_input_cp = 0;
 
 static int ring_empty(void) { return ring_head == ring_tail; }
 
@@ -128,6 +186,14 @@ int eden_term_init(void) {
     if (raw_active) return 0;
     signal(SIGINT, signal_handler);
     signal(SIGBREAK, signal_handler);
+    /* Set console code pages to UTF-8 before any I/O.
+     * Required for ConPTY/winpty bridges (MSYS2/mintty) which interpret
+     * output bytes according to the console code page. Without this,
+     * multi-byte UTF-8 sequences (e.g. box-drawing chars) are garbled. */
+    orig_output_cp = GetConsoleOutputCP();
+    orig_input_cp = GetConsoleCP();
+    SetConsoleOutputCP(65001);
+    SetConsoleCP(65001);
     _setmode(0, _O_BINARY);
     _setmode(1, _O_BINARY);
     hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -154,6 +220,8 @@ void eden_term_cleanup(void) {
     if (reader_thread) { TerminateThread(reader_thread, 0); CloseHandle(reader_thread); reader_thread = NULL; }
     if (has_data) { CloseHandle(has_data); has_data = NULL; }
     if (is_console && hOut != INVALID_HANDLE_VALUE) SetConsoleMode(hOut, orig_out_mode);
+    if (orig_output_cp) SetConsoleOutputCP(orig_output_cp);
+    if (orig_input_cp) SetConsoleCP(orig_input_cp);
     signal(SIGINT, SIG_DFL);
     raw_active = 0;
 }
@@ -260,7 +328,7 @@ void eden_term_flush(void) {
 /* ================================================================== */
 
 typedef struct {
-    char     ch;
+    int      ch;               /* Unicode codepoint (supports box-drawing) */
     unsigned char fr, fg, fb;  /* foreground RGB */
     unsigned char br, bg, bb;  /* background RGB */
     unsigned char bold;
@@ -317,7 +385,7 @@ void eden_screen_set(int row, int col, int ch,
     if (!screen_inited) return;
     if (row < 0 || row >= scr_h || col < 0 || col >= scr_w) return;
     Cell *c = &buf_back[row * scr_w + col];
-    c->ch = (char)ch;
+    c->ch = ch;
     c->fr = (unsigned char)fr; c->fg = (unsigned char)fg; c->fb = (unsigned char)fb;
     c->br = (unsigned char)br; c->bg = (unsigned char)bg; c->bb = (unsigned char)bb;
     c->bold = (unsigned char)bold;
@@ -331,6 +399,36 @@ void eden_screen_clear(void) {
     for (int i = 0; i < n; i++) buf_back[i] = bl;
 }
 
+/* Draw a nebula starfield pattern into the screen buffer.
+ * Deterministic hash places dots/colons with varied colors. */
+void eden_screen_nebula(int row, int col, int w, int h,
+                        int bgr, int bgg, int bgb) {
+    if (!screen_inited) return;
+    /* Color palette: muted, violet, ember, ice, rose */
+    static const unsigned char pal[][3] = {
+        {230,171,90}, {168,144,255}, {255,174,87}, {141,220,255}, {255,122,215}
+    };
+    for (int ri = 0; ri < h; ri++) {
+        for (int ci = 0; ci < w; ci++) {
+            int r = row + ri, c2 = col + ci;
+            if (r < 0 || r >= scr_h || c2 < 0 || c2 >= scr_w) continue;
+            unsigned hv = (unsigned)(ri * 7 + ci * 13 + 37);
+            int ch = 0, pi = 0;
+            if      (hv % 41 == 0) { ch = '.'; pi = 0; }
+            else if (hv % 53 == 0) { ch = '.'; pi = 1; }
+            else if (hv % 67 == 0) { ch = ':'; pi = 2; }
+            else if (hv % 71 == 0) { ch = ':'; pi = 3; }
+            else if (hv % 83 == 0) { ch = '.'; pi = 4; }
+            else continue;
+            Cell *cell = &buf_back[r * scr_w + c2];
+            cell->ch = ch;
+            cell->fr = pal[pi][0]; cell->fg = pal[pi][1]; cell->fb = pal[pi][2];
+            cell->br = (unsigned char)bgr; cell->bg = (unsigned char)bgg; cell->bb = (unsigned char)bgb;
+            cell->bold = 0;
+        }
+    }
+}
+
 /* Diff back vs front, emit ANSI for changed cells, swap buffers.
  * Output is built into a single buffer and written in one fwrite(). */
 void eden_screen_present(void) {
@@ -339,7 +437,7 @@ void eden_screen_present(void) {
 
     /* Worst case: each cell could need ~40 bytes of ANSI.
      * Plus sync markers and cursor hide/show. */
-    int cap = n * 50 + 256;
+    int cap = n * 54 + 256;
     char *out = (char *)malloc(cap);
     int pos = 0;
 
@@ -390,8 +488,31 @@ void eden_screen_present(void) {
             last_br = cell->br; last_bg2 = cell->bg; last_bb = cell->bb;
         }
 
-        /* Emit character */
-        if (pos < cap - 1) out[pos++] = cell->ch;
+        /* Emit character as UTF-8 */
+        {
+            int cp = cell->ch;
+            if (cp < 0x80) {
+                if (pos < cap - 1) out[pos++] = (char)cp;
+            } else if (cp < 0x800) {
+                if (pos < cap - 2) {
+                    out[pos++] = (char)(0xC0 | (cp >> 6));
+                    out[pos++] = (char)(0x80 | (cp & 0x3F));
+                }
+            } else if (cp < 0x10000) {
+                if (pos < cap - 3) {
+                    out[pos++] = (char)(0xE0 | (cp >> 12));
+                    out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+                    out[pos++] = (char)(0x80 | (cp & 0x3F));
+                }
+            } else {
+                if (pos < cap - 4) {
+                    out[pos++] = (char)(0xF0 | (cp >> 18));
+                    out[pos++] = (char)(0x80 | ((cp >> 12) & 0x3F));
+                    out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+                    out[pos++] = (char)(0x80 | (cp & 0x3F));
+                }
+            }
+        }
 
         last_row = r;
         last_col = c + 1;  /* cursor advances after write */

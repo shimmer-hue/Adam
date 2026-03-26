@@ -165,8 +165,8 @@ showMemeRegard m =
       rb = regardBreakdown defaultRegardWeights ns gm
   in putStrLn $ "  " ++ m.label ++ " [" ++ show m.domain ++ "]: regard=" ++ showDouble rb.totalRegard
 
-runStoreDemo : IO ()
-runStoreDemo = do
+runStoreDemo : Backend -> Maybe String -> IO ()
+runStoreDemo be mp = do
   putStrLn "=== EDEN Store + Pipeline Demo ==="
   putStrLn ""
 
@@ -202,7 +202,7 @@ runStoreDemo = do
   env <- newEdenEnv store exp.id sess.id ts
 
   -- Turn 0 via monadic pipeline
-  tr0 <- runEden env (mExecuteTurn 0 "What drives your thinking?")
+  tr0 <- runEden env (mExecuteTurnWith be mp 0 "What drives your thinking?")
   putStrLn $ "\n  [turn 0]"
   putStrLn $ "  user:  What drives your thinking?"
   putStrLn $ "  adam:  " ++ tr0.mrResponse
@@ -218,7 +218,7 @@ runStoreDemo = do
   traverse_ showMemeRegard expMemes'
 
   -- Turn 1 via monadic pipeline
-  tr1 <- runEden env (mExecuteTurn 1 "Tell me about honesty in reasoning.")
+  tr1 <- runEden env (mExecuteTurnWith be mp 1 "Tell me about honesty in reasoning.")
   putStrLn $ "\n  [turn 1]"
   putStrLn $ "  user:  Tell me about honesty in reasoning."
   putStrLn $ "  adam:  " ++ tr1.mrResponse
@@ -263,11 +263,30 @@ runStoreDemo = do
 -- CLI dispatch
 ------------------------------------------------------------------------
 
+parseBackend : String -> Backend
+parseBackend "claude" = Claude
+parseBackend "mlx"    = MLX
+parseBackend _        = Mock
+
+parseArgs : List String -> (Backend, Maybe String, Maybe String)
+parseArgs [] = (Mock, Nothing, Nothing)
+parseArgs ("--backend" :: b :: rest) =
+  let (_, mp, cmd) = parseArgs rest
+  in (parseBackend b, mp, cmd)
+parseArgs ("--model" :: m :: rest) =
+  let (be, _, cmd) = parseArgs rest
+  in (be, Just m, cmd)
+parseArgs (x :: rest) =
+  let (be, mp, _) = parseArgs rest
+  in (be, mp, Just x)
+
 main : IO ()
 main = do
   args <- getArgs
-  case drop 1 args of  -- drop program name
-    ["--repl"]  => runREPL
-    ["--demo"]  => runStoreDemo
-    ["--tui"]   => runTUI
-    _           => runInvariantDemo
+  let cliArgs = drop 1 args  -- drop program name
+  let (be, mp, _) = parseArgs cliArgs
+  case cliArgs of
+    ("--repl"  :: _) => runREPL
+    ("--demo"  :: _) => runStoreDemo be mp
+    ("--tui"   :: _) => runTUIWith be mp
+    _                => runInvariantDemo

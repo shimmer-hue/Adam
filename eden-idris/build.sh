@@ -15,11 +15,32 @@ IDRIS2_SUPPORT="/home/natanh/Idris2/support"
 export PATH="/ucrt64/bin:/usr/bin:$PATH"
 export CC=gcc
 
+# Clean TTC cache to force full recompilation
+rm -rf build/ttc
+
 echo "=== Phase 1: Idris2 type-check + RefC codegen ==="
-$IDRIS2 --no-banner --cg refc --build eden.ipkg 2>&1 || true
+
+# Record eden.c timestamp before codegen so we can detect stale output
+OLD_EDEN_C_TS=""
+if [ -f build/exec/eden.c ]; then
+    OLD_EDEN_C_TS=$(stat -c "%Y" build/exec/eden.c 2>/dev/null || echo "")
+fi
+
+if ! $IDRIS2 --no-banner --cg refc --build eden.ipkg 2>&1; then
+    echo ""
+    echo "WARNING: Idris2 exited with non-zero status."
+    echo "Checking if codegen output was produced anyway..."
+fi
 
 if [ ! -f build/exec/eden.c ]; then
     echo "ERROR: Idris2 codegen failed (no build/exec/eden.c)"
+    exit 1
+fi
+
+# Check if eden.c was actually regenerated
+NEW_EDEN_C_TS=$(stat -c "%Y" build/exec/eden.c 2>/dev/null || echo "")
+if [ -n "$OLD_EDEN_C_TS" ] && [ "$OLD_EDEN_C_TS" = "$NEW_EDEN_C_TS" ]; then
+    echo "ERROR: eden.c was NOT regenerated (timestamp unchanged). Codegen likely failed."
     exit 1
 fi
 

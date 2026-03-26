@@ -10,6 +10,9 @@ int eden_term_read_key(int timeout_ms);
 void eden_term_write(char *s);
 void eden_term_flush(void);
 
+/* Subprocess execution — returns "<exit_code>\n<output>" */
+char *eden_run_cmd(const char *cmd);
+
 /* Cell-buffer screen compositor */
 void eden_screen_init(int w, int h);
 void eden_screen_set(int row, int col, int ch,
@@ -17,6 +20,8 @@ void eden_screen_set(int row, int col, int ch,
                      int br, int bg, int bb,
                      int bold);
 void eden_screen_clear(void);
+void eden_screen_nebula(int row, int col, int w, int h,
+                        int bgr, int bgg, int bgb);
 void eden_screen_present(void);
 
 #endif

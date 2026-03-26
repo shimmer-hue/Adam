@@ -1,7 +1,7 @@
 ||| EDEN TUI application.
 |||
-||| Two-column layout with dialogue tape, active set, feedback,
-||| and graph telemetry. Renders via cell-buffer compositor (zero flicker).
+||| Matches Python Textual layout: action strip, status panels,
+||| dialogue tape, memgraph, reasoning tabs, composer, footer.
 module Eden.TUI
 
 import Data.IORef
@@ -11,7 +11,7 @@ import Eden.Types
 import Eden.Config
 import Eden.Regard
 import Eden.Retrieval
-import Eden.Budget -- for natDiv
+import Eden.Budget
 import Eden.Inference
 import Eden.Membrane
 import Eden.Hum
@@ -30,43 +30,44 @@ import Eden.Term
 import Eden.TermIO
 
 ------------------------------------------------------------------------
--- Palette (RGB values)
+-- Palette
 ------------------------------------------------------------------------
-
 colAmber : RGB
 colAmber = MkRGB 255 217 138
-
 colText : RGB
 colText = MkRGB 255 241 210
-
 colMuted : RGB
 colMuted = MkRGB 230 171 90
-
 colBg : RGB
 colBg = MkRGB 18 8 10
-
 colPanel : RGB
 colPanel = MkRGB 33 16 20
-
 colNeon : RGB
 colNeon = MkRGB 132 255 208
-
 colIce : RGB
 colIce = MkRGB 141 220 255
-
 colRose : RGB
 colRose = MkRGB 255 122 215
-
 colEmber : RGB
 colEmber = MkRGB 255 174 87
-
 colViolet : RGB
 colViolet = MkRGB 168 144 255
+colActBg : RGB
+colActBg = MkRGB 7 35 45
+colActBd : RGB
+colActBd = MkRGB 142 243 255
+
+------------------------------------------------------------------------
+-- Globals (avoids UIState field additions that crash codegen)
+------------------------------------------------------------------------
+gBackend : IORef Backend
+gBackend = unsafePerformIO (newIORef Mock)
+gModelPath : IORef (Maybe String)
+gModelPath = unsafePerformIO (newIORef Nothing)
 
 ------------------------------------------------------------------------
 -- UI State
 ------------------------------------------------------------------------
-
 public export
 record UIState where
   constructor MkUIState
@@ -86,177 +87,297 @@ record UIState where
   uiHeight     : IORef Int
 
 ------------------------------------------------------------------------
--- Cell-buffer rendering helpers
+-- Rendering primitives
 ------------------------------------------------------------------------
-
-||| Write a plain string, truncating to maxW characters.
 putText : Int -> Int -> RGB -> RGB -> Bool -> Int -> String -> IO ()
 putText row col fg bg bd maxW s = go col (unpack s)
   where
     go : Int -> List Char -> IO ()
     go c [] = pure ()
     go c (x :: xs) =
-      if c >= col + maxW
-        then pure ()
-        else do screenSet row c x fg bg bd
-                go (c + 1) xs
+      if c >= col + maxW then pure ()
+      else do screenSet row c x fg bg bd
+              go (c + 1) xs
 
-||| Fill a row from col to col+w with spaces.
 clearRow : Int -> Int -> Int -> RGB -> IO ()
 clearRow row col w bg = screenFill row col w ' ' colText bg
 
-||| Draw a full-width horizontal line.
-hBar : Int -> Int -> RGB -> RGB -> IO ()
-hBar row w fg bg = do
-  let chars = replicate (cast w) '-'
-  putText row 0 fg bg False w (pack chars)
+clearRect : Int -> Int -> Int -> Int -> RGB -> IO ()
+clearRect r h c w bg = go r
+  where go : Int -> IO ()
+        go row = if row >= r + h then pure ()
+                 else do clearRow row c w bg; go (row + 1)
 
-------------------------------------------------------------------------
--- Panel renderers (write directly to cell buffer)
-------------------------------------------------------------------------
+-- Box drawing codepoints
+cpTL : Int; cpTL = 9484
+cpTR : Int; cpTR = 9488
+cpBL : Int; cpBL = 9492
+cpBR : Int; cpBR = 9496
+cpH  : Int; cpH  = 9472
+cpV  : Int; cpV  = 9474
 
-||| Top status bar.
-drawTopBar : UIState -> Int -> IO ()
-drawTopBar ui w = do
-  idx <- readIORef ui.uiTurnIdx
-  counts <- runEden ui.uiEnv eGraphCounts
-  clearRow 0 0 w colPanel
-  putText 0 1 colAmber colPanel False (w - 1) " EDEN/Adam"
-  putText 0 13 colMuted colPanel False (w - 13) ("T" ++ show idx)
-  let statsCol = 18
-  putText 0 statsCol colIce colPanel False (w - statsCol)
-    ("memes=" ++ show counts.memeCount ++ " memodes=" ++ show counts.memodeCount
-     ++ " edges=" ++ show counts.edgeCount)
-
-||| Separator line.
-drawSep : Int -> Int -> IO ()
-drawSep row w = hBar row w colMuted colBg
-
-||| Dialogue tape (left column).
-drawDialogue : UIState -> Int -> Int -> Int -> IO ()
-drawDialogue ui startRow leftW bodyH = do
-  entries <- readIORef ui.uiDialogue
-  let pairs = take (cast (natDiv (cast bodyH) 2)) (reverse entries)
-  drawPairs startRow 0 pairs
+drawBox : Int -> Int -> Int -> Int -> RGB -> IO ()
+drawBox r c w h bc = do
+  screenSetCP r c cpTL bc colBg False
+  screenFillCP r (c+1) (w-2) cpH bc colBg
+  screenSetCP r (c+w-1) cpTR bc colBg False
+  screenSetCP (r+h-1) c cpBL bc colBg False
+  screenFillCP (r+h-1) (c+1) (w-2) cpH bc colBg
+  screenSetCP (r+h-1) (c+w-1) cpBR bc colBg False
+  sides (r+1) (r+h-1) c (c+w-1) bc
   where
-    drawPairs : Int -> Nat -> List (String, String) -> IO ()
-    drawPairs row idx [] = pure ()
-    drawPairs row idx ((user, adam) :: rest) = do
-      if row >= startRow + bodyH
-        then pure ()
-        else do
-          -- User line
-          clearRow row 0 leftW colBg
-          let tag = "[you T" ++ show idx ++ "] "
-          putText row 1 colAmber colBg True (leftW - 1) tag
-          let tagLen = cast (length tag) + 1
-          putText row tagLen colText colBg False (leftW - tagLen) user
-          -- Adam line
-          if row + 1 < startRow + bodyH
-            then do
-              clearRow (row + 1) 0 leftW colBg
-              let atag = "[adam T" ++ show idx ++ "] "
-              putText (row + 1) 1 colRose colBg False (leftW - 1) atag
-              let atagLen = cast (length atag) + 1
-              putText (row + 1) atagLen colText colBg False (leftW - atagLen) adam
-              drawPairs (row + 2) (idx + 1) rest
+    sides : Int -> Int -> Int -> Int -> RGB -> IO ()
+    sides row rEnd l ri bc2 =
+      if row >= rEnd then pure ()
+      else do screenSetCP row l cpV bc2 colBg False
+              screenSetCP row ri cpV bc2 colBg False
+              sides (row+1) rEnd l ri bc2
+
+boxTitle : Int -> Int -> String -> RGB -> IO ()
+boxTitle r c title fg = putText r (c+2) fg colBg True (cast (length title)) title
+
+showD : Double -> String
+showD d = let i = cast {to=Integer} (d * 100.0)
+          in show (cast {to=Double} i / 100.0)
+
+------------------------------------------------------------------------
+-- Centered section title with horizontal rules
+------------------------------------------------------------------------
+sectionTitle : Int -> Int -> Int -> String -> RGB -> IO ()
+sectionTitle row col w title fg = do
+  let tl = cast {to=Int} (length title) + 2
+  let ts = col + (w `div` 2) - (tl `div` 2)
+  screenFillCP row col (ts - col) cpH fg colBg
+  putText row ts fg colBg False tl (" " ++ title ++ " ")
+  screenFillCP row (ts + tl) (col + w - ts - tl) cpH fg colBg
+
+------------------------------------------------------------------------
+-- Action strip
+------------------------------------------------------------------------
+actionLine : Int -> Int -> Int -> Nat -> String -> IO ()
+actionLine row col maxW num label = do
+  let n = if num < 10 then "0" ++ show num else show num
+  putText row col colIce colActBg False maxW ("[ " ++ n ++ " " ++ label ++ " ]")
+
+drawActions : Int -> Int -> Int -> IO ()
+drawActions r c w = do
+  let h = 10
+  clearRect r h c w colActBg
+  drawBox r c w h colActBd
+  boxTitle r c " Actions " colNeon
+  let hw = (w - 4) `div` 2
+  let rc = c + 2 + hw + 1
+  actionLine (r+1) (c+2) hw  1  "Review Last Reply"
+  actionLine (r+2) (c+2) hw  2  "Open Conversation Log"
+  actionLine (r+3) (c+2) hw  3  "Open Conversation Atlas"
+  actionLine (r+4) (c+2) hw  4  "Tune Session"
+  actionLine (r+5) (c+2) hw  5  "Start New Session"
+  actionLine (r+6) (c+2) hw  6  "Continue Latest"
+  actionLine (r+7) (c+2) hw  7  "Prepare Local Model"
+  actionLine (r+1) rc hw  8  "Open Browser Observatory"
+  actionLine (r+2) rc hw  9  "Export Artifacts"
+  actionLine (r+3) rc hw 10  "Open Utilities Deck"
+  actionLine (r+4) rc hw 11  "Help"
+  actionLine (r+5) rc hw 12  "Ingest PDF / Doc"
+  actionLine (r+6) rc hw 13  "Toggle Aperture Drawer"
+  actionLine (r+7) rc hw 14  "Toggle Runtime Chyron"
+
+------------------------------------------------------------------------
+-- Status panels (right of actions)
+------------------------------------------------------------------------
+drawPanel : Int -> Int -> Int -> Int -> String -> RGB -> List String -> IO ()
+drawPanel r c w h title bc lns = do
+  clearRect r h c w colBg
+  drawBox r c w h bc
+  boxTitle r c (" " ++ title ++ " ") bc
+  writeLns (r+1) lns (c+1) (w-2) (r+h-1)
+  where
+    writeLns : Int -> List String -> Int -> Int -> Int -> IO ()
+    writeLns row [] c' w' rEnd = pure ()
+    writeLns row (l :: ls) c' w' rEnd =
+      if row >= rEnd then pure ()
+      else do putText row c' colText colBg False w' l
+              writeLns (row+1) ls c' w' rEnd
+
+drawStatusPanels : UIState -> Int -> Int -> Int -> IO ()
+drawStatusPanels ui r c tw = do
+  be <- readIORef gBackend
+  counts <- runEden ui.uiEnv eGraphCounts
+  active <- readIORef ui.uiLastActive
+  let pw = tw `div` 3
+  drawPanel r c pw 10 "Context" colAmber
+    ["No estimate yet", "Type to arm.", "Deck=F6"]
+  drawPanel r (c+pw) pw 10 "Turn Status" colAmber
+    ["Adam status", "phase=start", "model=" ++ show be, "memes=" ++ show counts.memeCount]
+  let aLns = case active of
+        [] => ["No active set.", "Type to arm scan."]
+        _  => map (\x => x.label ++ " " ++ showD x.regard) (take 3 active)
+  drawPanel r (c+pw+pw) (tw-pw-pw) 10 "Aperture" colAmber aLns
+
+------------------------------------------------------------------------
+-- Runtime status line
+------------------------------------------------------------------------
+drawRuntimeLine : UIState -> Int -> Int -> IO ()
+drawRuntimeLine ui row w = do
+  be <- readIORef gBackend
+  idx <- readIORef ui.uiTurnIdx
+  clearRow row 0 w colPanel
+  putText row 1 colIce colPanel False (w-1)
+    ("runtime=Adam / " ++ show be ++ " T" ++ show idx ++ " session=live profile=active focus=composer")
+
+------------------------------------------------------------------------
+-- Dialogue tape (bordered)
+------------------------------------------------------------------------
+drawDialogue : UIState -> Int -> Int -> Int -> Int -> IO ()
+drawDialogue ui r c w h = do
+  clearRect r h c w colBg
+  drawBox r c w h colRose
+  boxTitle r c " Dialogue Tape " colRose
+  sectionTitle (r+1) (c+1) (w-2) "Adam Dialogue" colAmber
+  entries <- readIORef ui.uiDialogue
+  let ch = h - 3
+  let cs = r + 2
+  case entries of
+    [] => do
+      putText cs (c+2) colMuted colBg False (w-4)
+        "Start here: type in the composer below and press Enter to send."
+      if cs + 1 < cs + ch
+        then putText (cs+1) (c+2) colMuted colBg False (w-4)
+               "Press F9 first if you want to ingest a document with a framing note."
+        else pure ()
+    _  => drawEntries cs 0 (take (cast (natDiv (cast ch) 2)) (reverse entries)) cs ch (c+1) (w-2)
+  where
+    drawEntries : Int -> Nat -> List (String, String) -> Int -> Int -> Int -> Int -> IO ()
+    drawEntries row idx [] s ch c' cw = pure ()
+    drawEntries row idx ((u, a) :: rest) s ch c' cw =
+      if row >= s + ch then pure ()
+      else do
+        clearRow row c' cw colBg
+        let tag = "[you T" ++ show idx ++ "] "
+        putText row (c'+1) colAmber colBg True (cw-1) tag
+        putText row (c' + 1 + cast (length tag)) colText colBg False (cw - 1 - cast (length tag)) u
+        if row+1 < s + ch
+          then do
+            clearRow (row+1) c' cw colBg
+            let at = "[adam T" ++ show idx ++ "] "
+            putText (row+1) (c'+1) colRose colBg False (cw-1) at
+            putText (row+1) (c' + 1 + cast (length at)) colText colBg False (cw - 1 - cast (length at)) a
+            drawEntries (row+2) (idx+1) rest s ch c' cw
+          else pure ()
+
+------------------------------------------------------------------------
+-- Memgraph (simplified scatter)
+------------------------------------------------------------------------
+drawMemgraph : UIState -> Int -> Int -> Int -> Int -> IO ()
+drawMemgraph ui r c w h = do
+  sectionTitle r c w "Memgraph Bus" colMuted
+  clearRect (r+1) (h-1) c w colBg
+  -- Nebula starfield background (C FFI for codegen budget)
+  screenNebula (r+1) c w (h-1) colBg
+  -- Session anchor @ in center
+  let cy = r + 1 + (h-1) `div` 2
+  let cx = c + w `div` 2
+  screenSet cy cx '@' colIce colBg False
+  -- Plot memes
+  memes <- runEden ui.uiEnv eGetMemes
+  plotMemes (r+1) c w (h-1) memes
+  where
+    plotMemes : Int -> Int -> Int -> Int -> List Meme -> IO ()
+    plotMemes rs c' w' sh [] = pure ()
+    plotMemes rs c' w' sh (m :: ms) = do
+      let ry = cast {to=Int} (m.rewardEma * cast {to=Double} (max 1 (sh - 1)))
+      let rx = cast {to=Int} (m.riskEma * cast {to=Double} (max 1 (w' - 1)))
+      let pr = rs + max 0 (sh - 1 - ry)
+      let pc = c' + min (w' - 1) (max 0 rx)
+      let ch = case m.domain of Knowledge => 'o'; Behavior => '^'
+      let ptCol = case m.domain of Knowledge => colNeon; Behavior => colRose
+      screenSet pr pc ch ptCol colBg False
+      plotMemes rs c' w' sh ms
+
+------------------------------------------------------------------------
+-- Tab bar + Reasoning
+------------------------------------------------------------------------
+drawTabBar : Int -> Int -> Int -> IO ()
+drawTabBar row col w = do
+  clearRow row col w colPanel
+  let tw = w `div` 3
+  putText row (col+1) colAmber colPanel True (tw-1) "* Reasoning"
+  putText row (col+tw) colMuted colPanel False tw "  Chain-Like"
+  putText row (col+tw+tw) colMuted colPanel False (w-tw-tw) "  Hum Live"
+
+drawReasoning : UIState -> Int -> Int -> Int -> Int -> IO ()
+drawReasoning ui r c w h = do
+  sectionTitle r c w "Reasoning" colMuted
+  clearRect (r+1) (h-1) c w colBg
+  putText (r+1) (c+1) colNeon colBg True (w-1) "Response material"
+  if h > 2 then putText (r+2) (c+1) colMuted colBg False (w-1) "No operator-facing answer is persisted yet."
+           else pure ()
+  if h > 4 then do putText (r+4) (c+1) colAmber colBg True (w-1) "Reasoning signal"
+                   if h > 5 then putText (r+5) (c+1) colMuted colBg False (w-1) "No model-emitted reasoning artifact was captured for this turn."
+                            else pure ()
+           else pure ()
+  if h > 7 then do putText (r+7) (c+1) colIce colBg True (w-1) "Runtime condition"
+                   be <- readIORef gBackend
+                   if h > 8 then putText (r+8) (c+1) colMuted colBg False (w-1) ("- state=persisted profile=pending mode=pending -> pending")
+                            else pure ()
+                   if h > 9 then putText (r+9) (c+1) colMuted colBg False (w-1) ("- lane=quiet focus=none yet reasoning_chars=0")
+                            else pure ()
+                   if h > 10 then putText (r+10) (c+1) colMuted colBg False (w-1) ("- feedback=no explicit feedback yet")
+                             else pure ()
+           else pure ()
+  if h > 12 then putText (r+12) (c+1) colNeon colBg True (w-1) "Membrane record"
             else pure ()
 
-||| Column divider.
-drawDivider : Int -> Int -> Int -> IO ()
-drawDivider col startRow bodyH = go startRow
-  where
-    go : Int -> IO ()
-    go row = if row >= startRow + bodyH
-               then pure ()
-               else do screenSet row col '|' colMuted colBg False
-                       go (row + 1)
-
-||| Aperture panel (right column, top half).
-drawAperture : UIState -> Int -> Int -> Int -> Int -> IO ()
-drawAperture ui startRow col panelW panelH = do
-  active <- readIORef ui.uiLastActive
-  -- Header
-  clearRow startRow col panelW colBg
-  putText startRow (col + 1) colAmber colBg True (panelW - 1) "Aperture"
-  let countStr = " (" ++ show (length active) ++ ")"
-  putText startRow (col + 10) colMuted colBg False (panelW - 10) countStr
-  -- Items
-  drawItems (startRow + 1) (take (cast (panelH - 1)) active)
-  where
-    showD : Double -> String
-    showD d = let i = cast {to=Integer} (d * 100.0)
-              in show (cast {to=Double} i / 100.0)
-
-    drawItems : Int -> List CandidateScore -> IO ()
-    drawItems row [] = pure ()
-    drawItems row (c :: cs) = do
-      if row >= startRow + panelH
-        then pure ()
-        else do
-          clearRow row col panelW colBg
-          let domCol = case c.domain of Knowledge => colNeon; Behavior => colRose
-          putText row (col + 1) colAmber colBg False 7 (showD c.selection)
-          putText row (col + 9) domCol colBg False 20 c.label
-          putText row (col + 30) colMuted colBg False (panelW - 30) ("reg=" ++ showD c.regard)
-          drawItems (row + 1) cs
-
-||| Hum/thinking panel (right column, bottom half).
-drawThinking : UIState -> Int -> Int -> Int -> Int -> IO ()
-drawThinking ui startRow col panelW panelH = do
-  mhum <- readIORef ui.uiLastHum
-  clearRow startRow col panelW colBg
-  case mhum of
-    Nothing => putText startRow (col + 1) colMuted colBg False (panelW - 1) "(no hum yet)"
-    Just hum => do
-      putText startRow (col + 1) colIce colBg True (panelW - 1) "Hum"
-      let statusCol = col + 6
-      putText startRow statusCol colMuted colBg False (panelW - 6) (show hum.hpStatus)
-      -- Metrics
-      if startRow + 1 < startRow + panelH
-        then do
-          clearRow (startRow + 1) col panelW colBg
-          putText (startRow + 1) (col + 1) colMuted colBg False (panelW - 1)
-            ("turns=" ++ show hum.metrics.turnsCovered ++ " motifs=" ++ show hum.metrics.recurringItems)
-          -- Motifs
-          drawMotifs (startRow + 2) (take 5 hum.tokenTable)
-        else pure ()
-  where
-    drawMotifs : Int -> List HumTokenRow -> IO ()
-    drawMotifs row [] = pure ()
-    drawMotifs row (r :: rs) = do
-      if row >= startRow + panelH
-        then pure ()
-        else do
-          clearRow row col panelW colBg
-          putText row (col + 1) colViolet colBg False 20 r.htToken
-          putText row (col + 22) colMuted colBg False (panelW - 22) ("x" ++ show r.htFrequency)
-          drawMotifs (row + 1) rs
-
-||| Composer line.
-drawComposer : UIState -> Int -> Int -> IO ()
-drawComposer ui row w = do
+------------------------------------------------------------------------
+-- Composer (bordered)
+------------------------------------------------------------------------
+drawComposer : UIState -> Int -> Int -> Int -> Int -> IO ()
+drawComposer ui r c w h = do
+  clearRect r h c w colBg
+  drawBox r c w h colAmber
+  boxTitle r c " >> Composer " colNeon
   text <- readIORef ui.uiComposer
-  clearRow row 0 w colBg
-  putText row 0 colNeon colBg True 6 "[you] "
   if text == ""
-    then putText row 6 colMuted colBg False (w - 6) "type a message..."
-    else putText row 6 colText colBg False (w - 6) text
+    then do
+      putText (r+1) (c+2) colMuted colBg False (w-4)
+        "Message Adam here. Ask a question, continue the session, or correct the draft. Enter sends."
+      if h > 2
+        then putText (r+2) (c+2) colMuted colBg False (w-4) "F9 ingests a document first if needed."
+        else pure ()
+    else putText (r+1) (c+2) colText colBg False (w-4) text
 
-||| Status bar.
-drawStatusBar : UIState -> Int -> Int -> IO ()
-drawStatusBar ui row w = do
-  fb <- readIORef ui.uiFeedback
+------------------------------------------------------------------------
+-- Footer
+------------------------------------------------------------------------
+drawFooter : Int -> Int -> IO ()
+drawFooter row w = do
   clearRow row 0 w colPanel
-  case fb of
-    Nothing => putText row 1 colMuted colPanel False (w - 1) "Esc=quit  Enter=send  F1=help"
-    Just s  => putText row 1 colAmber colPanel False (w - 1) s
+  putText row 1  colAmber colPanel True 2 "Aq"
+  putText row 3  colText colPanel False 5 " Quit"
+  putText row 9  colAmber colPanel True 2 "f1"
+  putText row 11 colText colPanel False 5 " Help"
+  putText row 17 colAmber colPanel True 2 "As"
+  putText row 19 colText colPanel False 5 " Send"
+  putText row 25 colAmber colPanel True 2 "f2"
+  putText row 27 colText colPanel False 8 " Export"
+  putText row 36 colAmber colPanel True 2 "f3"
+  putText row 38 colText colPanel False 13 " Observatory"
+  putText row 52 colAmber colPanel True 2 "f4"
+  putText row 54 colText colPanel False 8 " Motion"
+  putText row 63 colAmber colPanel True 2 "f5"
+  putText row 65 colText colPanel False 13 " New Session"
+  putText row 79 colAmber colPanel True 2 "f8"
+  putText row 81 colText colPanel False 10 " Aperture"
+  putText row 92  colAmber colPanel True 2 "f9"
+  putText row 94  colText colPanel False 8 " Ingest"
+  putText row 103 colAmber colPanel True 3 "f10"
+  putText row 106 colText colPanel False 9 " Archive"
+  putText row 116 colAmber colPanel True 3 "f11"
+  putText row 119 colText colPanel False 16 " Runtime Chyron"
 
 ------------------------------------------------------------------------
 -- Full frame render
 ------------------------------------------------------------------------
-
-||| Render the complete TUI frame into the cell buffer, then present.
 renderFrame : UIState -> IO ()
 renderFrame ui = do
   ts <- getTermSize
@@ -264,45 +385,41 @@ renderFrame ui = do
   let h = cast {to=Int} ts.tsHeight
   writeIORef ui.uiWidth w
   writeIORef ui.uiHeight h
-
   screenInit w h
   screenClear
 
-  let bodyH = h - 5
-  let leftW = (w * 60) `div` 100
-  let divCol = leftW
-  let rightCol = leftW + 1
-  let rightW = w - rightCol
+  let actH = 10
+  let actW = (w * 55) `div` 100
+  let stC = actW + 1
+  let stW = w - stC
+  let rlRow = actH
+  let bStart = actH + 1
+  let fRow = h - 1
+  let compH = 3
+  let compRow = fRow - compH
+  let bH = compRow - bStart
+  let lW = (w * 60) `div` 100
+  let rC = lW + 1
+  let rW = w - rC
+  let mgH = bH `div` 3
+  let tRow = bStart + mgH
+  let rsRow = tRow + 1
+  let rsH = bH - mgH - 1
 
-  -- Top bar (row 0)
-  drawTopBar ui w
-  -- Separator (row 1)
-  drawSep 1 w
-  -- Dialogue tape (rows 2 .. 2+bodyH-1, left column)
-  drawDialogue ui 2 leftW bodyH
-  -- Divider
-  drawDivider divCol 2 bodyH
-  -- Aperture (right column, top half of body)
-  let apertH = bodyH `div` 2
-  drawAperture ui 2 rightCol rightW apertH
-  -- Thinking/Hum (right column, bottom half)
-  let thinkStart = 2 + apertH
-  let thinkH = bodyH - apertH
-  drawThinking ui thinkStart rightCol rightW thinkH
-  -- Separator (row 2+bodyH)
-  drawSep (2 + bodyH) w
-  -- Composer (row 3+bodyH)
-  drawComposer ui (3 + bodyH) w
-  -- Status bar (row 4+bodyH)
-  drawStatusBar ui (4 + bodyH) w
-
-  -- Diff and flush — only changed cells are written
+  drawActions 0 0 actW
+  drawStatusPanels ui 0 stC stW
+  drawRuntimeLine ui rlRow w
+  drawDialogue ui bStart 0 lW bH
+  drawMemgraph ui bStart rC rW mgH
+  drawTabBar tRow rC rW
+  drawReasoning ui rsRow rC rW rsH
+  drawComposer ui compRow 0 lW compH
+  drawFooter fRow w
   screenPresent
 
 ------------------------------------------------------------------------
 -- Input handling
 ------------------------------------------------------------------------
-
 parseVerdict : Char -> Maybe Verdict
 parseVerdict 'a' = Just Accept
 parseVerdict 'r' = Just Reject
@@ -310,58 +427,43 @@ parseVerdict 'e' = Just Edit
 parseVerdict 's' = Just Skip
 parseVerdict _   = Nothing
 
-||| Handle a key event in the main loop.
 handleKey : UIState -> KeyEvent -> IO ()
--- Quit
 handleKey ui KeyF12 = writeIORef ui.uiQuit True
 handleKey ui (KeyCtrl 'q') = writeIORef ui.uiQuit True
 handleKey ui (KeyCtrl 'c') = writeIORef ui.uiQuit True
 handleKey ui KeyEscape = writeIORef ui.uiQuit True
--- Send turn on Enter
 handleKey ui KeyEnter = do
   text <- readIORef ui.uiComposer
   if text == ""
     then pure ()
     else do
-      -- Execute turn
-      idx <- readIORef ui.uiTurnIdx
-      writeIORef ui.uiTurnIdx (idx + 1)
-      writeIORef ui.uiFeedback (Just "generating...")
-      renderFrame ui
-
-      tr <- runEden ui.uiEnv (mExecuteTurn idx text)
-
-      -- Update state
-      entries <- readIORef ui.uiDialogue
-      writeIORef ui.uiDialogue ((text, tr.mrResponse) :: entries)
-      writeIORef ui.uiComposer ""
-
-      -- Update active set
-      activeSet <- runEden ui.uiEnv mRetrieve
-      writeIORef ui.uiLastActive activeSet
-
-      -- Update projections
-      projs <- runEden ui.uiEnv mProject
-      writeIORef ui.uiLastProj projs
-
-      -- Prompt for feedback
-      writeIORef ui.uiFeedback (Just "feedback? (a/r/e/s)")
-      renderFrame ui
-
-      -- Wait for feedback key
-      fbKey <- readKey 10000  -- 10 second timeout
-      case fbKey of
-        KeyChar c => case parseVerdict c of
-          Just v => do
-            let turnId = MkId {a=TurnTag} ("turn-" ++ show (idx + 3))
-            runEden ui.uiEnv (mProcessFeedback turnId v "")
-            writeIORef ui.uiFeedback (Just ("recorded: " ++ show v))
-            -- Refresh hum
-            hum <- runEden ui.uiEnv mBuildHum
-            writeIORef ui.uiLastHum (Just hum)
-          Nothing => writeIORef ui.uiFeedback (Just "skipped")
-        _ => writeIORef ui.uiFeedback (Just "skipped")
--- Backspace
+    idx <- readIORef ui.uiTurnIdx
+    writeIORef ui.uiTurnIdx (idx + 1)
+    writeIORef ui.uiFeedback (Just "generating...")
+    renderFrame ui
+    be <- readIORef gBackend
+    mp <- readIORef gModelPath
+    tr <- runEden ui.uiEnv (mExecuteTurnWith be mp idx text)
+    entries <- readIORef ui.uiDialogue
+    writeIORef ui.uiDialogue ((text, tr.mrResponse) :: entries)
+    writeIORef ui.uiComposer ""
+    activeSet <- runEden ui.uiEnv mRetrieve
+    writeIORef ui.uiLastActive activeSet
+    projs <- runEden ui.uiEnv mProject
+    writeIORef ui.uiLastProj projs
+    writeIORef ui.uiFeedback (Just "feedback? (a/r/e/s)")
+    renderFrame ui
+    fbKey <- readKey 10000
+    case fbKey of
+      KeyChar c => case parseVerdict c of
+        Just v => do
+          let turnId = MkId {a=TurnTag} ("turn-" ++ show (idx + 3))
+          runEden ui.uiEnv (mProcessFeedback turnId v "")
+          writeIORef ui.uiFeedback (Just ("recorded: " ++ show v))
+          hum <- runEden ui.uiEnv mBuildHum
+          writeIORef ui.uiLastHum (Just hum)
+        Nothing => writeIORef ui.uiFeedback (Just "skipped")
+      _ => writeIORef ui.uiFeedback (Just "skipped")
 handleKey ui KeyBackspace = do
   text <- readIORef ui.uiComposer
   case strM text of
@@ -369,21 +471,16 @@ handleKey ui KeyBackspace = do
     StrCons _ _ =>
       let l = length text
       in writeIORef ui.uiComposer (substr 0 (cast (minus l 1)) text)
--- Regular character input
 handleKey ui (KeyChar c) = do
   text <- readIORef ui.uiComposer
   writeIORef ui.uiComposer (text ++ singleton c)
--- Help
-handleKey ui KeyF1 = do
-  writeIORef ui.uiFeedback (Just "EDEN/Adam Idris2 TUI | Esc/Ctrl+Q/F12=quit | Enter=send | Type to chat")
--- Ignore other keys
+handleKey ui KeyF1 =
+  writeIORef ui.uiFeedback (Just "EDEN/Adam TUI | Esc/Ctrl+Q=quit | Enter=send")
 handleKey _ _ = pure ()
 
 ------------------------------------------------------------------------
--- Main TUI loop
+-- Main loop
 ------------------------------------------------------------------------
-
-||| Run the TUI main loop.
 tuiLoop : UIState -> IO ()
 tuiLoop ui = do
   key <- readKey 500
@@ -405,27 +502,20 @@ tuiLoop ui = do
 ------------------------------------------------------------------------
 -- Entry point
 ------------------------------------------------------------------------
-
-||| Initialize and run the TUI.
 export
-runTUI : IO ()
-runTUI = do
-  -- Set up runtime
+runTUIWith : Backend -> Maybe String -> IO ()
+runTUIWith be mp = do
+  writeIORef gBackend be
+  writeIORef gModelPath mp
   store <- newStore
   let ts = MkTimestamp "2026-03-26T00:00:00Z"
   exp <- createExperiment store "tui" "tui" Blank ts
   let agentId = MkId {a=AgentTag} "adam-01"
   sess <- createSession store exp.id agentId "TUI session" ts
-
-  -- Seed behavior memes
-  _ <- upsertMeme store exp.id "Curiosity" "Drive to explore and understand" Behavior SeedSource Global ts
-  _ <- upsertMeme store exp.id "Honesty" "Commitment to truthful communication" Behavior SeedSource Global ts
-  _ <- upsertMeme store exp.id "Clarity" "Preference for clear explanations" Behavior SeedSource Global ts
-
-  -- Create EdenEnv
+  _ <- upsertMeme store exp.id "Curiosity" "Drive to explore" Behavior SeedSource Global ts
+  _ <- upsertMeme store exp.id "Honesty" "Truthful communication" Behavior SeedSource Global ts
+  _ <- upsertMeme store exp.id "Clarity" "Clear explanations" Behavior SeedSource Global ts
   env <- newEdenEnv store exp.id sess.id ts
-
-  -- Create UI state
   turnIdx <- newIORef (the Nat 0)
   composer <- newIORef ""
   dialogue <- newIORef (the (List (String, String)) [])
@@ -439,18 +529,14 @@ runTUI = do
   quit <- newIORef False
   uiW <- newIORef (the Int 120)
   uiH <- newIORef (the Int 30)
-
   let ui = MkUIState env turnIdx composer dialogue feedback
                      lastActive lastHum lastBudget lastProj
                      focusPanel scrollOff quit uiW uiH
-
-  -- Enter TUI mode
   ok <- enterTUI
   if ok
-    then do
-      renderFrame ui
-      tuiLoop ui
-      leaveTUI
-      putStrLn "Goodbye."
-    else do
-      putStrLn "Failed to initialize terminal. Falling back to REPL."
+    then do renderFrame ui; tuiLoop ui; leaveTUI; putStrLn "Goodbye."
+    else putStrLn "Failed to initialize terminal."
+
+export
+runTUI : IO ()
+runTUI = runTUIWith Mock Nothing

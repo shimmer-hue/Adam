@@ -44,6 +44,9 @@ prim__screenSet : Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int ->
 %foreign "C:eden_screen_clear,eden_term"
 prim__screenClear : PrimIO ()
 
+%foreign "C:eden_screen_nebula,eden_term"
+prim__screenNebula : Int -> Int -> Int -> Int -> Int -> Int -> Int -> PrimIO ()
+
 %foreign "C:eden_screen_present,eden_term"
 prim__screenPresent : PrimIO ()
 
@@ -191,10 +194,32 @@ screenSet : (row : Int) -> (col : Int) -> (ch : Char) -> (fg : RGB) -> (bg : RGB
 screenSet row col ch fg bg bd =
   primIO (prim__screenSet row col (ord ch) fg.r fg.g fg.b bg.r bg.g bg.b (if bd then 1 else 0))
 
+||| Set a cell using a Unicode codepoint directly (bypasses Char 8-bit truncation in RefC).
+export
+screenSetCP : (row : Int) -> (col : Int) -> (codepoint : Int) -> (fg : RGB) -> (bg : RGB) -> (isBold : Bool) -> IO ()
+screenSetCP row col cp fg bg bd =
+  primIO (prim__screenSet row col cp fg.r fg.g fg.b bg.r bg.g bg.b (if bd then 1 else 0))
+
+||| Fill a horizontal span with a Unicode codepoint.
+export
+screenFillCP : (row : Int) -> (col : Int) -> (width : Int) -> (codepoint : Int) -> (fg : RGB) -> (bg : RGB) -> IO ()
+screenFillCP row col w cp fg bg = go col
+  where
+    go : Int -> IO ()
+    go c = if c >= col + w
+             then pure ()
+             else do screenSetCP row c cp fg bg False
+                     go (c + 1)
+
 ||| Clear back buffer to blanks.
 export
 screenClear : IO ()
 screenClear = primIO prim__screenClear
+
+||| Draw a nebula starfield pattern into the screen buffer.
+export
+screenNebula : (row : Int) -> (col : Int) -> (width : Int) -> (height : Int) -> (bg : RGB) -> IO ()
+screenNebula row col w h bg = primIO (prim__screenNebula row col w h bg.r bg.g bg.b)
 
 ||| Diff back vs front and emit only changed cells. Zero flicker.
 export
@@ -222,6 +247,29 @@ screenFill row col w ch fg bg = go col
              then pure ()
              else do screenSet row c ch fg bg False
                      go (c + 1)
+
+------------------------------------------------------------------------
+-- Subprocess execution (C FFI)
+------------------------------------------------------------------------
+
+-- eden_run_cmd returns "<exit_code>\n<output>".
+%foreign "C:eden_run_cmd,eden_term"
+prim__runCmd : String -> PrimIO String
+
+splitFirst : Nat -> String -> (String, String)
+splitFirst n s =
+  if n >= length s then (s, "")
+  else if substr n 1 s == "\n"
+    then (substr 0 n s, substr (n + 1) (length s) s)
+    else splitFirst (n + 1) s
+
+||| Run a shell command and capture stdout. Returns (output, exitCode).
+export
+runCommand : String -> IO (String, Int)
+runCommand cmd = do
+  raw <- primIO (prim__runCmd cmd)
+  let (codePart, output) = splitFirst 0 raw
+  pure (output, cast (cast {to=Integer} codePart))
 
 ------------------------------------------------------------------------
 -- High-level terminal setup/teardown

@@ -1,0 +1,724 @@
+from __future__ import annotations
+
+import json
+
+import eden.runtime as runtime_module
+from eden.config import DEFAULT_MLX_MODEL_DIR
+from eden.models.base import ModelResult
+from eden.semantic_relations import MEMODE_MEMBERSHIP_EDGE_TYPE
+
+
+def test_single_graph_bootstrap_chat_feedback_and_exports(runtime, tmp_path) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(experiment["id"], title="E2E")
+    counts_before = runtime.store.graph_counts(experiment["id"])
+
+    outcome = runtime.chat(session_id=session["id"], user_text="How does Adam remain the same persona over time?")
+    counts_after = runtime.store.graph_counts(experiment["id"])
+
+    assert outcome.turn["turn_index"] == 0
+    assert counts_after["turns"] == counts_before["turns"] + 1
+    assert counts_after["memes"] > counts_before["memes"]
+    assert len(outcome.active_set) > 0
+    assert outcome.profile["requested_mode"] == "manual"
+    assert outcome.budget["prompt_budget_tokens"] > 0
+    assert outcome.turn["user_text"].startswith("Brian the operator:")
+    assert "Answer:" not in outcome.turn["membrane_text"]
+    assert "Basis:" not in outcome.turn["membrane_text"]
+    assert "Next Step:" not in outcome.turn["membrane_text"]
+
+    turn_metadata = json.loads(outcome.turn["metadata_json"])
+    assert turn_metadata["budget"]["remaining_input_tokens"] >= 0
+    assert turn_metadata["inference_profile"]["profile_name"].startswith("manual:")
+    assert turn_metadata["operator_input_raw"] == "How does Adam remain the same persona over time?"
+
+    feedback = runtime.apply_feedback(
+        session_id=session["id"],
+        turn_id=outcome.turn["id"],
+        verdict="edit",
+        explanation="Mention the persistent graph explicitly.",
+        corrected_text="Adam persists through graph state, regard updates, and retrieval selection.",
+    )
+    assert feedback["corrected_text"].startswith("Adam persists through graph state")
+
+    retrieval = runtime.retrieval_service.retrieve(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        query="persistent graph state regard retrieval selection",
+        settings=runtime.settings,
+    )
+    assert any(item["source_kind"] == "feedback" or "graph state" in item["text"].lower() for item in retrieval["items"])
+
+    export_paths = runtime.exporter.export_all(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        out_dir=tmp_path / "exports",
+    )
+    assert (tmp_path / "exports" / "graph_knowledge_base.html").exists()
+    assert (tmp_path / "exports" / "behavioral_attractor_basin.html").exists()
+    assert (tmp_path / "exports" / "geometry_lab.html").exists()
+    assert (tmp_path / "exports" / "measurement_ledger.html").exists()
+    assert (tmp_path / "exports" / "observatory_index.html").exists()
+    assert (tmp_path / "exports" / "tanakh_surface.json").exists()
+    assert (tmp_path / "exports" / "tanakh_render_validation.json").exists()
+    assert export_paths["graph_html"].endswith(".html")
+    observatory_shell = (tmp_path / "exports" / "observatory_index.html").read_text(encoding="utf-8")
+    assert '"asset_version":' in observatory_shell
+    assert "style.css?v=" in observatory_shell
+    assert "index.js?v=" in observatory_shell
+    graph_payload = json.loads((tmp_path / "exports" / "graph_knowledge_base.json").read_text())
+    assert graph_payload["semantic_nodes"]
+    assert any(
+        node.get("export_label") and node["export_label"] != node["id"] and node["export_label"] != node.get("label")
+        for node in graph_payload["semantic_nodes"]
+    )
+    assert any(edge.get("export_label") and edge["export_label"] != edge.get("type") for edge in graph_payload["semantic_edges"])
+    assert "memode_audit" in graph_payload
+    geometry_payload = json.loads((tmp_path / "exports" / "geometry_diagnostics.json").read_text())
+    assert "local_reports" in geometry_payload
+
+
+def test_runtime_launch_profile_and_session_snapshot(runtime) -> None:
+    updated = runtime.update_runtime_launch_profile(backend="mlx", model_path=None)
+    assert updated["backend"] == "mlx"
+    assert updated["model_path"] == str(DEFAULT_MLX_MODEL_DIR)
+    assert runtime.runtime_launch_profile()["backend"] == "mlx"
+    model_status = runtime.mlx_model_status()
+    assert model_status["local_dir"] == str(DEFAULT_MLX_MODEL_DIR)
+    assert model_status["repo_id"].endswith("Qwen3.5-35B-A3B-mlx-lm-mxfp4")
+    runtime.update_runtime_launch_profile(backend="mock", model_path=None)
+
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(experiment["id"], title="Resume Me")
+    outcome = runtime.chat(session_id=session["id"], user_text="Summarize the current persistent persona state.")
+
+    snapshot = runtime.session_state_snapshot(session["id"])
+
+    assert snapshot["experiment_id"] == experiment["id"]
+    assert snapshot["experiment_name"] == experiment["name"]
+    assert snapshot["session_id"] == session["id"]
+    assert snapshot["session_title"] == "Resume Me"
+    assert snapshot["last_turn_id"] == outcome.turn["id"]
+    assert snapshot["last_response"] == outcome.turn["membrane_text"]
+    assert "Answer:" not in snapshot["last_response"]
+    assert snapshot["last_active_set"]
+    assert snapshot["last_trace"]
+    assert snapshot["current_budget"]["prompt_budget_tokens"] > 0
+    assert snapshot["current_profile"]["profile_name"].startswith("manual:")
+    assert snapshot["conversation_log_path"].endswith(".md")
+
+
+def test_initialize_experiment_reuses_primary_graph(runtime) -> None:
+    primary = runtime.initialize_experiment("blank")
+    reused = runtime.initialize_experiment("seeded")
+
+    assert reused["id"] == primary["id"]
+    assert reused["name"] == "Adam Graph"
+    assert reused["mode"] == "persistent"
+    assert runtime.primary_experiment()["id"] == primary["id"]
+
+
+def test_conversation_archive_records_and_taxonomy(runtime) -> None:
+    first_experiment = runtime.initialize_experiment("blank")
+    first_session = runtime.start_session(first_experiment["id"], title="Archive One")
+    runtime.chat(session_id=first_session["id"], user_text="Describe the archive surface.")
+
+    second_experiment = runtime.initialize_experiment("blank")
+    second_session = runtime.start_session(second_experiment["id"], title="Archive Two")
+    runtime.chat(session_id=second_session["id"], user_text="Describe the shared archive surface.")
+
+    assert second_experiment["id"] == first_experiment["id"]
+
+    updated = runtime.update_conversation_archive(
+        first_session["id"],
+        folder="projects/archive",
+        tags="memory, atlas, memory",
+    )
+    assert updated["archive"]["folder"] == "projects/archive"
+    assert updated["archive"]["tags"] == ["memory", "atlas"]
+
+    records = runtime.conversation_archive_records()
+    assert len(records) == 2
+    first_record = next(record for record in records if record["id"] == first_session["id"])
+    second_record = next(record for record in records if record["id"] == second_session["id"])
+
+    assert first_record["folder"] == "projects/archive"
+    assert first_record["tags"] == ["memory", "atlas"]
+    assert "all_texts" in first_record["projection_paths"]
+    assert any(path.startswith("graph:") for path in first_record["projection_paths"])
+    assert first_record["requested_mode"] == "manual"
+    assert first_record["conversation_log_exists"] is False
+    assert second_record["folder"] == "inbox"
+    assert second_record["tags"] == []
+
+    preview = runtime.conversation_archive_preview(first_session["id"])
+    assert preview["archive"]["folder"] == "projects/archive"
+    assert preview["archive"]["tags"] == ["memory", "atlas"]
+    assert preview["recent_turns"]
+    assert preview["conversation_log_exists"] is False
+
+    log_path = runtime.write_conversation_log(first_session["id"])
+    assert log_path.exists()
+    refreshed_preview = runtime.conversation_archive_preview(first_session["id"])
+    assert refreshed_preview["conversation_log_exists"] is True
+
+
+def test_index_text_into_graph_builds_memode_label_without_refetching_memes(runtime, monkeypatch) -> None:
+    monkeypatch.setattr(
+        runtime_module,
+        "extract_semantic_candidates",
+        lambda text, limit=6: {
+            "meme_candidates": [
+                {"label": "alpha", "score": 1.0, "kind": "phrase"},
+                {"label": "beta", "score": 0.8, "kind": "phrase"},
+                {"label": "gamma", "score": 0.6, "kind": "phrase"},
+            ],
+            "relation_candidates": [],
+        },
+    )
+
+    class FakeStore:
+        def __init__(self) -> None:
+            self._count = 0
+            self.memode_payload: dict[str, object] | None = None
+
+        def upsert_meme(self, **kwargs):
+            self._count += 1
+            return {"id": f"meme-{self._count}", "label": kwargs["label"]}
+
+        def add_edge(self, **kwargs) -> None:
+            return None
+
+        def set_edge(self, **kwargs):
+            return {"id": f"edge-{kwargs['src_id']}-{kwargs['dst_id']}-{kwargs['edge_type']}"}
+
+        def upsert_memode(self, **kwargs):
+            self.memode_payload = kwargs
+            return {"id": "memode-1"}
+
+        def get_meme(self, meme_id: str):
+            raise AssertionError(f"unexpected redundant get_meme({meme_id}) during memode label construction")
+
+    fake_store = FakeStore()
+    runtime.store = fake_store
+
+    indexed = runtime._index_text_into_graph(
+        experiment_id="exp-1",
+        turn_id="turn-1",
+        session_id="session-1",
+        text="alpha beta gamma delta",
+        domain="knowledge",
+        source_kind="turn_user",
+        actor="brian_operator",
+    )
+
+    assert indexed["meme_ids"] == ["meme-1", "meme-2", "meme-3"]
+    assert indexed["memode_ids"] == []
+    assert fake_store.memode_payload is None
+
+
+def test_index_text_into_graph_derives_authorship_without_materializing_knowledge_memodes(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(experiment["id"], title="Typed relations")
+    turn = runtime.store.record_turn(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        user_text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        prompt_context="",
+        response_text="",
+        membrane_text="",
+        active_set=[],
+        trace=[],
+    )
+
+    indexed = runtime._index_text_into_graph(
+        experiment_id=experiment["id"],
+        turn_id=turn["id"],
+        session_id=session["id"],
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="turn_user",
+        actor="brian_operator",
+    )
+
+    edge_types = {edge["edge_type"] for edge in runtime.store.list_edges(experiment["id"])}
+
+    assert indexed["memode_ids"] == []
+    assert "AUTHOR_OF" in edge_types
+    assert MEMODE_MEMBERSHIP_EDGE_TYPE not in edge_types
+
+
+def test_graph_payload_projects_knowledge_constatives_into_information_nodes(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(experiment["id"], title="Ontology projection")
+    turn = runtime.store.record_turn(
+        experiment_id=experiment["id"],
+        session_id=session["id"],
+        user_text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        prompt_context="",
+        response_text="",
+        membrane_text="",
+        active_set=[],
+        trace=[],
+    )
+
+    runtime._index_text_into_graph(
+        experiment_id=experiment["id"],
+        turn_id=turn["id"],
+        session_id=session["id"],
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="turn_user",
+        actor="brian_operator",
+    )
+
+    payload = runtime.observatory_service.graph_payload(experiment_id=experiment["id"], session_id=session["id"])
+    assembly_nodes = payload["assembly_nodes"]
+    assembly_edges = payload["assembly_edges"]
+
+    assert any(node["kind"] == "information" and node["entity_type"] == "author" for node in assembly_nodes)
+    assert any(node["kind"] == "information" and node["entity_type"] == "work" for node in assembly_nodes)
+    assert all(node["kind"] == "meme" and node["domain"] == "behavior" for node in payload["semantic_nodes"])
+    assert any(edge["type"] == "AUTHOR_OF" for edge in assembly_edges)
+
+
+def test_graph_payload_projects_legacy_relation_entities_for_export(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Legacy relation row",
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="document",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={
+            "source_path": "/tmp/legacy.pdf",
+            "title": "legacy.pdf",
+            "page_number": 1,
+            "candidate_kind": "phrase",
+        },
+    )
+
+    payload = runtime.observatory_service.graph_payload(experiment_id=experiment["id"], session_id=None)
+    assembly_nodes = payload["assembly_nodes"]
+    assembly_edges = payload["assembly_edges"]
+
+    assert any(
+        node["label"] == "Michel Foucault"
+        and node["kind"] == "information"
+        and node["entity_type"] == "author"
+        and node["storage_kind"] == "projection"
+        for node in assembly_nodes
+    )
+    assert any(
+        node["label"] == "The Archaeology of Knowledge"
+        and node["kind"] == "information"
+        and node["entity_type"] == "work"
+        and node["storage_kind"] == "projection"
+        for node in assembly_nodes
+    )
+    assert any(
+        edge["type"] == "AUTHOR_OF"
+        and edge["assertion_origin"] == "projection_derived"
+        for edge in assembly_edges
+    )
+
+
+def test_start_session_normalizes_legacy_knowledge_rows(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Legacy relation row",
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="document",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={
+            "source_path": "/tmp/legacy.pdf",
+            "title": "legacy.pdf",
+            "page_number": 1,
+            "document_id": "doc-legacy",
+            "candidate_kind": "phrase",
+        },
+    )
+
+    session = runtime.start_session(experiment["id"], title="Legacy normalization")
+    memes = runtime.store.list_memes(experiment["id"])
+    edges = runtime.store.list_edges(experiment["id"])
+    session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
+
+    assert any(meme["label"] == "Michel Foucault" for meme in memes)
+    assert any(meme["label"] == "The Archaeology of Knowledge" for meme in memes)
+    author_edge = next(edge for edge in edges if edge["edge_type"] == "AUTHOR_OF")
+    provenance = json.loads(author_edge["provenance_json"] or "{}")
+    assert provenance["assertion_origin"] == "legacy_normalization_deterministic"
+    assert session_meta["session_graph_normalization"]["rows_changed"] >= 1
+    assert session_meta["session_graph_normalization"]["edges_added"] >= 1
+
+
+def test_start_session_uses_mlx_wakeup_review_by_default_when_ready(runtime, monkeypatch) -> None:
+    runtime.settings.model_backend = "mlx"
+    monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
+    monkeypatch.setattr(
+        runtime,
+        "_adam_identity_relation_review",
+        lambda **kwargs: [
+            {
+                "source_label": "Michel Foucault",
+                "source_entity_type": "author",
+                "target_label": "The Archaeology of Knowledge",
+                "target_entity_type": "work",
+                "edge_type": "AUTHOR_OF",
+                "confidence": 0.94,
+                "sentence_excerpt": "Michel Foucault wrote The Archaeology of Knowledge.",
+            }
+        ],
+    )
+
+    experiment = runtime.initialize_experiment("blank")
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Legacy gated row",
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="document",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={"candidate_kind": "phrase"},
+    )
+
+    session = runtime.start_session(experiment["id"], title="MLX gate default")
+    author_edge = next(edge for edge in runtime.store.list_edges(experiment["id"]) if edge["edge_type"] == "AUTHOR_OF")
+    provenance = json.loads(author_edge["provenance_json"] or "{}")
+    session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
+
+    assert provenance["assertion_origin"] == "adam_identity_mlx"
+    assert session_meta["session_graph_normalization"]["mode"] == "adam_identity_mlx"
+    assert session_meta["session_graph_normalization"]["mlx_review_gate"] == "enabled_by_default"
+    assert session_meta["session_graph_wakeup"]["mode"] == "adam_identity_mlx"
+
+
+def test_start_session_uses_adam_identity_mlx_review_for_graph_normalization(runtime, monkeypatch) -> None:
+    runtime.settings.model_backend = "mlx"
+    monkeypatch.setenv(runtime_module.SESSION_START_MLX_REVIEW_ENV, "1")
+    monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
+
+    class FakeAdapter:
+        backend_name = "mlx"
+
+        def generate(self, **kwargs):
+            return ModelResult(
+                backend="mlx",
+                text='{"relations":[{"source_label":"Michel Foucault","source_entity_type":"author","target_label":"The Archaeology of Knowledge","target_entity_type":"work","edge_type":"AUTHOR_OF","confidence":0.93,"sentence_excerpt":"Michel Foucault wrote The Archaeology of Knowledge."}]}',
+                tokens_estimate=64,
+                metadata={"mode": "fake_mlx"},
+                answer_text='{"relations":[{"source_label":"Michel Foucault","source_entity_type":"author","target_label":"The Archaeology of Knowledge","target_entity_type":"work","edge_type":"AUTHOR_OF","confidence":0.93,"sentence_excerpt":"Michel Foucault wrote The Archaeology of Knowledge."}]}',
+            )
+
+    monkeypatch.setattr(runtime, "_get_model_adapter", lambda: FakeAdapter())
+
+    experiment = runtime.initialize_experiment("blank")
+    runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Legacy Foucault row",
+        text='Michel Foucault wrote "The Archaeology of Knowledge".',
+        domain="knowledge",
+        source_kind="document",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={
+            "source_path": "/tmp/foucault.pdf",
+            "title": "foucault.pdf",
+            "page_number": 1,
+            "candidate_kind": "phrase",
+        },
+    )
+
+    session = runtime.start_session(experiment["id"], title="MLX normalization")
+    author_edge = next(edge for edge in runtime.store.list_edges(experiment["id"]) if edge["edge_type"] == "AUTHOR_OF")
+    provenance = json.loads(author_edge["provenance_json"] or "{}")
+    session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
+
+    assert provenance["assertion_origin"] == "adam_identity_mlx"
+    assert session_meta["session_graph_normalization"]["mode"] == "adam_identity_mlx"
+    assert session_meta["session_graph_normalization"]["mlx_review_applied_rows"] >= 1
+
+
+def test_start_session_runs_behavior_taxonomy_audit(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    seed_session = runtime.start_session(experiment["id"], title="Seed behavior")
+    turn = runtime.store.record_turn(
+        experiment_id=experiment["id"],
+        session_id=seed_session["id"],
+        user_text="Brian the operator: refine yourself",
+        prompt_context="",
+        response_text="Offer a repair plan, compare it against the graph, and revise the answer.",
+        membrane_text="Offer a repair plan, compare it against the graph, and revise the answer.",
+        active_set=[],
+        trace=[],
+    )
+
+    member_ids: list[str] = []
+    for label in ["Offer a repair plan", "Compare it against the graph", "Revise the answer"]:
+        meme = runtime.store.upsert_meme(
+            experiment_id=experiment["id"],
+            label=label,
+            text=turn["membrane_text"],
+            domain="behavior",
+            source_kind="turn_adam",
+            scope=f"session:{seed_session['id']}",
+            evidence_inc=1.0,
+            metadata={
+                "turn_id": turn["id"],
+                "session_id": seed_session["id"],
+                "origin": "adam",
+                "candidate_kind": "phrase",
+            },
+        )
+        member_ids.append(str(meme["id"]))
+        runtime.store.add_edge(
+            experiment_id=experiment["id"],
+            src_kind="turn",
+            src_id=turn["id"],
+            dst_kind="meme",
+            dst_id=str(meme["id"]),
+            edge_type="OCCURS_IN",
+            provenance={"actor": "adam"},
+        )
+    for left_index, left_id in enumerate(member_ids):
+        for right_id in member_ids[left_index + 1 :]:
+            runtime.store.set_edge(
+                experiment_id=experiment["id"],
+                src_kind="meme",
+                src_id=left_id,
+                dst_kind="meme",
+                dst_id=right_id,
+                edge_type="CO_OCCURS_WITH",
+                provenance={
+                    "turn_id": turn["id"],
+                    "actor": "adam",
+                    "assertion_origin": "auto_derived",
+                    "evidence_label": "AUTO_DERIVED",
+                    "confidence": 1.0,
+                },
+            )
+
+    wake_session = runtime.start_session(experiment["id"], title="Wake audit")
+    session_meta = json.loads(runtime.store.get_session(wake_session["id"])["metadata_json"] or "{}")
+    memodes = runtime.store.list_memodes(experiment["id"])
+    audited_memode = next(
+        memode
+        for memode in memodes
+        if json.loads(memode["metadata_json"] or "{}").get("taxonomy_origin") == runtime_module.SESSION_START_BEHAVIOR_TAXONOMY
+    )
+    audited_metadata = json.loads(audited_memode["metadata_json"] or "{}")
+    strengthened = {
+        meme["label"]: json.loads(meme["metadata_json"] or "{}")
+        for meme in runtime.store.list_memes(experiment["id"])
+        if meme["label"] in {"Offer a repair plan", "Compare it against the graph", "Revise the answer"}
+    }
+    trace_events = runtime.store.list_trace_events(experiment["id"], session_id=wake_session["id"])
+    payload = runtime.observatory_service.graph_payload(experiment_id=experiment["id"], session_id=wake_session["id"])
+    member_cluster_signatures = {
+        node["id"]: node.get("cluster_signature", "")
+        for node in payload["semantic_nodes"]
+        if node["id"] in member_ids
+    }
+    projected_memode = next(node for node in payload["assembly_nodes"] if node["id"] == audited_memode["id"])
+    assembly_summary = next(item for item in payload["assemblies"] if item["id"] == audited_memode["id"])
+
+    assert session_meta["session_graph_taxonomy"]["bundles_changed"] >= 1
+    assert session_meta["session_graph_taxonomy"]["memodes_touched"] >= 1
+    assert audited_metadata["origin"] == "adam"
+    assert audited_metadata["turn_id"] == turn["id"]
+    assert audited_metadata["supporting_edge_ids"]
+    assert all(metadata["entity_type"] == "behavior_meme" for metadata in strengthened.values())
+    assert all(member_cluster_signatures.values())
+    assert projected_memode["cluster_signature"] in set(member_cluster_signatures.values())
+    assert projected_memode["cluster_label"]
+    assert assembly_summary["cluster_signature"] == projected_memode["cluster_signature"]
+    assert any(event["event_type"] == "GRAPH_TAXONOMY_AUDIT" for event in trace_events)
+
+
+def test_start_session_uses_adam_identity_mlx_for_behavior_taxonomy(runtime, monkeypatch) -> None:
+    runtime.settings.model_backend = "mlx"
+    monkeypatch.setenv(runtime_module.SESSION_START_MLX_REVIEW_ENV, "1")
+    monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
+    monkeypatch.setattr(
+        runtime,
+        "_adam_identity_behavior_taxonomy_review",
+        lambda bundle: {
+            "selected_labels": ["Offer a repair plan", "Revise the answer"],
+            "memode_label": "repair loop",
+            "memode_summary": "A focused repair cycle that proposes and then revises.",
+            "memeplex_hint": "reflective repair chain",
+            "confidence": 0.94,
+        },
+    )
+
+    experiment = runtime.initialize_experiment("blank")
+    seed_session = runtime.start_session(experiment["id"], title="Seed behavior mlx")
+    turn = runtime.store.record_turn(
+        experiment_id=experiment["id"],
+        session_id=seed_session["id"],
+        user_text="Brian the operator: repair",
+        prompt_context="",
+        response_text="Offer a repair plan, compare it against the graph, and revise the answer.",
+        membrane_text="Offer a repair plan, compare it against the graph, and revise the answer.",
+        active_set=[],
+        trace=[],
+    )
+
+    member_ids: list[str] = []
+    for label in ["Offer a repair plan", "Compare it against the graph", "Revise the answer"]:
+        meme = runtime.store.upsert_meme(
+            experiment_id=experiment["id"],
+            label=label,
+            text=turn["membrane_text"],
+            domain="behavior",
+            source_kind="turn_adam",
+            scope=f"session:{seed_session['id']}",
+            evidence_inc=1.0,
+            metadata={
+                "turn_id": turn["id"],
+                "session_id": seed_session["id"],
+                "origin": "adam",
+                "candidate_kind": "phrase",
+            },
+        )
+        member_ids.append(str(meme["id"]))
+        runtime.store.add_edge(
+            experiment_id=experiment["id"],
+            src_kind="turn",
+            src_id=turn["id"],
+            dst_kind="meme",
+            dst_id=str(meme["id"]),
+            edge_type="OCCURS_IN",
+            provenance={"actor": "adam"},
+        )
+    for left_index, left_id in enumerate(member_ids):
+        for right_id in member_ids[left_index + 1 :]:
+            runtime.store.set_edge(
+                experiment_id=experiment["id"],
+                src_kind="meme",
+                src_id=left_id,
+                dst_kind="meme",
+                dst_id=right_id,
+                edge_type="CO_OCCURS_WITH",
+                provenance={
+                    "turn_id": turn["id"],
+                    "actor": "adam",
+                    "assertion_origin": "auto_derived",
+                    "evidence_label": "AUTO_DERIVED",
+                    "confidence": 1.0,
+                },
+            )
+
+    wake_session = runtime.start_session(experiment["id"], title="Wake audit mlx")
+    session_meta = json.loads(runtime.store.get_session(wake_session["id"])["metadata_json"] or "{}")
+    audited_memode = next(
+        memode
+        for memode in runtime.store.list_memodes(experiment["id"])
+        if json.loads(memode["metadata_json"] or "{}").get("taxonomy_origin") == runtime_module.SESSION_START_BEHAVIOR_TAXONOMY
+    )
+    audited_metadata = json.loads(audited_memode["metadata_json"] or "{}")
+
+    assert audited_memode["label"] == "repair loop"
+    assert audited_metadata["memeplex_hint"] == "reflective repair chain"
+    assert session_meta["session_graph_taxonomy"]["mode"] == "adam_identity_mlx"
+    assert session_meta["session_graph_taxonomy"]["mlx_review_applied_bundles"] >= 1
+
+
+def test_start_session_uses_adam_identity_mlx_for_coherence_reweave(runtime, monkeypatch) -> None:
+    runtime.settings.model_backend = "mlx"
+    monkeypatch.setattr(runtime, "mlx_model_status", lambda: {"ready": True})
+
+    experiment = runtime.initialize_experiment("blank")
+    first = runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Offer a repair plan",
+        text="Offer a repair plan before finalizing an answer.",
+        domain="behavior",
+        source_kind="turn_adam",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={"origin": "adam", "candidate_kind": "phrase"},
+    )
+    second = runtime.store.upsert_meme(
+        experiment_id=experiment["id"],
+        label="Compare against the graph",
+        text="Compare the answer against the graph before persisting it.",
+        domain="behavior",
+        source_kind="turn_adam",
+        scope="global",
+        evidence_inc=1.0,
+        metadata={"origin": "adam", "candidate_kind": "phrase"},
+    )
+    runtime.store.set_edge(
+        experiment_id=experiment["id"],
+        src_kind="meme",
+        src_id=first["id"],
+        dst_kind="meme",
+        dst_id=second["id"],
+        edge_type="CO_OCCURS_WITH",
+        provenance={"actor": "adam", "assertion_origin": "auto_derived", "evidence_label": "AUTO_DERIVED", "confidence": 1.0},
+    )
+    repair_memode = runtime.store.upsert_memode(
+        experiment_id=experiment["id"],
+        label="repair weave",
+        member_ids=[first["id"], second["id"]],
+        summary="A repair-first weave that checks the graph before finalizing.",
+        domain="behavior",
+        metadata={"origin": "adam"},
+    )
+
+    monkeypatch.setattr(
+        runtime,
+        "_adam_identity_coherence_reweave_review",
+        lambda candidates: {
+            "anchor_memode_ids": [repair_memode["id"]],
+            "focus_summary": "Wake the session through the repair weave first.",
+            "confidence": 0.93,
+        },
+    )
+
+    before = runtime.store.get_memode(repair_memode["id"])
+    before_usage = int(before.get("usage_count") or 0)
+
+    session = runtime.start_session(experiment["id"], title="Coherence wake")
+    after = runtime.store.get_memode(repair_memode["id"])
+    session_meta = json.loads(runtime.store.get_session(session["id"])["metadata_json"] or "{}")
+    trace_events = runtime.store.list_trace_events(experiment["id"], session_id=session["id"])
+
+    assert int(after.get("usage_count") or 0) > before_usage
+    assert session_meta["session_graph_coherence"]["mode"] == "adam_identity_mlx"
+    assert session_meta["session_graph_coherence"]["mlx_review_applied"] is True
+    assert session_meta["session_graph_coherence"]["anchor_memode_ids"] == [repair_memode["id"]]
+    assert session_meta["session_graph_coherence"]["focus_summary"] == "Wake the session through the repair weave first."
+    assert any(event["event_type"] == "GRAPH_COHERENCE_REWEAVE" for event in trace_events)
+
+
+def test_session_state_snapshot_includes_resolved_profile_before_first_turn(runtime) -> None:
+    experiment = runtime.initialize_experiment("blank")
+    session = runtime.start_session(
+        experiment["id"],
+        title="Profile Preview",
+        profile_request={
+            "mode": "manual",
+            "budget_mode": "wide",
+            "history_turns": 11,
+            "max_output_tokens": 1800,
+            "response_char_cap": 6400,
+        },
+    )
+
+    snapshot = runtime.session_state_snapshot(session["id"])
+
+    assert snapshot["last_turn_id"] is None
+    assert snapshot["current_profile"]["profile_name"] == "manual:wide"
+    assert snapshot["current_profile"]["history_turns"] == 11
+    assert snapshot["current_profile"]["max_output_tokens"] == 1800
+    assert snapshot["current_profile"]["response_char_cap"] == 6400
+    assert snapshot["current_budget"]["prompt_budget_tokens"] == snapshot["current_profile"]["prompt_budget_tokens"]

@@ -10,6 +10,7 @@ module Eden.Pipeline
 
 import Data.IORef
 import Data.List
+import Data.Maybe
 import Data.String
 import Eden.Types
 import Eden.Config
@@ -28,6 +29,7 @@ import Eden.SemanticRelations
 import Eden.OntologyProjection
 import Eden.Trace
 import Eden.Monad
+import Eden.TermIO
 
 ------------------------------------------------------------------------
 -- Monadic turn result
@@ -63,14 +65,25 @@ mAssemble activeSet userText = do
   pure (assemblePrompt "Adam" "You are a curious, honest thinker."
           activeSet history "" userText)
 
-||| Step 3: Generate a response (mock backend).
+||| Run a subprocess backend (claude or mlx) and return a ModelResult.
+cmdGenerate : String -> String -> EdenM ModelResult
+cmdGenerate name cmd = do
+  (output, exitCode) <- liftIO (runCommand cmd)
+  let answer = trim output
+  let toks = length (words answer)
+  pure (MkModelResult name (if exitCode /= 0 then "(" ++ name ++ " error)" else answer) toks answer "" answer)
+
+||| Step 3: Generate a response via the specified backend.
 export
-mGenerate : AssemblyResult -> EdenM ModelResult
-mGenerate assembly =
+mGenerateWith : Backend -> Maybe String -> AssemblyResult -> EdenM ModelResult
+mGenerateWith backend modelPath assembly = do
   let params = MkGenerateParams assembly.arSysPrompt assembly.arConvPrompt
                  (cast assembly.arProfile.rpMaxOutput)
                  assembly.arProfile.rpTemp 0.9 1.05
-  in pure (mockGenerate params)
+  case backend of
+    Mock => pure (mockGenerate params)
+    Claude => cmdGenerate "claude" ("claude -p " ++ show params.gpConvPrompt ++ " --model " ++ fromMaybe "sonnet" modelPath)
+    MLX => cmdGenerate "mlx" ("python3 -c \"from mlx_lm import load,generate;m,t=load('" ++ fromMaybe "mlx-community/Llama-3.2-3B-Instruct-4bit" modelPath ++ "');print(generate(m,t,prompt=" ++ show params.gpConvPrompt ++ ",max_tokens=" ++ show params.gpMaxTokens ++ "))\"")
 
 ||| Step 4: Apply the membrane.
 export
@@ -126,34 +139,26 @@ mProject = do
 -- Full monadic turn pipeline
 ------------------------------------------------------------------------
 
-||| Execute a complete turn using the EdenM monad.
-||| No manual parameter threading — everything comes from the environment.
+||| Execute a complete turn with explicit backend selection.
 export
-mExecuteTurn : Nat -> String -> EdenM MTurnResult
-mExecuteTurn idx userText = do
-  -- Retrieve + assemble
+mExecuteTurnWith : Backend -> Maybe String -> Nat -> String -> EdenM MTurnResult
+mExecuteTurnWith be mp idx userText = do
   activeSet <- mRetrieve
   assembly  <- mAssemble activeSet userText
-
-  -- Generate + membrane
-  genResult <- mGenerate assembly
+  genResult <- mGenerateWith be mp assembly
   mo        <- mMembrane assembly.arProfile.rpRespCap genResult.mrText
-
-  -- Record + index
-  _ <- mRecordTurn idx userText assembly.arConvPrompt
-         genResult.mrText mo.moCleanedText
+  _ <- mRecordTurn idx userText assembly.arConvPrompt genResult.mrText mo.moCleanedText
   idxResult <- mIndex userText mo.moCleanedText
-
-  -- Semantic relations
   rels <- mRelations userText mo.moCleanedText idxResult.ioConceptNames
   mCreateRelationEdges rels
-
-  -- Materialize + project
   _ <- mMaterialize
   projs <- mProject
+  pure (MkMTurnResult mo.moCleanedText idxResult.ioConceptNames idxResult.ioNewEdges rels projs)
 
-  pure (MkMTurnResult mo.moCleanedText idxResult.ioConceptNames
-                      idxResult.ioNewEdges rels projs)
+||| Execute a complete turn (mock backend).
+export
+mExecuteTurn : Nat -> String -> EdenM MTurnResult
+mExecuteTurn = mExecuteTurnWith Mock Nothing
 
 ------------------------------------------------------------------------
 -- Monadic feedback processing
