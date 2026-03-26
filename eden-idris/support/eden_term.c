@@ -413,12 +413,18 @@ void eden_screen_nebula(int row, int col, int w, int h,
             int r = row + ri, c2 = col + ci;
             if (r < 0 || r >= scr_h || c2 < 0 || c2 >= scr_w) continue;
             unsigned hv = (unsigned)(ri * 7 + ci * 13 + 37);
+            unsigned hv2 = (unsigned)(ri * 11 + ci * 3 + 19);
             int ch = 0, pi = 0;
-            if      (hv % 41 == 0) { ch = '.'; pi = 0; }
-            else if (hv % 53 == 0) { ch = '.'; pi = 1; }
-            else if (hv % 67 == 0) { ch = ':'; pi = 2; }
-            else if (hv % 71 == 0) { ch = ':'; pi = 3; }
-            else if (hv % 83 == 0) { ch = '.'; pi = 4; }
+            /* Structured row patterns: colons every ~4 rows, dots every ~3 rows */
+            if (ri % 4 == 0 && ci % 10 == 3) { ch = ':'; pi = 2; }
+            else if (ri % 3 == 1 && ci % 8 == 5) { ch = '.'; pi = 0; }
+            /* Hash-based scatter */
+            else if (hv % 29 == 0) { ch = '.'; pi = 0; }
+            else if (hv % 37 == 0) { ch = '.'; pi = 1; }
+            else if (hv % 47 == 0) { ch = ':'; pi = 2; }
+            else if (hv % 59 == 0) { ch = ':'; pi = 3; }
+            else if (hv2 % 43 == 0) { ch = '.'; pi = 4; }
+            else if (hv2 % 61 == 0) { ch = '.'; pi = 0; }
             else continue;
             Cell *cell = &buf_back[r * scr_w + c2];
             cell->ch = ch;

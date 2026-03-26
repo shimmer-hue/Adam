@@ -155,10 +155,10 @@ sectionTitle row col w title fg = do
 -- Action strip
 ------------------------------------------------------------------------
 colActHi : RGB
-colActHi = MkRGB 152 244 255
+colActHi = MkRGB 4 22 27
 
 colActHiBg : RGB
-colActHiBg = MkRGB 4 22 27
+colActHiBg = MkRGB 152 244 255
 
 actionLine : Int -> Int -> Int -> Nat -> Bool -> String -> IO ()
 actionLine row col maxW num sel label = do
@@ -386,7 +386,8 @@ drawFooter row w = do
   fItem row 77 "f8" " Aperture  "
   fItem row 89 "f9" " Ingest  "
   fItem row 99 "f10" " Archive  "
-  fItem row 111 "f11" " Runtime Chyron"
+  fItem row 111 "f11" " Runtime Chyron  "
+  fItem row 131 "Ap" " palette"
 
 ------------------------------------------------------------------------
 -- Full frame render
@@ -419,14 +420,20 @@ renderFrame ui = do
   let rsRow = tRow + 1
   let rsH = bH - mgH - 1
 
+  let deckH = fRow - bStart  -- total left column height
+
   drawActions 0 0 actW
   drawStatusPanels ui 0 stC stW
   drawRuntimeLine ui rlRow w
-  drawDialogue ui bStart 0 lW bH
+  -- Outer amber border (chat_deck) wrapping dialogue + composer
+  drawBox bStart 0 lW deckH colAmber
+  -- Dialogue tape (rose border) inside chat_deck
+  drawDialogue ui (bStart + 1) 1 (lW - 2) (bH - 2)
   drawMemgraph ui bStart rC rW mgH
   drawTabBar tRow rC rW
   drawReasoning ui rsRow rC rW rsH
-  drawComposer ui compRow 0 lW compH
+  -- Composer inside chat_deck at bottom
+  drawComposer ui compRow 1 (lW - 2) compH
   drawFooter fRow w
   screenPresent
 
