@@ -16,6 +16,10 @@
 #include <string.h>
 #include <signal.h>
 
+#ifndef _WIN32
+#include <sys/wait.h>   /* WIFEXITED, WEXITSTATUS — needed on macOS */
+#endif
+
 /* ================================================================== */
 /* Subprocess execution                                                */
 /* ================================================================== */
