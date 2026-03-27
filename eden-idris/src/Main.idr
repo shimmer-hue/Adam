@@ -7,6 +7,8 @@
 module Main
 
 import System
+import System.File
+import System.Directory
 import Data.IORef
 import Data.List
 import Data.String
@@ -19,6 +21,7 @@ import Eden.Inference
 import Eden.Membrane
 import Eden.Hum
 import Eden.Ingest
+import Eden.Ingest.Pipeline
 import Eden.Models.Base
 import Eden.Models.Mock
 import Eden.Storage
@@ -30,6 +33,7 @@ import Eden.Monad
 import Eden.Pipeline
 import Eden.Trace
 import Eden.SemanticRelations
+import Eden.TermIO
 import Eden.TUI
 
 -- Helper for display
@@ -260,6 +264,33 @@ runStoreDemo be mp = do
   putStrLn "=== Demo complete. ==="
 
 ------------------------------------------------------------------------
+-- Document ingestion
+------------------------------------------------------------------------
+
+ingestOneFile : StoreState -> ExperimentId -> Eden.Types.Timestamp -> String -> IO ()
+ingestOneFile store eid ts path = do
+  Right content <- readFile path
+    | Left _ => putStrLn ("  SKIP " ++ path ++ " (read error)")
+  result <- ingestText store eid path path content ts
+  putStrLn ("  " ++ show result.irMemeCount ++ " concepts, "
+         ++ show result.irChunkCount ++ " chunks <- " ++ path)
+
+runIngest : String -> IO ()
+runIngest dir = do
+  store <- newStore
+  let ts = MkTimestamp "2026-03-27T00:00:00Z"
+  exp <- createExperiment store "ingest" "article ingest" Blank ts
+  Right entries <- listDir dir
+    | Left _ => putStrLn ("ERROR: cannot read directory " ++ dir)
+  let files = map (\f => dir ++ "/" ++ f) (filter (isSuffixOf ".md") entries)
+  putStrLn ("=== Ingesting " ++ show (length files) ++ " files from " ++ dir ++ " ===")
+  traverse_ (ingestOneFile store exp.id ts) files
+  memes <- readIORef store.memes
+  edges <- readIORef store.edges
+  putStrLn ("=== Done: " ++ show (length memes) ++ " memes, "
+         ++ show (length edges) ++ " edges in graph ===")
+
+------------------------------------------------------------------------
 -- CLI dispatch
 ------------------------------------------------------------------------
 
@@ -289,4 +320,5 @@ main = do
     ("--repl"  :: _) => runREPL
     ("--demo"  :: _) => runStoreDemo be mp
     ("--tui"   :: _) => runTUIWith be mp
+    ("--ingest" :: d :: _) => runIngest d
     _                => runInvariantDemo
