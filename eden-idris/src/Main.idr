@@ -264,6 +264,21 @@ runStoreDemo be mp = do
   putStrLn "=== Demo complete. ==="
 
 ------------------------------------------------------------------------
+-- Agent profile loading
+------------------------------------------------------------------------
+
+||| Load agent principles from seed_constitution.md and profile.json.
+||| Falls back to default if files are not found.
+loadAgentProfile : IO ()
+loadAgentProfile = do
+  -- Read seed constitution
+  Right constitution <- readFile "eden/agents/adam/seed_constitution.md"
+    | Left _ => do Right c2 <- readFile "../eden/agents/adam/seed_constitution.md"
+                     | Left _ => putStrLn "  (using default principles)"
+                   writeIORef gPrinciples c2
+  writeIORef gPrinciples constitution
+
+------------------------------------------------------------------------
 -- Document ingestion
 ------------------------------------------------------------------------
 
@@ -316,6 +331,7 @@ main = do
   args <- getArgs
   let cliArgs = drop 1 args  -- drop program name
   let (be, mp, _) = parseArgs cliArgs
+  loadAgentProfile
   case cliArgs of
     ("--repl"  :: _) => runREPLWith be mp
     ("--demo"  :: _) => runStoreDemo be mp

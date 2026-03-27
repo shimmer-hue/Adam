@@ -32,6 +32,15 @@ import Eden.Monad
 import Eden.TermIO
 
 ------------------------------------------------------------------------
+-- Agent principles (loaded from seed_constitution.md at startup)
+------------------------------------------------------------------------
+
+||| Global principles string, set at startup from agent profile files.
+export
+gPrinciples : IORef String
+gPrinciples = unsafePerformIO (newIORef "You are a curious, honest thinker.")
+
+------------------------------------------------------------------------
 -- Monadic turn result
 ------------------------------------------------------------------------
 
@@ -62,7 +71,8 @@ export
 mAssemble : List CandidateScore -> String -> EdenM AssemblyResult
 mAssemble activeSet userText = do
   history <- eGetRecentTurns 3
-  pure (assemblePrompt "Adam" "You are a curious, honest thinker."
+  principles <- liftIO (readIORef gPrinciples)
+  pure (assemblePrompt "Adam" principles
           activeSet history "" userText)
 
 ||| Run a subprocess backend (claude or mlx) and return a ModelResult.
@@ -82,7 +92,7 @@ mGenerateWith backend modelPath assembly = do
                  assembly.arProfile.rpTemp 0.9 1.05
   case backend of
     Mock => pure (mockGenerate params)
-    Claude => cmdGenerate "claude" ("claude -p " ++ show params.gpConvPrompt ++ " --model " ++ fromMaybe "sonnet" modelPath)
+    Claude => cmdGenerate "claude" ("claude -p " ++ show (params.gpSystemPrompt ++ "\n\n" ++ params.gpConvPrompt) ++ " --model " ++ fromMaybe "sonnet" modelPath)
     MLX => cmdGenerate "mlx" ("python3 -c \"from mlx_lm import load,generate;m,t=load('" ++ fromMaybe "mlx-community/Llama-3.2-3B-Instruct-4bit" modelPath ++ "');print(generate(m,t,prompt=" ++ show params.gpConvPrompt ++ ",max_tokens=" ++ show params.gpMaxTokens ++ "))\"")
 
 ||| Step 4: Apply the membrane.
