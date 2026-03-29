@@ -58,13 +58,14 @@ record MTurnResult where
 ------------------------------------------------------------------------
 
 ||| Step 1: Retrieve and score the active set.
+||| Semantic similarity is computed against the user's query text.
 export
-mRetrieve : EdenM (List CandidateScore)
-mRetrieve = do
+mRetrieve : String -> EdenM (List CandidateScore)
+mRetrieve userText = do
   sid' <- getSessId
   memes <- eGetMemes
   let sw = defaultSelectionWeights
-  pure (assembleActiveSet sw sid' 3600.0 5 memes)
+  pure (assembleActiveSet sw sid' 3600.0 5 userText memes)
 
 ||| Step 2: Assemble the prompt.
 export
@@ -153,16 +154,53 @@ mProject = do
 export
 mExecuteTurnWith : Backend -> Maybe String -> Nat -> String -> EdenM MTurnResult
 mExecuteTurnWith be mp idx userText = do
-  activeSet <- mRetrieve
+  let turnId = MkId {a=TurnTag} ("turn-" ++ show idx)
+  -- Step 1: Retrieve active set (similarity scored against user query)
+  activeSet <- mRetrieve userText
+  eTraceTurn turnId ("retrieve: " ++ show (length activeSet) ++ " candidates")
+  -- Step 1b: Snapshot active set
+  traverse_ (\cs => eRecordActiveSetEntry turnId cs.nodeId cs.label cs.domain
+    cs.selection cs.semanticSimilarity cs.activationVal cs.regard) activeSet
+  -- Step 2: Assemble prompt
   assembly  <- mAssemble activeSet userText
+  eTraceTurn turnId ("assemble: profile=" ++ show assembly.arProfile.rpEffective
+                   ++ " budget=" ++ show assembly.arBudget.pressure)
+  -- Step 3: Generate
   genResult <- mGenerateWith be mp assembly
+  eTraceTurn turnId ("generate: backend=" ++ genResult.mrBackend
+                   ++ " tokens=" ++ show genResult.mrTokenEstimate)
+  -- Step 4: Membrane
   mo        <- mMembrane assembly.arProfile.rpRespCap genResult.mrText
+  eTraceTurn turnId ("membrane: events=" ++ show (length mo.moEvents))
+  -- Step 5: Record turn
   _ <- mRecordTurn idx userText assembly.arConvPrompt genResult.mrText mo.moCleanedText
+  -- Step 5b: Record turn metadata
+  ts' <- getTimestamp
+  let tmeta = MkTurnMetadata turnId
+        (show assembly.arProfile.rpRequested)
+        (show assembly.arProfile.rpEffective)
+        (show assembly.arProfile.rpBudgetMode)
+        (show assembly.arBudget.pressure)
+        assembly.arBudget.usedPromptTokens
+        assembly.arBudget.remainingInputTokens
+        (length activeSet)
+        mo.moReasoningText
+        assembly.arProfile.rpTemp
+        assembly.arProfile.rpMaxOutput
+        assembly.arProfile.rpRespCap
+        ts'
+  eRecordTurnMetadata tmeta
+  -- Step 6: Index
   idxResult <- mIndex userText mo.moCleanedText
+  eTraceTurn turnId ("index: concepts=" ++ show idxResult.ioConceptNames
+                   ++ " edges=" ++ show idxResult.ioNewEdges)
+  -- Step 7-9: Relations, materialization, projection
   rels <- mRelations userText mo.moCleanedText idxResult.ioConceptNames
   mCreateRelationEdges rels
   _ <- mMaterialize
   projs <- mProject
+  eTraceTurn turnId ("complete: relations=" ++ show (length rels)
+                   ++ " projections=" ++ show (length projs))
   pure (MkMTurnResult mo.moCleanedText idxResult.ioConceptNames idxResult.ioNewEdges rels projs)
 
 ||| Execute a complete turn (mock backend).
@@ -181,19 +219,21 @@ mProcessFeedback tid verdict explanation = do
   let sig = feedbackSignal verdict
   _ <- eRecordFeedback tid verdict explanation "" sig
 
-  -- Propagate to active memes
+  -- Propagate to all memes with distance-based attenuation
   memes <- eGetMemes
   let scale = propagateScale verdict
-      affected = take 3 memes
-  traverse_ (propagateToMeme sig scale) affected
+  propagateAll sig scale 1.0 memes
 
   -- Trace the event
   eTraceFeedback tid ("verdict=" ++ show verdict)
   where
-    propagateToMeme : FeedbackSignal -> Double -> Meme -> EdenM ()
-    propagateToMeme sig scale m = do
-      let (rw', rk', ed') = applyFeedback m.rewardEma m.riskEma m.editEma sig scale
+    propagateAll : FeedbackSignal -> Double -> Double -> List Meme -> EdenM ()
+    propagateAll _   _     _      []        = pure ()
+    propagateAll sig scale atten (m :: ms)  = do
+      let s = scale * atten
+          (rw', rk', ed') = applyFeedback m.rewardEma m.riskEma m.editEma sig s
       eUpdateMemeChannels m.id rw' rk' ed'
+      propagateAll sig scale (atten * 0.85) ms
 
 ------------------------------------------------------------------------
 -- Monadic hum generation

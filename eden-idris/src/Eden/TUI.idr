@@ -28,6 +28,8 @@ import Eden.Monad
 import Eden.Pipeline
 import Eden.Term
 import Eden.TermIO
+import Eden.Export
+import Eden.SQLite
 
 ------------------------------------------------------------------------
 -- Palette
@@ -467,7 +469,7 @@ handleKey ui KeyEnter = do
     entries <- readIORef ui.uiDialogue
     writeIORef ui.uiDialogue ((text, tr.mrResponse) :: entries)
     writeIORef ui.uiComposer ""
-    activeSet <- runEden ui.uiEnv mRetrieve
+    activeSet <- runEden ui.uiEnv (mRetrieve text)
     writeIORef ui.uiLastActive activeSet
     projs <- runEden ui.uiEnv mProject
     writeIORef ui.uiLastProj projs
@@ -481,6 +483,7 @@ handleKey ui KeyEnter = do
           runEden ui.uiEnv (mProcessFeedback turnId v "")
           writeIORef ui.uiFeedback (Just ("recorded: " ++ show v))
           hum <- runEden ui.uiEnv mBuildHum
+          writeHumFile hum
           writeIORef ui.uiLastHum (Just hum)
         Nothing => writeIORef ui.uiFeedback (Just "skipped")
       _ => writeIORef ui.uiFeedback (Just "skipped")
@@ -528,14 +531,31 @@ runTUIWith be mp = do
   writeIORef gBackend be
   writeIORef gModelPath mp
   store <- newStore
-  let ts = MkTimestamp "2026-03-26T00:00:00Z"
-  exp <- createExperiment store "tui" "tui" Blank ts
+  ts <- currentTimestamp
+
+  -- Open SQLite database
+  mdb <- openDB "data/eden.db"
+  case mdb of
+    Just db => writeIORef store.dbHandle (Just db)
+    Nothing => pure ()
+
+  -- Load or create experiment
+  case mdb of
+    Just db => do _ <- loadFromDB db store; pure ()
+    Nothing => pure ()
+  exps <- readIORef store.experiments
+  eid <- case exps of
+    (e :: _) => pure e.id
+    [] => do
+      exp <- createExperiment store "tui" "tui" Blank ts
+      _ <- upsertMeme store exp.id "Curiosity" "Drive to explore" Behavior SeedSource Global ts
+      _ <- upsertMeme store exp.id "Honesty" "Truthful communication" Behavior SeedSource Global ts
+      _ <- upsertMeme store exp.id "Clarity" "Clear explanations" Behavior SeedSource Global ts
+      pure exp.id
   let agentId = MkId {a=AgentTag} "adam-01"
-  sess <- createSession store exp.id agentId "TUI session" ts
-  _ <- upsertMeme store exp.id "Curiosity" "Drive to explore" Behavior SeedSource Global ts
-  _ <- upsertMeme store exp.id "Honesty" "Truthful communication" Behavior SeedSource Global ts
-  _ <- upsertMeme store exp.id "Clarity" "Clear explanations" Behavior SeedSource Global ts
-  env <- newEdenEnv store exp.id sess.id ts
+  sess <- createSession store eid agentId "TUI session" ts
+  turns <- readIORef store.turns
+  env <- newEdenEnv store eid sess.id ts
   turnIdx <- newIORef (the Nat 0)
   composer <- newIORef ""
   dialogue <- newIORef (the (List (String, String)) [])
@@ -554,7 +574,13 @@ runTUIWith be mp = do
                      focusPanel scrollOff quit uiW uiH
   ok <- enterTUI
   if ok
-    then do renderFrame ui; tuiLoop ui; leaveTUI; putStrLn "Goodbye."
+    then do renderFrame ui; tuiLoop ui; leaveTUI
+            -- Close DB on exit
+            mdb2 <- readIORef store.dbHandle
+            case mdb2 of
+              Just db => do closeDB db; pure ()
+              Nothing => pure ()
+            putStrLn "Goodbye."
     else putStrLn "Failed to initialize terminal."
 
 export

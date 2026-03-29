@@ -25,7 +25,9 @@ esac
 
 if [ -z "$IDRIS2" ]; then
     # Try common locations
-    if [ -x "/home/natanh/Idris2/build/exec/idris2.exe" ]; then
+    if [ -x "/home/natanh/Idris2/build/exec/idris2_stack64.exe" ]; then
+        IDRIS2="/home/natanh/Idris2/build/exec/idris2_stack64.exe"
+    elif [ -x "/home/natanh/Idris2/build/exec/idris2.exe" ]; then
         IDRIS2="/home/natanh/Idris2/build/exec/idris2.exe"
         IDRIS2_SUPPORT="/home/natanh/Idris2/support"
     elif command -v idris2 >/dev/null 2>&1; then
@@ -92,6 +94,8 @@ if [ -f "$EDEN_C" ]; then
     OLD_TS=$(eval $STAT_FMT "$EDEN_C" 2>/dev/null || echo "")
 fi
 
+export IDRIS2_PREFIX="${IDRIS2_PREFIX:-/home/natanh/.idris2}"
+
 if ! $IDRIS2 --no-banner --cg refc --build eden.ipkg 2>&1; then
     echo ""
     echo "WARNING: Idris2 exited with non-zero status."
@@ -116,7 +120,7 @@ echo "=== Phase 2: GCC compile + link ==="
 
 # Build include/library flags
 CFLAGS="-Wno-error=implicit-function-declaration"
-IFLAGS="-include support/eden_term.h"
+IFLAGS="-include support/eden_term.h -include support/eden_sqlite.h"
 LDFLAGS="-lm -lpthread $PLAT_LDFLAGS"
 
 # Add Idris2 support paths if they exist
@@ -146,9 +150,21 @@ else
     LDFLAGS="$LDFLAGS -lgmp"
 fi
 
+# SQLite3: find include/lib paths
+if pkg-config --exists sqlite3 2>/dev/null; then
+    IFLAGS="$IFLAGS $(pkg-config --cflags sqlite3)"
+    LDFLAGS="$LDFLAGS $(pkg-config --libs sqlite3)"
+elif [ -d "/ucrt64/include" ]; then
+    IFLAGS="$IFLAGS -I/ucrt64/include"
+    LDFLAGS="$LDFLAGS -L/ucrt64/lib -lsqlite3"
+else
+    LDFLAGS="$LDFLAGS -lsqlite3"
+fi
+
 $CC -o "$EDEN_BIN" \
     "$EDEN_C" \
     support/eden_term.c \
+    support/eden_sqlite.c \
     $IFLAGS $CFLAGS \
     -lidris2_refc -lidris2_support \
     $LDFLAGS

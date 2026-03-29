@@ -204,6 +204,10 @@ data EdgeType
   | ChunkOf
   | MemberOf
   | SourceDocument
+  | HasTurn
+  | HasFeedback
+  | BelongsToSession
+  | BelongsToAgent
 
 public export
 Show EdgeType where
@@ -217,6 +221,10 @@ Show EdgeType where
   show ChunkOf         = "CHUNK_OF"
   show MemberOf        = "MEMBER_OF"
   show SourceDocument  = "SOURCE_DOCUMENT"
+  show HasTurn         = "HAS_TURN"
+  show HasFeedback     = "HAS_FEEDBACK"
+  show BelongsToSession = "BELONGS_TO_SESSION"
+  show BelongsToAgent  = "BELONGS_TO_AGENT"
 
 public export
 Eq EdgeType where
@@ -230,10 +238,15 @@ Eq EdgeType where
   ChunkOf         == ChunkOf         = True
   MemberOf        == MemberOf        = True
   SourceDocument  == SourceDocument  = True
+  HasTurn         == HasTurn         = True
+  HasFeedback     == HasFeedback     = True
+  BelongsToSession == BelongsToSession = True
+  BelongsToAgent  == BelongsToAgent  = True
   _               == _               = False
 
 public export
 data NodeKind = MemeNode | MemodeNode | DocumentNode | TurnNode | ChunkNode
+              | SessionNode | AgentNode | FeedbackNode
 
 public export
 Show NodeKind where
@@ -242,6 +255,9 @@ Show NodeKind where
   show DocumentNode = "document"
   show TurnNode     = "turn"
   show ChunkNode    = "chunk"
+  show SessionNode  = "session"
+  show AgentNode    = "agent"
+  show FeedbackNode = "feedback"
 
 public export
 Eq NodeKind where
@@ -250,6 +266,9 @@ Eq NodeKind where
   DocumentNode == DocumentNode = True
   TurnNode     == TurnNode     = True
   ChunkNode    == ChunkNode    = True
+  SessionNode  == SessionNode  = True
+  AgentNode    == AgentNode    = True
+  FeedbackNode == FeedbackNode = True
   _            == _            = False
 
 ------------------------------------------------------------------------
@@ -583,3 +602,92 @@ record IndexResult where
   newMemes   : Nat
   newMemodes : Nat
   newEdges   : Nat
+
+------------------------------------------------------------------------
+-- Agent
+------------------------------------------------------------------------
+
+public export
+record Agent where
+  constructor MkAgent
+  id           : AgentId
+  experimentId : ExperimentId
+  name         : String
+  persona      : String
+  createdAt    : Timestamp
+
+------------------------------------------------------------------------
+-- Active set entry (per-turn snapshot)
+------------------------------------------------------------------------
+
+public export
+record ActiveSetEntry where
+  constructor MkActiveSetEntry
+  id             : String
+  experimentId   : ExperimentId
+  sessionId      : SessionId
+  turnId         : TurnId
+  nodeKind       : NodeKind
+  nodeId         : String
+  label          : String
+  domain         : Domain
+  selectionScore : Double
+  semanticSim    : Double
+  activationVal  : Double
+  regardVal      : Double
+  createdAt      : Timestamp
+
+------------------------------------------------------------------------
+-- Measurement event (observatory audit trail)
+------------------------------------------------------------------------
+
+public export
+record MeasurementEvent where
+  constructor MkMeasurementEvent
+  id             : String
+  experimentId   : ExperimentId
+  sessionId      : SessionId
+  action         : MeasurementAction
+  state          : MeasurementState
+  operator       : String
+  evidence       : String
+  beforeState    : String
+  proposedState  : String
+  committedState : String
+  revertOf       : String
+  createdAt      : Timestamp
+
+------------------------------------------------------------------------
+-- Export artifact registry
+------------------------------------------------------------------------
+
+public export
+record ExportArtifact where
+  constructor MkExportArtifact
+  id           : String
+  experimentId : ExperimentId
+  artifactType : String
+  path         : String
+  graphHash    : String
+  createdAt    : Timestamp
+
+------------------------------------------------------------------------
+-- Turn metadata (inference profile, budget, reasoning)
+------------------------------------------------------------------------
+
+public export
+record TurnMetadata where
+  constructor MkTurnMetadata
+  turnId                : TurnId
+  inferenceModeReq      : String
+  inferenceModeEff      : String
+  budgetMode            : String
+  budgetPressure        : String
+  budgetUsedTokens      : Nat
+  budgetRemainingTokens : Nat
+  activeSetSize         : Nat
+  reasoningText         : String
+  temperature           : Double
+  maxOutput             : Nat
+  responseCap           : Nat
+  createdAt             : Timestamp

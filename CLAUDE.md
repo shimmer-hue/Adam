@@ -21,8 +21,15 @@ cd eden-idris && ./build.sh
 # Run TUI
 ./build/exec/eden.exe --tui
 
-# Run REPL
+# Run REPL (with optional backend)
 ./build/exec/eden.exe --repl
+./build/exec/eden.exe --repl --backend claude
+
+# Export graph JSON for observatory
+./build/exec/eden.exe --export
+
+# Ingest articles into knowledge graph
+./build/exec/eden.exe --ingest ~/docs/the-verge-of-redemption
 
 # Type-check a single module
 PATH="/ucrt64/bin:/usr/bin:$PATH" /home/natanh/Idris2/build/exec/idris2.exe --no-banner --check --source-dir src src/Eden/Types.idr
@@ -61,6 +68,7 @@ gcc -o build/exec/eden.exe build/exec/eden.c support/eden_term.c \
 - **Term.idr** — Pure ANSI escape sequences, EDEN palette (Amber Dark theme), styled text helpers.
 - **TermIO.idr** — C FFI bindings for raw terminal I/O via `support/eden_term.c`.
 - **TUI.idr** — Two-column TUI application: dialogue tape, aperture panel, hum panel, composer.
+- **Export.idr** — Hum file persistence (`data/hum/`), observatory JSON export (`data/export/`), minimal JSON serializer.
 - **Loop.idr** — REPL implementation.
 
 ### C FFI Support

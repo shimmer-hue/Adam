@@ -35,6 +35,8 @@ import Eden.Trace
 import Eden.SemanticRelations
 import Eden.TermIO
 import Eden.TUI
+import Eden.Export
+import Eden.SQLite
 
 -- Helper for display
 showDouble : Double -> String
@@ -175,13 +177,21 @@ runStoreDemo be mp = do
   putStrLn ""
 
   store <- newStore
-  let ts = MkTimestamp "2026-03-25T12:00:00Z"
+  ts <- currentTimestamp
 
-  -- Create experiment + session
+  -- Open SQLite database for write-through
+  mdb <- openDB "data/eden.db"
+  case mdb of
+    Just db => do writeIORef store.dbHandle (Just db)
+                  putStrLn "  [db] opened data/eden.db"
+    Nothing => putStrLn "  [db] warning: no sqlite, using in-memory only"
+
+  -- Create experiment + agent + session
   exp <- createExperiment store "demo" "demo" Blank ts
-  let agentId = MkId {a=AgentTag} "adam-01"
-  sess <- createSession store exp.id agentId "Demo session" ts
+  agent <- createAgent store exp.id "Adam" "Curious, honest thinker" ts
+  sess <- createSession store exp.id agent.id "Demo session" ts
   putStrLn $ "  experiment: " ++ show exp.id
+  putStrLn $ "  agent:      " ++ show agent.id
   putStrLn $ "  session:    " ++ show sess.id
 
   -- Seed behavior memes
@@ -240,12 +250,17 @@ runStoreDemo be mp = do
           ++ " peripheral=" ++ show roles.peripheralCount
           ++ " emergent=" ++ show roles.emergentCount
 
-  -- Hum via monadic pipeline
+  -- Hum via monadic pipeline + persistence
   hum <- runEden env mBuildHum
+  writeHumFile hum
   putStrLn $ "\n  --- Hum ---"
   putStrLn $ "  status: " ++ show hum.hpStatus
   putStrLn $ "  turns:  " ++ show hum.metrics.turnsCovered
   putStrLn $ "  motifs: " ++ show hum.metrics.recurringItems
+
+  -- Graph export
+  exportPath <- writeGraphExport store exp.id
+  putStrLn $ "  exported: " ++ exportPath
 
   -- Graph summary
   putStrLn ""
@@ -260,6 +275,14 @@ runStoreDemo be mp = do
   -- Trace events
   tcount <- traceCount env.trace
   putStrLn $ "  trace:      " ++ show tcount ++ " events"
+
+  -- Close SQLite handle if open
+  mdb2 <- readIORef store.dbHandle
+  case mdb2 of
+    Just db => do closeDB db
+                  putStrLn "  graph:      saved to data/eden.db"
+    Nothing => do saveGraph store
+                  putStrLn "  graph:      saved to data/graph.eden"
   putStrLn ""
   putStrLn "=== Demo complete. ==="
 
@@ -293,7 +316,20 @@ ingestOneFile store eid ts path = do
 runIngest : String -> IO ()
 runIngest dir = do
   store <- newStore
-  let ts = MkTimestamp "2026-03-27T00:00:00Z"
+  ts <- currentTimestamp
+
+  -- Open SQLite database
+  mdb <- openDB "data/eden.db"
+  case mdb of
+    Just db => do writeIORef store.dbHandle (Just db)
+                  putStrLn "  [db] opened data/eden.db"
+    Nothing => putStrLn "  [db] warning: no sqlite, using in-memory only"
+
+  -- Load existing graph if DB available
+  case mdb of
+    Just db => do _ <- loadFromDB db store; pure ()
+    Nothing => pure ()
+
   exp <- createExperiment store "ingest" "article ingest" Blank ts
   Right entries <- listDir dir
     | Left _ => putStrLn ("ERROR: cannot read directory " ++ dir)
@@ -304,6 +340,16 @@ runIngest dir = do
   edges <- readIORef store.edges
   putStrLn ("=== Done: " ++ show (length memes) ++ " memes, "
          ++ show (length edges) ++ " edges in graph ===")
+  -- Export graph for observatory
+  exportPath <- writeGraphExport store exp.id
+  putStrLn ("  exported: " ++ exportPath)
+
+  -- Close SQLite handle
+  mdb2 <- readIORef store.dbHandle
+  case mdb2 of
+    Just db => do closeDB db
+                  putStrLn "  [db] saved to data/eden.db"
+    Nothing => pure ()
 
 ------------------------------------------------------------------------
 -- CLI dispatch
@@ -333,8 +379,51 @@ main = do
   let (be, mp, _) = parseArgs cliArgs
   loadAgentProfile
   case cliArgs of
-    ("--repl"  :: _) => runREPLWith be mp
-    ("--demo"  :: _) => runStoreDemo be mp
-    ("--tui"   :: _) => runTUIWith be mp
+    ("--repl"   :: _) => runREPLWith be mp
+    ("--demo"   :: _) => runStoreDemo be mp
+    ("--tui"    :: _) => runTUIWith be mp
     ("--ingest" :: d :: _) => runIngest d
-    _                => runInvariantDemo
+    ("--export" :: _) => do
+      -- Export the graph from existing DB, or generate a demo
+      putStrLn "=== Generating graph export for observatory ==="
+      store <- newStore
+      ts <- currentTimestamp
+
+      -- Open SQLite database and load existing graph
+      mdb <- openDB "data/eden.db"
+      case mdb of
+        Just db => do writeIORef store.dbHandle (Just db)
+                      _ <- loadFromDB db store
+                      pure ()
+        Nothing => pure ()
+
+      -- Check if we have data; if not, create a demo session
+      existingMemes <- readIORef store.memes
+      eid <- case existingMemes of
+        [] => do
+          exp <- createExperiment store "export" "export" Blank ts
+          agent <- createAgent store exp.id "Adam" "Curious, honest thinker" ts
+          sess <- createSession store exp.id agent.id "export" ts
+          _ <- upsertMeme store exp.id "Curiosity" "Drive to explore" Behavior SeedSource Global ts
+          _ <- upsertMeme store exp.id "Honesty" "Truthful communication" Behavior SeedSource Global ts
+          _ <- upsertMeme store exp.id "Clarity" "Clear explanations" Behavior SeedSource Global ts
+          env <- newEdenEnv store exp.id sess.id ts
+          _ <- runEden env (mExecuteTurnWith be mp 0 "Export test")
+          _ <- materializeMemodes store exp.id ts
+          pure exp.id
+        _ => do
+          exps <- readIORef store.experiments
+          case exps of
+            (e :: _) => pure e.id
+            [] => do exp <- createExperiment store "export" "export" Blank ts
+                     pure exp.id
+
+      path <- writeGraphExport store eid
+      putStrLn ("  -> " ++ path)
+
+      -- Close DB
+      mdb2 <- readIORef store.dbHandle
+      case mdb2 of
+        Just db => do closeDB db; pure ()
+        Nothing => pure ()
+    _                 => runInvariantDemo

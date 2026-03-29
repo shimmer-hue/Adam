@@ -27,6 +27,8 @@ import Eden.SemanticRelations
 import Eden.OntologyProjection
 import Eden.Monad
 import Eden.Pipeline
+import Eden.Export
+import Eden.SQLite
 
 ------------------------------------------------------------------------
 -- REPL commands
@@ -128,6 +130,7 @@ handleRegard env = do
 handleHum : EdenEnv -> IO ()
 handleHum env = do
   payload <- runEden env mBuildHum
+  writeHumFile payload
   putStrLn $ "  --- Hum (v1) ---"
   putStrLn $ "  status:   " ++ show payload.hpStatus
   putStrLn $ "  turns:    " ++ show payload.metrics.turnsCovered
@@ -194,6 +197,14 @@ mutual
   dispatch be mp env turnIdx CmdQuit = do
     putStrLn "\n--- Session complete ---"
     handleStats env
+    -- Close SQLite handle if open
+    mdb <- readIORef env.store.dbHandle
+    case mdb of
+      Just db => do closeDB db
+                    writeIORef env.store.dbHandle Nothing
+                    putStrLn "  graph saved to data/eden.db"
+      Nothing => do saveGraph env.store
+                    putStrLn "  graph saved to data/graph.eden"
     putStrLn "Goodbye."
   dispatch be mp env turnIdx CmdStats = do
     handleStats env
@@ -224,18 +235,37 @@ runREPLWith be mp = do
   putStrLn ""
 
   store <- newStore
-  let ts = MkTimestamp "2026-03-27T00:00:00Z"
+  ts <- currentTimestamp
 
-  exp <- createExperiment store "repl" "repl" Blank ts
+  -- Open SQLite database
+  mdb <- openDB "data/eden.db"
+  case mdb of
+    Just db => do writeIORef store.dbHandle (Just db)
+                  _ <- loadFromDB db store
+                  putStrLn "  [db] opened data/eden.db"
+    Nothing => putStrLn "  [db] warning: could not open data/eden.db, using in-memory only"
+
+  -- Check if experiment was loaded from DB
+  exps <- readIORef store.experiments
+  eid <- case exps of
+    (e :: _) => do
+      putStrLn $ "  [db] resumed experiment: " ++ show e.id
+      pure e.id
+    [] => do
+      exp <- createExperiment store "repl" "repl" Blank ts
+      -- Seed initial memes on first run
+      _ <- upsertMeme store exp.id "Curiosity" "Drive to explore and understand" Behavior SeedSource Global ts
+      _ <- upsertMeme store exp.id "Honesty" "Commitment to truthful communication" Behavior SeedSource Global ts
+      _ <- upsertMeme store exp.id "Clarity" "Preference for clear explanations" Behavior SeedSource Global ts
+      pure exp.id
+  turns <- readIORef store.turns
+  let turnStart = length turns
+
   let agentId = MkId {a=AgentTag} "adam-01"
-  sess <- createSession store exp.id agentId "REPL session" ts
+  sess <- createSession store eid agentId "REPL session" ts
 
-  _ <- upsertMeme store exp.id "Curiosity" "Drive to explore and understand" Behavior SeedSource Global ts
-  _ <- upsertMeme store exp.id "Honesty" "Commitment to truthful communication" Behavior SeedSource Global ts
-  _ <- upsertMeme store exp.id "Clarity" "Preference for clear explanations" Behavior SeedSource Global ts
-
-  env <- newEdenEnv store exp.id sess.id ts
-  turnIdx <- newIORef (the Nat 0)
+  env <- newEdenEnv store eid sess.id ts
+  turnIdx <- newIORef (the Nat turnStart)
   replLoop be mp env turnIdx
 
 ||| Run the interactive REPL (mock backend).

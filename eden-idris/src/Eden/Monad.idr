@@ -10,6 +10,7 @@
 module Eden.Monad
 
 import Data.IORef
+import System
 import Eden.Types
 import Eden.Store.InMemory
 import Eden.Trace
@@ -118,6 +119,36 @@ getTraceLog : EdenM TraceLog
 getTraceLog = asks trace
 
 ------------------------------------------------------------------------
+-- System clock integration
+------------------------------------------------------------------------
+
+||| Get the current time as an EDEN Timestamp.
+||| Produces an ISO 8601 string from epoch seconds (Hinnant civil_from_days).
+export
+currentTimestamp : HasIO io => io Timestamp
+currentTimestamp = do
+  t <- time
+  let remSec   = t `mod` 86400
+      h        = remSec `div` 3600
+      mn       = (remSec `mod` 3600) `div` 60
+      s        = remSec `mod` 60
+      -- Hinnant civil_from_days algorithm (days since 1970-01-01 -> y/m/d)
+      z        = t `div` 86400 + 719468
+      era      = z `div` 146097
+      doe      = z - era * 146097
+      yoe      = (doe - doe `div` 1461 + doe `div` 36524 - doe `div` 146096) `div` 365
+      y        = yoe + era * 400
+      doy      = doe - (365 * yoe + yoe `div` 4 - yoe `div` 100)
+      mp       = (5 * doy + 2) `div` 153
+      d        = doy - (153 * mp + 2) `div` 5 + 1
+      m        = if mp < 10 then mp + 3 else mp - 9
+      year     = if m <= 2 then y + 1 else y
+      pad2     : Integer -> String
+      pad2 n   = if n < 10 then "0" ++ show n else show n
+  pure (MkTimestamp (show year ++ "-" ++ pad2 m ++ "-" ++ pad2 d
+                  ++ "T" ++ pad2 h ++ ":" ++ pad2 mn ++ ":" ++ pad2 s ++ "Z"))
+
+------------------------------------------------------------------------
 -- Convenience: lifted store operations
 ------------------------------------------------------------------------
 
@@ -193,6 +224,46 @@ eGetSessionTurns : EdenM (List Turn)
 eGetSessionTurns = do
   env <- ask
   liftIO (getSessionTurns env.store env.sid)
+
+||| Create an agent in EdenM.
+public export
+eCreateAgent : String -> String -> EdenM Agent
+eCreateAgent name persona = do
+  env <- ask
+  liftIO (createAgent env.store env.eid name persona env.ts)
+
+||| Record an active set entry in EdenM.
+public export
+eRecordActiveSetEntry : TurnId -> String -> String -> Domain
+                     -> Double -> Double -> Double -> Double -> EdenM ()
+eRecordActiveSetEntry tid nid label dom sel sem act reg = do
+  env <- ask
+  liftIO (recordActiveSetEntry env.store env.eid env.sid tid nid label dom
+            sel sem act reg env.ts)
+
+||| Record turn metadata in EdenM.
+public export
+eRecordTurnMetadata : TurnMetadata -> EdenM ()
+eRecordTurnMetadata meta = do
+  st <- getStore
+  liftIO (recordTurnMetadata st meta)
+
+||| Record a measurement event in EdenM.
+public export
+eRecordMeasurementEvent : MeasurementAction -> MeasurementState
+                       -> String -> String -> String -> String -> String -> String
+                       -> EdenM MeasurementEvent
+eRecordMeasurementEvent action state operator evidence before proposed committed revertOf = do
+  env <- ask
+  liftIO (recordMeasurementEvent env.store env.eid env.sid action state
+            operator evidence before proposed committed revertOf env.ts)
+
+||| Record an export artifact in EdenM.
+public export
+eRecordExportArtifact : String -> String -> String -> EdenM ExportArtifact
+eRecordExportArtifact artType path graphHash = do
+  env <- ask
+  liftIO (recordExportArtifact env.store env.eid artType path graphHash env.ts)
 
 ------------------------------------------------------------------------
 -- Convenience: lifted trace operations

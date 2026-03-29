@@ -9,7 +9,8 @@ sourcedir = "src"
 main = Main
 executable = eden
 
-modules = Eden.Types
+modules = Eden.Analytics
+        , Eden.Types
         , Eden.Config
         , Eden.Regard
         , Eden.Retrieval
@@ -34,4 +35,6 @@ modules = Eden.Types
         , Eden.Term
         , Eden.TermIO
         , Eden.TUI
+        , Eden.Export
+        , Eden.SQLite
         , Eden.Proofs

@@ -5,11 +5,40 @@
 module Eden.Retrieval
 
 import Data.List
+import Data.String
 import Eden.Types
 import Eden.Config
 import Eden.Regard
 
 %default total
+
+------------------------------------------------------------------------
+-- Term-overlap similarity (Jaccard)
+------------------------------------------------------------------------
+
+||| Normalize a word for comparison: lowercase, strip short noise words.
+normWord : String -> String
+normWord = toLower
+
+||| Compute Jaccard similarity between a query and a meme's combined text.
+||| Returns a value in [0.0, 1.0].
+wordOverlap : List String -> List String -> Nat
+wordOverlap qs ms = length (filter (\w => elem w ms) qs)
+
+||| Compute Jaccard similarity between a query and a meme's combined text.
+||| Returns a value in [0.0, 1.0].
+public export
+termSimilarity : String -> String -> Double
+termSimilarity query memeText =
+  let qWords = nub (map normWord (words query))
+      mWords = nub (map normWord (words memeText))
+  in simFromWords qWords mWords
+  where
+    simFromWords : List String -> List String -> Double
+    simFromWords qs ms =
+      let unionSize = length (nub (qs ++ ms))
+      in if unionSize == 0 then 0.0
+         else cast (wordOverlap qs ms) / cast unionSize
 
 ------------------------------------------------------------------------
 -- Selection scoring
@@ -95,7 +124,10 @@ buildCandidateScore : SelectionWeights -> SessionId
                    -> Meme -> CandidateScore
 buildCandidateScore w curSess sim deltaSec m =
   let act  = activationDecay deltaSec m.activationTau
-      reg  = rewardScore m.rewardEma m.riskEma
+      ns   = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau deltaSec
+      gm   = MkGraphMetrics 0.5 0.4 0.3  -- defaults until live graph metrics
+      rb   = regardBreakdown defaultRegardWeights ns gm
+      reg  = rb.totalRegard
       sb   = calcSessionBias m.scope curSess
       ef   = calcExplicitFeedback m.rewardEma m.riskEma m.feedbackCount
       sp   = calcScopePenalty m.scope curSess
@@ -135,11 +167,14 @@ selectTopK k candidates =
 ------------------------------------------------------------------------
 
 ||| Score all memes and select the top k as the active set.
-||| `sim` is a placeholder (0.5) until embedding similarity is available.
+||| Semantic similarity is computed via term overlap (Jaccard) between
+||| the query and each meme's label + text.
 public export
 assembleActiveSet : SelectionWeights -> SessionId
                  -> (deltaSec : Double) -> (k : Nat)
-                 -> List Meme -> List CandidateScore
-assembleActiveSet w curSess deltaSec k memes =
-  let candidates = map (buildCandidateScore w curSess 0.5 deltaSec) memes
+                 -> (query : String) -> List Meme -> List CandidateScore
+assembleActiveSet w curSess deltaSec k query memes =
+  let candidates = map (\m => buildCandidateScore w curSess
+                          (termSimilarity query (m.label ++ " " ++ m.text))
+                          deltaSec m) memes
   in selectTopK k candidates

@@ -1,6 +1,5 @@
 ||| In-memory graph store backed by mutable IORef lists.
-||| This is the test/development store -- the production path would
-||| use SQLite via FFI.
+||| When dbHandle is Just, every mutation writes through to SQLite.
 module Eden.Store.InMemory
 
 import Data.IORef
@@ -9,6 +8,64 @@ import Data.String
 import Eden.Types
 import Eden.Config
 import Eden.Storage
+
+------------------------------------------------------------------------
+-- SQLite FFI (inline declarations to avoid circular import)
+------------------------------------------------------------------------
+
+%foreign "C:eden_db_save_experiment,eden_sqlite"
+prim__wt_exp : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_session,eden_sqlite"
+prim__wt_sess : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_turn,eden_sqlite"
+prim__wt_turn : AnyPtr -> String -> String -> String -> Int -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_meme_tsv,eden_sqlite"
+prim__wt_meme_tsv : AnyPtr -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_memode_tsv,eden_sqlite"
+prim__wt_memode_tsv : AnyPtr -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_edge,eden_sqlite"
+prim__wt_edge : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> Double -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_feedback,eden_sqlite"
+prim__wt_fb : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> Double -> Double -> Double -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_membrane_event,eden_sqlite"
+prim__wt_mbe : AnyPtr -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_trace_event,eden_sqlite"
+prim__wt_tre : AnyPtr -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_update_meme_channels,eden_sqlite"
+prim__wt_memech : AnyPtr -> String -> Double -> Double -> Double -> PrimIO Int
+
+%foreign "C:eden_db_set_config,eden_sqlite"
+prim__wt_config : AnyPtr -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_document,eden_sqlite"
+prim__wt_doc : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_chunk,eden_sqlite"
+prim__wt_chunk : AnyPtr -> String -> String -> String -> Int -> Int -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_agent,eden_sqlite"
+prim__wt_agent : AnyPtr -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_active_set_tsv,eden_sqlite"
+prim__wt_aset_tsv : AnyPtr -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_measurement_event_tsv,eden_sqlite"
+prim__wt_meas_tsv : AnyPtr -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_export_artifact,eden_sqlite"
+prim__wt_export : AnyPtr -> String -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_turn_metadata_tsv,eden_sqlite"
+prim__wt_tmeta_tsv : AnyPtr -> String -> PrimIO Int
 
 ------------------------------------------------------------------------
 -- Feedback record (cleaner than 8-tuple, which also hits Idris2 parse limit)
@@ -31,6 +88,7 @@ record FeedbackRecord where
 ------------------------------------------------------------------------
 
 ||| Mutable in-memory store state.
+||| When dbHandle holds a Just ptr, mutations write through to SQLite.
 public export
 record StoreState where
   constructor MkStoreState
@@ -44,6 +102,12 @@ record StoreState where
   membraneEvts   : IORef (List (MembraneEventType, String, Timestamp))
   traceEvts      : IORef (List (TraceEventType, TraceLevel, String, Timestamp))
   nextId         : IORef Nat
+  dbHandle       : IORef (Maybe AnyPtr)
+  agents         : IORef (List Agent)
+  activeSetSnaps : IORef (List ActiveSetEntry)
+  measurements   : IORef (List MeasurementEvent)
+  exportArtifacts: IORef (List ExportArtifact)
+  turnMetadata   : IORef (List TurnMetadata)
 
 ------------------------------------------------------------------------
 -- Create a fresh store
@@ -62,7 +126,48 @@ newStore = do
   mbes  <- newIORef []
   tres  <- newIORef []
   nid   <- newIORef 1
-  pure (MkStoreState exps sess trns mms mds eds fbs mbes tres nid)
+  dbh   <- newIORef Nothing
+  ags   <- newIORef []
+  asets <- newIORef []
+  msev  <- newIORef []
+  exart <- newIORef []
+  tmeta <- newIORef []
+  pure (MkStoreState exps sess trns mms mds eds fbs mbes tres nid dbh ags asets msev exart tmeta)
+
+------------------------------------------------------------------------
+-- Write-through helpers
+------------------------------------------------------------------------
+
+||| Discard PrimIO Int result.
+wt_ : IO Int -> IO ()
+wt_ act = do _ <- act; pure ()
+
+||| Call f(db) if SQLite handle is open, else no-op.
+withDB : StoreState -> (AnyPtr -> IO ()) -> IO ()
+withDB st f = do
+  mdb <- readIORef st.dbHandle
+  case mdb of
+    Nothing => pure ()
+    Just db => f db
+
+||| Join strings with tab separator.
+joinTSV : List String -> String
+joinTSV [] = ""
+joinTSV [x] = x
+joinTSV (x :: xs) = x ++ "\t" ++ joinTSV xs
+
+wtMeme : StoreState -> Meme -> IO ()
+wtMeme st m =
+  let tsv = joinTSV [ show m.id, show m.experimentId
+                    , m.label, m.canonicalLabel, m.text
+                    , show m.domain, show m.sourceKind, show m.scope
+                    , show m.evidenceN, show m.usageCount
+                    , show m.rewardEma, show m.riskEma, show m.editEma
+                    , show m.skipCount, show m.contradictionCount
+                    , show m.membraneConflicts, show m.feedbackCount
+                    , show m.activationTau
+                    , show m.lastActiveAt, show m.createdAt, show m.updatedAt ]
+  in withDB st (\db => wt_ (primIO (prim__wt_meme_tsv db tsv)))
 
 ------------------------------------------------------------------------
 -- ID generation
@@ -72,7 +177,9 @@ export
 genId : StoreState -> String -> IO String
 genId st pfx = do
   n <- readIORef st.nextId
-  writeIORef st.nextId (n + 1)
+  let next = n + 1
+  writeIORef st.nextId next
+  withDB st (\db => wt_ (primIO (prim__wt_config db "next_id" (show next))))
   pure (pfx ++ "-" ++ show n)
 
 ------------------------------------------------------------------------
@@ -85,6 +192,7 @@ createExperiment st name slug mode now = do
   eid <- genId st "exp"
   let exp = MkExperiment (MkId eid) name slug mode Active now now
   modifyIORef st.experiments (exp ::)
+  withDB st (\db => wt_ (primIO (prim__wt_exp db eid name slug (show mode) (show Active) (show now) (show now))))
   pure exp
 
 export
@@ -103,6 +211,7 @@ createSession st eid aid title now = do
   sid <- genId st "sess"
   let sess = MkSession (MkId sid) eid aid title now now Nothing
   modifyIORef st.sessions (sess ::)
+  withDB st (\db => wt_ (primIO (prim__wt_sess db sid (show eid) (show aid) title (show now) (show now) "")))
   pure sess
 
 export
@@ -122,6 +231,8 @@ recordTurn st eid sid idx userText promptCtx respText membText now = do
   tid <- genId st "turn"
   let turn = MkTurn (MkId tid) eid sid idx userText promptCtx respText membText now
   modifyIORef st.turns (turn ::)
+  withDB st (\db => wt_ (primIO (prim__wt_turn db tid (show eid) (show sid)
+    (cast idx) userText promptCtx respText membText (show now))))
   pure turn
 
 export
@@ -158,12 +269,14 @@ upsertMeme st eid label text domain sk scope now = do
                     , updatedAt := now } m
           others = filter (\x => x.id /= m.id) allMemes
       writeIORef st.memes (updated :: others)
+      wtMeme st updated
       pure updated
     Nothing => do
       mid <- genId st "meme"
       let meme = MkMeme (MkId mid) eid label canonical text domain sk scope
                         0.0 1 0.0 0.0 0.0 0 0 0 0 86400.0 now now now
       modifyIORef st.memes (meme ::)
+      wtMeme st meme
       pure meme
 
 export
@@ -195,6 +308,12 @@ upsertMemode st eid lbl summary dom memberIds now = do
       md = MkMemode (MkId mid) eid lbl hash summary dom Global
                     0.0 1 0.0 0.0 0.0 0 86400.0 now now now
   modifyIORef st.memodes (md ::)
+  let tsv = joinTSV [ mid, show eid, lbl, hash, summary
+                    , show dom, show Global
+                    , "0.0", "1", "0.0", "0.0", "0.0"
+                    , "0", "86400.0"
+                    , show now, show now, show now ]
+  withDB st (\db => wt_ (primIO (prim__wt_memode_tsv db tsv)))
   pure md
 
 export
@@ -237,6 +356,8 @@ createEdge st eid sk sid dk did et w now = do
   edgeId <- genId st "edge"
   let edge = MkEdge (MkId edgeId) eid sk sid dk did et w now now
   modifyIORef st.edges (edge ::)
+  withDB st (\db => wt_ (primIO (prim__wt_edge db edgeId (show eid)
+    (show sk) sid (show dk) did (show et) w (show now) (show now))))
   pure edge
 
 export
@@ -265,6 +386,8 @@ recordFeedback st eid sid tid v expl corr sig now = do
   let fbid = MkId {a=FeedbackTag} fid
       rec  = MkFeedbackRecord fbid eid sid tid v expl corr sig
   modifyIORef st.feedbackEvents (rec ::)
+  withDB st (\db => wt_ (primIO (prim__wt_fb db fid (show eid) (show sid) (show tid)
+    (show v) expl corr sig.reward sig.risk sig.edit (show now))))
   pure fbid
 
 ------------------------------------------------------------------------
@@ -273,13 +396,19 @@ recordFeedback st eid sid tid v expl corr sig now = do
 
 export
 recordMembraneEvent : StoreState -> MembraneEventType -> String -> Timestamp -> IO ()
-recordMembraneEvent st evt detail now =
+recordMembraneEvent st evt detail now = do
   modifyIORef st.membraneEvts ((evt, detail, now) ::)
+  nid <- readIORef st.nextId
+  let mid = "mbe-" ++ show nid
+  withDB st (\db => wt_ (primIO (prim__wt_mbe db mid (show evt) detail (show now))))
 
 export
 recordTraceEvent : StoreState -> TraceEventType -> TraceLevel -> String -> Timestamp -> IO ()
-recordTraceEvent st evt lvl msg now =
+recordTraceEvent st evt lvl msg now = do
   modifyIORef st.traceEvts ((evt, lvl, msg, now) ::)
+  nid <- readIORef st.nextId
+  let tid = "tre-" ++ show nid
+  withDB st (\db => wt_ (primIO (prim__wt_tre db tid (show evt) (show lvl) msg (show now))))
 
 ------------------------------------------------------------------------
 -- Document operations
@@ -290,14 +419,15 @@ createDocument : StoreState -> ExperimentId -> String -> DocKind -> String -> St
 createDocument st eid path kind title sha now = do
   did <- genId st "doc"
   let doc = MkDocument (MkId did) eid path kind title sha Processing now
-  -- Store in edges IORef repurposed... actually we need a docs IORef
-  -- For now, return the document (stateless creation)
+  withDB st (\db => wt_ (primIO (prim__wt_doc db did (show eid) path (show kind) title sha (show Processing) (show now))))
   pure doc
 
 export
 createChunk : StoreState -> ExperimentId -> DocumentId -> Nat -> Maybe Nat -> String -> Timestamp -> IO Chunk
 createChunk st eid did idx pageNum text now = do
   cid <- genId st "chunk"
+  let pn : Int = case pageNum of Just p => cast p; Nothing => 0
+  withDB st (\db => wt_ (primIO (prim__wt_chunk db cid (show eid) (show did) (cast idx) pn text (show now))))
   pure (MkChunk (MkId cid) eid did idx pageNum text now)
 
 ------------------------------------------------------------------------
@@ -312,10 +442,11 @@ graphCounts st = do
   es  <- readIORef st.edges
   ts  <- readIORef st.turns
   fs  <- readIORef st.feedbackEvents
+  mev <- readIORef st.measurements
   mbe <- readIORef st.membraneEvts
   tre <- readIORef st.traceEvts
   pure (MkGraphCounts (length ms) (length mds) (length es) (length ts)
-                      (length fs) 0 (length mbe) (length tre))
+                      (length fs) (length mev) (length mbe) (length tre))
 
 ------------------------------------------------------------------------
 -- Update feedback channels on a meme
@@ -329,3 +460,87 @@ updateMemeChannels st mid newRw newRk newEd = do
                            then { rewardEma := newRw, riskEma := newRk, editEma := newEd } m
                            else m) allMemes
   writeIORef st.memes updated
+  withDB st (\db => wt_ (primIO (prim__wt_memech db (show mid) newRw newRk newEd)))
+
+------------------------------------------------------------------------
+-- Agent operations
+------------------------------------------------------------------------
+
+export
+createAgent : StoreState -> ExperimentId -> String -> String -> Timestamp -> IO Agent
+createAgent st eid name persona now = do
+  aid <- genId st "agent"
+  let agent = MkAgent (MkId aid) eid name persona now
+  modifyIORef st.agents (agent ::)
+  withDB st (\db => wt_ (primIO (prim__wt_agent db aid (show eid) name persona (show now))))
+  pure agent
+
+------------------------------------------------------------------------
+-- Active set snapshot operations
+------------------------------------------------------------------------
+
+export
+recordActiveSetEntry : StoreState -> ExperimentId -> SessionId -> TurnId
+                    -> String -> String -> Domain -> Double -> Double -> Double -> Double
+                    -> Timestamp -> IO ()
+recordActiveSetEntry st eid sid tid nid label dom sel sem act reg now = do
+  asid <- genId st "aset"
+  let entry = MkActiveSetEntry asid eid sid tid MemeNode nid label dom sel sem act reg now
+  modifyIORef st.activeSetSnaps (entry ::)
+  let tsv = joinTSV [ asid, show eid, show sid, show tid
+                    , show MemeNode, nid, label, show dom
+                    , show sel, show sem, show act, show reg
+                    , show now ]
+  withDB st (\db => wt_ (primIO (prim__wt_aset_tsv db tsv)))
+
+------------------------------------------------------------------------
+-- Measurement event operations
+------------------------------------------------------------------------
+
+export
+recordMeasurementEvent : StoreState -> ExperimentId -> SessionId
+                      -> MeasurementAction -> MeasurementState
+                      -> String -> String -> String -> String -> String -> String
+                      -> Timestamp -> IO MeasurementEvent
+recordMeasurementEvent st eid sid action state operator evidence
+                       before proposed committed revertOf now = do
+  mid <- genId st "meas"
+  let evt = MkMeasurementEvent mid eid sid action state operator evidence
+                               before proposed committed revertOf now
+  modifyIORef st.measurements (evt ::)
+  let tsv = joinTSV [ mid, show eid, show sid, show action, show state
+                    , operator, evidence, before, proposed, committed
+                    , revertOf, show now ]
+  withDB st (\db => wt_ (primIO (prim__wt_meas_tsv db tsv)))
+  pure evt
+
+------------------------------------------------------------------------
+-- Export artifact operations
+------------------------------------------------------------------------
+
+export
+recordExportArtifact : StoreState -> ExperimentId -> String -> String -> String
+                    -> Timestamp -> IO ExportArtifact
+recordExportArtifact st eid artType path graphHash now = do
+  aid <- genId st "expart"
+  let art = MkExportArtifact aid eid artType path graphHash now
+  modifyIORef st.exportArtifacts (art ::)
+  withDB st (\db => wt_ (primIO (prim__wt_export db aid (show eid) artType path graphHash (show now))))
+  pure art
+
+------------------------------------------------------------------------
+-- Turn metadata operations
+------------------------------------------------------------------------
+
+export
+recordTurnMetadata : StoreState -> TurnMetadata -> IO ()
+recordTurnMetadata st meta = do
+  modifyIORef st.turnMetadata (meta ::)
+  let tsv = joinTSV [ show meta.turnId
+                    , meta.inferenceModeReq, meta.inferenceModeEff
+                    , meta.budgetMode, meta.budgetPressure
+                    , show meta.budgetUsedTokens, show meta.budgetRemainingTokens
+                    , show meta.activeSetSize, meta.reasoningText
+                    , show meta.temperature, show meta.maxOutput
+                    , show meta.responseCap, show meta.createdAt ]
+  withDB st (\db => wt_ (primIO (prim__wt_tmeta_tsv db tsv)))
