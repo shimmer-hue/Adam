@@ -244,9 +244,6 @@ drawRuntimeLine ui row w = do
 drawDialogue : UIState -> Int -> Int -> Int -> Int -> IO ()
 drawDialogue ui r c w h = do
   clearRect r h c w colBg
-  drawBox r c w h colRose
-  boxTitle r c " Dialogue Tape " colRose
-  sectionTitle (r+1) (c+1) (w-2) "Adam Dialogue" colAmber
   entries <- readIORef ui.uiDialogue
   let ch = h - 3
   let cs = r + 2
@@ -259,6 +256,10 @@ drawDialogue ui r c w h = do
                "Press F9 first if you want to ingest a document with a framing note."
         else pure ()
     _  => drawEntries cs 0 (reverse entries) cs ch (c+1) (w-2)
+  -- Draw box borders AFTER content so they're never overwritten
+  drawBox r c w h colRose
+  boxTitle r c " Dialogue Tape " colRose
+  sectionTitle (r+1) (c+1) (w-2) "Adam Dialogue" colAmber
   where
     -- Break a string into lines of at most maxW characters
     wrapLines : Nat -> String -> List String
@@ -376,16 +377,24 @@ drawComposer : UIState -> Int -> Int -> Int -> Int -> IO ()
 drawComposer ui r c w h = do
   clearRect r h c w colBg
   drawBox r c w h colAmber
-  boxTitle r c " >> Composer " colNeon
   text <- readIORef ui.uiComposer
-  if text == ""
-    then do
-      putText (r+1) (c+2) colMuted colBg False (w-4)
-        "Message Adam here. Ask a question, continue the session, or correct the draft. Enter sends."
-      if h > 2
-        then putText (r+2) (c+2) colMuted colBg False (w-4) "F9 ingests a document first if needed."
-        else pure ()
-    else putText (r+1) (c+2) colText colBg False (w-4) text
+  fb <- readIORef ui.uiFeedback
+  case fb of
+    Just msg => do
+      boxTitle r c " >> Composer " colEmber
+      putText (r+1) (c+2) colEmber colBg False (w-4) msg
+    Nothing =>
+      if text == ""
+        then do
+          boxTitle r c " >> Composer " colNeon
+          putText (r+1) (c+2) colMuted colBg False (w-4)
+            "Message Adam here. Ask a question, continue the session, or correct the draft. Enter sends."
+          if h > 2
+            then putText (r+2) (c+2) colMuted colBg False (w-4) "F9 ingests a document first if needed."
+            else pure ()
+        else do
+          boxTitle r c " >> Composer " colNeon
+          putText (r+1) (c+2) colText colBg False (w-4) text
 
 ------------------------------------------------------------------------
 -- Footer
@@ -481,19 +490,20 @@ handleKey ui KeyEnter = do
     else do
     idx <- readIORef ui.uiTurnIdx
     writeIORef ui.uiTurnIdx (idx + 1)
-    writeIORef ui.uiFeedback (Just "generating...")
+    -- Clear composer and show thinking indicator before blocking call
+    writeIORef ui.uiComposer ""
+    writeIORef ui.uiFeedback (Just "Adam is thinking...")
     renderFrame ui
     let be = ui.uiBackend
     let mp = ui.uiModelPath
     tr <- runEden ui.uiEnv (mExecuteTurnWith be mp idx text)
     entries <- readIORef ui.uiDialogue
     writeIORef ui.uiDialogue ((text, tr.mrResponse) :: entries)
-    writeIORef ui.uiComposer ""
     activeSet <- runEden ui.uiEnv (mRetrieve text)
     writeIORef ui.uiLastActive activeSet
     projs <- runEden ui.uiEnv mProject
     writeIORef ui.uiLastProj projs
-    writeIORef ui.uiFeedback (Just "feedback? (a/r/e/s)")
+    writeIORef ui.uiFeedback Nothing
     renderFrame ui
     fbKey <- readKey 10000
     case fbKey of
@@ -507,6 +517,10 @@ handleKey ui KeyEnter = do
           writeIORef ui.uiLastHum (Just hum)
         Nothing => writeIORef ui.uiFeedback (Just "skipped")
       _ => writeIORef ui.uiFeedback (Just "skipped")
+    renderFrame ui
+    -- Brief pause so user sees feedback result, then clear it
+    _ <- readKey 1500
+    writeIORef ui.uiFeedback Nothing
 handleKey ui KeyBackspace = do
   text <- readIORef ui.uiComposer
   case strM text of

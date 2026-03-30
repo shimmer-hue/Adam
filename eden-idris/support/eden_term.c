@@ -26,12 +26,11 @@ void eden_term_rearm(void);
 #include <windows.h>
 #include <io.h>
 #include <fcntl.h>
-/* Variables — declared here so eden_run_cmd can reference them.
- * Defined/initialized in the Win32 terminal section below. */
+/* Variables — declared here, defined/initialized in the Win32 section below. */
 static int raw_active = 0;
 static volatile int reader_running = 0;
 static HANDLE reader_thread = NULL;
-/* Ring buffer forward declarations */
+/* Ring buffer + reader thread forward declarations (used by eden_run_cmd) */
 static int ring_empty(void);
 static int ring_pop(void);
 static DWORD WINAPI reader_fn(LPVOID arg);
@@ -54,14 +53,15 @@ static DWORD WINAPI reader_fn(LPVOID arg);
  */
 char *eden_run_cmd(const char *cmd) {
 #ifdef _WIN32
-    /* Pause reader thread if active (TUI mode) to prevent fd 0 race */
+    /* Pause reader thread before popen to avoid CRT fd-table contention.
+     * ReadFile (used by reader_fn) is cancellable via CancelSynchronousIo,
+     * so the thread exits cleanly — no TerminateThread needed. */
     int had_reader = 0;
     if (raw_active && reader_running && reader_thread) {
         had_reader = 1;
         reader_running = 0;
         CancelSynchronousIo(reader_thread);
-        if (WaitForSingleObject(reader_thread, 3000) == WAIT_TIMEOUT)
-            TerminateThread(reader_thread, 0);
+        WaitForSingleObject(reader_thread, 1000);
         CloseHandle(reader_thread);
         reader_thread = NULL;
     }
@@ -105,7 +105,6 @@ char *eden_run_cmd(const char *cmd) {
 
 #ifdef _WIN32
     int code = status;
-    /* Restart reader thread and rearm terminal */
     if (had_reader) {
         eden_term_rearm();
         while (!ring_empty()) ring_pop();
@@ -236,11 +235,34 @@ static int ring_pop(void) {
 
 static DWORD WINAPI reader_fn(LPVOID arg) {
     (void)arg;
-    while (reader_running) {
-        unsigned char c;
-        int n = _read(0, &c, 1);
-        if (n == 1) ring_push(c);
-        else if (n <= 0) Sleep(1);
+    HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD ftype = GetFileType(hIn);
+    if (ftype == FILE_TYPE_PIPE) {
+        /* Pipe stdin (mintty / MSYS2 pty): non-blocking poll.
+         * PeekNamedPipe checks for available data without blocking,
+         * so the thread can exit within ~2ms when reader_running = 0. */
+        while (reader_running) {
+            DWORD avail = 0;
+            if (PeekNamedPipe(hIn, NULL, 0, NULL, &avail, NULL) && avail > 0) {
+                unsigned char c;
+                DWORD nRead = 0;
+                if (ReadFile(hIn, &c, 1, &nRead, NULL) && nRead == 1)
+                    ring_push(c);
+            } else {
+                Sleep(2);
+            }
+        }
+    } else {
+        /* Console stdin (cmd.exe, Windows Terminal): use ReadFile.
+         * CancelSynchronousIo can cancel this cleanly. */
+        while (reader_running) {
+            unsigned char c;
+            DWORD nRead = 0;
+            BOOL ok = ReadFile(hIn, &c, 1, &nRead, NULL);
+            if (ok && nRead == 1) ring_push(c);
+            else if (!reader_running) break;
+            else Sleep(1);
+        }
     }
     return 0;
 }
