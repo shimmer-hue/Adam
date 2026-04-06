@@ -156,6 +156,7 @@ record UIState where
   uiActionSel    : IORef Nat
   uiChyronVisible : IORef Bool
   uiApertureDrawer : IORef Bool
+  uiReasoningTab   : IORef Nat
 
 ------------------------------------------------------------------------
 -- Rendering primitives
@@ -258,7 +259,8 @@ actionLine row col maxW num sel label = do
   let fg = if sel then colActHi else colIce
   let bg = if sel then colActHiBg else colActBg
   clearRow row col maxW bg
-  putText row col fg bg sel maxW ("[ " ++ n ++ " " ++ label ++ " ]")
+  let marker = if sel then ">> " else "   "
+  putText row col fg bg sel maxW (marker ++ "[ " ++ n ++ " " ++ label ++ " ]")
 
 drawActions : UIState -> Int -> Int -> Int -> IO ()
 drawActions ui r c w = do
@@ -455,38 +457,66 @@ drawMemgraph ui r c w h = do
 ------------------------------------------------------------------------
 -- Tab bar + Reasoning
 ------------------------------------------------------------------------
-drawTabBar : Int -> Int -> Int -> IO ()
-drawTabBar row col w = do
+drawTabBar : UIState -> Int -> Int -> Int -> IO ()
+drawTabBar ui row col w = do
+  tab <- readIORef ui.uiReasoningTab
   clearRow row col w colPanel
   let tw = w `div` 3
-  screenSetCP row (col+1) 9679 colAmber colPanel False
-  putText row (col+3) colAmber colPanel True (tw-3) "Reasoning"
-  putText row (col+tw) colMuted colPanel False tw "  Chain-Like"
-  putText row (col+tw+tw) colMuted colPanel False (w-tw-tw) "  Hum Live"
+  let c0fg = if tab == 0 then colAmber else colMuted
+  let c1fg = if tab == 1 then colAmber else colMuted
+  let c2fg = if tab == 2 then colAmber else colMuted
+  let c0b  = tab == 0
+  let c1b  = tab == 1
+  let c2b  = tab == 2
+  putText row (col+1) c0fg colPanel c0b (tw-1) " Reasoning"
+  putText row (col+tw) c1fg colPanel c1b tw " Chain-Like"
+  putText row (col+tw+tw) c2fg colPanel c2b (w-tw-tw) " Hum Live"
 
 drawReasoning : UIState -> Int -> Int -> Int -> Int -> IO ()
 drawReasoning ui r c w h = do
-  sectionTitle r c w "Reasoning" colMuted
+  tab <- readIORef ui.uiReasoningTab
+  let tabName = if tab == 1 then "Chain-Like" else if tab == 2 then "Hum Live" else "Reasoning"
+  sectionTitle r c w tabName colMuted
   clearRect (r+1) (h-1) c w colBg
-  putText (r+1) (c+1) colNeon colBg True (w-1) "Response material"
-  if h > 2 then putText (r+2) (c+1) colMuted colBg False (w-1) "No operator-facing answer is persisted yet."
-           else pure ()
-  if h > 4 then do putText (r+4) (c+1) colAmber colBg True (w-1) "Reasoning signal"
-                   if h > 5 then putText (r+5) (c+1) colMuted colBg False (w-1) "No model-emitted reasoning artifact was captured for this turn."
-                            else pure ()
-           else pure ()
-  if h > 7 then do putText (r+7) (c+1) colIce colBg True (w-1) "Runtime condition"
-                   if h > 8 then putText (r+8) (c+1) colMuted colBg False (w-1) "- state=persisted profile=pending mode=pending -> pending"
-                            else pure ()
-                   if h > 9 then putText (r+9) (c+1) colMuted colBg False (w-1) "- pressure=n/a response_cap=n/a retrieval_depth=n/a"
-                            else pure ()
-                   if h > 10 then putText (r+10) (c+1) colMuted colBg False (w-1) "- lane=quiet focus=none yet reasoning_chars=0"
-                             else pure ()
-                   if h > 11 then putText (r+11) (c+1) colMuted colBg False (w-1) "- feedback=no explicit feedback yet"
-                             else pure ()
-           else pure ()
-  if h > 13 then putText (r+13) (c+1) colNeon colBg True (w-1) "Membrane record"
-            else pure ()
+  if tab == 1
+    then do -- Chain-Like: numbered beats from last answer
+      lastResp <- readIORef ui.uiLastResponse
+      let beats = if lastResp == "" then ["(no answer yet)"]
+                  else zipWith (\n, l => show n ++ ". " ++ l) [1..10] (take 10 (lines lastResp))
+      drawBeatLines (r+1) (c+1) (w-1) (min (cast (h - 1)) (cast (length beats))) beats
+    else if tab == 2
+      then do -- Hum Live: hum summary
+        mhum <- readIORef ui.uiLastHum
+        case mhum of
+          Nothing => putText (r+1) (c+1) colMuted colBg False (w-1) "(no hum data yet)"
+          Just hp => do
+            putText (r+1) (c+1) colAmber colBg True (w-1) "[HUM_STATS]"
+            if h > 2 then putText (r+2) (c+1) colMuted colBg False (w-1) ("status=" ++ show hp.hpStatus ++ " turns=" ++ show hp.metrics.turnsCovered)
+                     else pure ()
+            if h > 3 then putText (r+3) (c+1) colAmber colBg True (w-1) "[HUM_METRICS]"
+                     else pure ()
+            if h > 4 then putText (r+4) (c+1) colMuted colBg False (w-1) ("motifs=" ++ show hp.metrics.recurringItems ++ " unique=" ++ show hp.metrics.uniqueMotifs)
+                     else pure ()
+      else do -- Reasoning tab (default)
+        putText (r+1) (c+1) colNeon colBg True (w-1) "Response material"
+        if h > 2 then do
+          lastResp <- readIORef ui.uiLastResponse
+          putText (r+2) (c+1) colMuted colBg False (w-1) (if lastResp == "" then "(awaiting first turn)" else substr 0 (cast (w - 2)) lastResp)
+                 else pure ()
+        if h > 4 then putText (r+4) (c+1) colAmber colBg True (w-1) "Reasoning signal"
+                 else pure ()
+        if h > 5 then putText (r+5) (c+1) colMuted colBg False (w-1) "(no model-emitted reasoning yet)"
+                 else pure ()
+        if h > 7 then putText (r+7) (c+1) colIce colBg True (w-1) "Membrane record"
+                 else pure ()
+  pure ()
+  where
+    drawBeatLines : Int -> Int -> Int -> Int -> List String -> IO ()
+    drawBeatLines _ _ _ _ [] = pure ()
+    drawBeatLines _ _ _ 0 _  = pure ()
+    drawBeatLines row col maxW n (b :: bs) = do
+      putText row col colMuted colBg False maxW b
+      drawBeatLines (row + 1) col maxW (n - 1) bs
 
 ------------------------------------------------------------------------
 -- Composer (bordered)
@@ -605,10 +635,13 @@ showConfigItems ui cursor r0 cc cw rEnd = do
               , ("Inference Mode",   show prof.spMode)
               , ("Token Budget",     show prof.spBudget)
               , ("Retrieval Depth",  show prof.spRetrDepth)
-              , ("Max Output",       show prof.spMaxOutput)
+              , ("Max Output",       show prof.spMaxOutput ++ " [128..4096]")
               , ("Temperature",      showD prof.spTemp)
-              , ("Response Cap",     show prof.spRespCap)
-              , ("History Turns",    show prof.spHistTurns)
+              , ("Top P",            showD prof.spTopP)
+              , ("Repetition Pen",   showD prof.spRepPen)
+              , ("Max Context",      show prof.spMaxCtx)
+              , ("Response Cap",     show prof.spRespCap ++ " [600..12000]")
+              , ("History Turns",    show prof.spHistTurns ++ " [1..256]")
               , ("Low Motion",       show prof.spLowMotion)
               , ("Debug",            show prof.spDebug)
               ]
@@ -777,7 +810,7 @@ renderFrame ui = do
   -- Dialogue tape (rose border) inside chat_deck
   drawDialogue ui (bStart + 1) 1 (lW - 2) (bH - 2)
   drawMemgraph ui bStart rC rW mgH
-  drawTabBar tRow rC rW
+  drawTabBar ui tRow rC rW
   drawReasoning ui rsRow rC rW rsH
   -- Composer inside chat_deck at bottom
   drawComposer ui compRow 1 (lW - 2) compH
@@ -844,34 +877,8 @@ handleFKey ui 11 = do
   writeIORef ui.uiFeedback (Just ("chyron: " ++ show (not cv)))
 handleFKey _ _ = pure ()
 
-handleNormalKey : UIState -> KeyEvent -> IO ()
-handleNormalKey ui KeyF12 = writeIORef ui.uiQuit True
-handleNormalKey ui KeyF1 = handleFKey ui 1
-handleNormalKey ui KeyF2 = handleFKey ui 2
-handleNormalKey ui KeyF3 = handleFKey ui 3
-handleNormalKey ui KeyF4 = handleFKey ui 4
-handleNormalKey ui KeyF5 = handleFKey ui 5
-handleNormalKey ui KeyF6 = handleFKey ui 6
-handleNormalKey ui KeyF7 = handleFKey ui 7
-handleNormalKey ui KeyF8 = handleFKey ui 8
-handleNormalKey ui KeyF9 = handleFKey ui 9
-handleNormalKey ui KeyF10 = handleFKey ui 10
-handleNormalKey ui KeyF11 = handleFKey ui 11
-handleNormalKey ui (KeyCtrl 'q') = writeIORef ui.uiQuit True
-handleNormalKey ui (KeyCtrl 'c') = writeIORef ui.uiQuit True
-handleNormalKey ui (KeyCtrl 's') = do
-  text <- readIORef ui.uiComposer
-  when (text /= "") $ ignore (handleNormalKey ui KeyEnter)
-  when (text == "") $ writeIORef ui.uiFeedback (Just "nothing to send")
-handleNormalKey ui KeyEscape = do
-  af <- readIORef ui.uiActionFocus
-  md <- readIORef ui.uiMode
-  when af $ do writeIORef ui.uiActionFocus False
-               writeIORef ui.uiFeedback Nothing
-  case md of
-    Normal => pure ()
-    _      => writeIORef ui.uiMode Normal
-handleNormalKey ui KeyEnter = do
+handleEnterComposer : UIState -> IO ()
+handleEnterComposer ui = do
   text <- readIORef ui.uiComposer
   if text == ""
     then pure ()
@@ -907,7 +914,7 @@ handleNormalKey ui KeyEnter = do
         writeIORef ui.uiComposer ""
         memes <- runEden ui.uiEnv eGetMemes
         let labels = map (\m =>
-              let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+              let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
                   gm = MkGraphMetrics 0.5 0.4 0.3
                   rb = regardBreakdown defaultRegardWeights ns gm
               in m.label ++ "=" ++ showD rb.totalRegard) (take 8 memes)
@@ -933,7 +940,6 @@ handleNormalKey ui KeyEnter = do
         writeIORef ui.uiComposer ""
         lm <- readIORef ui.uiLowMotion
         sr <- readIORef ui.uiScreenReader
-        -- Toggle both flags
         writeIORef ui.uiLowMotion (not lm)
         writeIORef ui.uiScreenReader (not sr)
         writeIORef ui.uiFeedback (Just
@@ -947,7 +953,6 @@ handleNormalKey ui KeyEnter = do
         writeIORef ui.uiFeedback (Just
           ("accessibility: lowMotion=" ++ show (not lm) ++ " screenReader=" ++ show (not sr)))
       _ => do
-        -- Normal message: execute turn
         idx <- readIORef ui.uiTurnIdx
         writeIORef ui.uiTurnIdx (idx + 1)
         writeIORef ui.uiComposer ""
@@ -969,12 +974,8 @@ handleNormalKey ui KeyEnter = do
         case fbKey of
           KeyChar c => case parseVerdict c of
             Just Edit => do
-              -- Open the edit modal with Adam's last response
               lastResp <- readIORef ui.uiLastResponse
-              let editLines = lines lastResp
-                  buf = case editLines of
-                    [] => [""]
-                    _  => editLines
+              let buf = if lastResp == "" then [""] else lines lastResp
               writeIORef ui.uiMode (EditModal buf 0 0)
             Just v => do
               let turnId = MkId {a=TurnTag} ("turn-" ++ show (idx + 3))
@@ -986,13 +987,50 @@ handleNormalKey ui KeyEnter = do
             Nothing => writeIORef ui.uiFeedback (Just "skipped")
           _ => writeIORef ui.uiFeedback (Just "skipped")
         renderFrame ui
-        -- Brief pause so user sees feedback result, then clear it
-        -- Respect lowMotion setting: skip the pause if enabled
         lowMot <- readIORef ui.uiLowMotion
         if lowMot
           then writeIORef ui.uiFeedback Nothing
           else do _ <- readKey 1500
                   writeIORef ui.uiFeedback Nothing
+
+handleNormalKey : UIState -> KeyEvent -> IO ()
+handleNormalKey ui KeyF12 = writeIORef ui.uiQuit True
+handleNormalKey ui KeyF1 = handleFKey ui 1
+handleNormalKey ui KeyF2 = handleFKey ui 2
+handleNormalKey ui KeyF3 = handleFKey ui 3
+handleNormalKey ui KeyF4 = handleFKey ui 4
+handleNormalKey ui KeyF5 = handleFKey ui 5
+handleNormalKey ui KeyF6 = handleFKey ui 6
+handleNormalKey ui KeyF7 = handleFKey ui 7
+handleNormalKey ui KeyF8 = handleFKey ui 8
+handleNormalKey ui KeyF9 = handleFKey ui 9
+handleNormalKey ui KeyF10 = handleFKey ui 10
+handleNormalKey ui KeyF11 = handleFKey ui 11
+handleNormalKey ui (KeyCtrl 'q') = writeIORef ui.uiQuit True
+handleNormalKey ui (KeyCtrl 'c') = writeIORef ui.uiQuit True
+handleNormalKey ui (KeyCtrl 's') = do
+  text <- readIORef ui.uiComposer
+  when (text /= "") $ ignore (handleNormalKey ui KeyEnter)
+  when (text == "") $ writeIORef ui.uiFeedback (Just "nothing to send")
+handleNormalKey ui (KeyCtrl 'r') = do
+  tab <- readIORef ui.uiReasoningTab
+  writeIORef ui.uiReasoningTab (if tab >= 2 then 0 else tab + 1)
+handleNormalKey ui KeyEscape = do
+  af <- readIORef ui.uiActionFocus
+  md <- readIORef ui.uiMode
+  when af $ do writeIORef ui.uiActionFocus False
+               writeIORef ui.uiFeedback Nothing
+  case md of
+    Normal => pure ()
+    _      => writeIORef ui.uiMode Normal
+handleNormalKey ui KeyEnter = do
+  af <- readIORef ui.uiActionFocus
+  if af
+    then do sel <- readIORef ui.uiActionSel
+            handleFKey ui sel
+            writeIORef ui.uiActionFocus False
+    else handleEnterComposer ui
+  pure ()
 handleNormalKey ui KeyBackspace = do
   text <- readIORef ui.uiComposer
   case strM text of
@@ -1086,7 +1124,7 @@ handleConfigKey ui cursor KeyUp =
     then writeIORef ui.uiMode (ConfigModal (minus cursor 1))
     else pure ()
 handleConfigKey ui cursor KeyDown =
-  if cursor < 9
+  if cursor < 12
     then writeIORef ui.uiMode (ConfigModal (cursor + 1))
     else pure ()
 handleConfigKey ui cursor KeyEnter = do
@@ -1110,21 +1148,30 @@ handleConfigKey ui cursor KeyEnter = do
       let nd = if prof.spRetrDepth >= 20 then 4 else prof.spRetrDepth + 1
       writeIORef ui.uiSessProf ({ spRetrDepth := nd } prof)
     4 => do
-      let no = if prof.spMaxOutput >= 4096 then 256 else prof.spMaxOutput + 256
+      let no = if prof.spMaxOutput >= 4096 then 128 else prof.spMaxOutput + 128
       writeIORef ui.uiSessProf ({ spMaxOutput := no } prof)
     5 => do
       let nt = if prof.spTemp >= 1.95 then 0.1 else prof.spTemp + 0.1
       writeIORef ui.uiSessProf ({ spTemp := nt } prof)
     6 => do
-      let nr = if prof.spRespCap >= 10000 then 500 else prof.spRespCap + 500
-      writeIORef ui.uiSessProf ({ spRespCap := nr } prof)
+      let np = if prof.spTopP >= 0.99 then 0.1 else prof.spTopP + 0.05
+      writeIORef ui.uiSessProf ({ spTopP := np } prof)
     7 => do
-      let nh = if prof.spHistTurns >= 20 then 1 else prof.spHistTurns + 1
-      writeIORef ui.uiSessProf ({ spHistTurns := nh } prof)
+      let nr = if prof.spRepPen >= 2.0 then 1.0 else prof.spRepPen + 0.05
+      writeIORef ui.uiSessProf ({ spRepPen := nr } prof)
     8 => do
+      let nc = if prof.spMaxCtx >= 20 then 3 else prof.spMaxCtx + 1
+      writeIORef ui.uiSessProf ({ spMaxCtx := nc } prof)
+    9 => do
+      let nr = if prof.spRespCap >= 12000 then 600 else prof.spRespCap + 500
+      writeIORef ui.uiSessProf ({ spRespCap := nr } prof)
+    10 => do
+      let nh = if prof.spHistTurns >= 256 then 1 else prof.spHistTurns + 1
+      writeIORef ui.uiSessProf ({ spHistTurns := nh } prof)
+    11 => do
       writeIORef ui.uiSessProf ({ spLowMotion := not prof.spLowMotion } prof)
       writeIORef ui.uiLowMotion (not prof.spLowMotion)
-    9 => writeIORef ui.uiSessProf ({ spDebug := not prof.spDebug } prof)
+    12 => writeIORef ui.uiSessProf ({ spDebug := not prof.spDebug } prof)
     _ => pure ()
 handleConfigKey ui _ _ = pure ()
 
@@ -1385,7 +1432,11 @@ runTUIWith be mp principles = do
       _ <- upsertMeme store exp.id "Clarity" "Clear explanations" Behavior SeedSource Global ts
       pure exp.id
   let agentId = MkId {a=AgentTag} "adam-01"
-  sess <- createSession store eid agentId "TUI session" ts
+  -- Resume latest session if one exists, otherwise create new
+  existingSessions <- readIORef store.sessions
+  sess <- case existingSessions of
+    (s :: _) => pure s
+    []       => createSession store eid agentId "TUI session" ts
   turns <- readIORef store.turns
   env <- newEdenEnv store eid sess.id ts principles
 
@@ -1419,6 +1470,7 @@ runTUIWith be mp principles = do
   actionSel <- newIORef (the Nat 1)
   chyronVisible <- newIORef False
   apertureDrawer <- newIORef False
+  reasoningTab <- newIORef (the Nat 0)
 
   let ui = MkUIState env beRef mp turnIdx composer dialogue feedback
                      lastActive lastHum lastBudget lastProj
@@ -1426,7 +1478,7 @@ runTUIWith be mp principles = do
                      sessMeta sessProfRef
                      themeName lowMotion screenReader lastResponse
                      tapeScroll actionFocus actionSel
-                     chyronVisible apertureDrawer
+                     chyronVisible apertureDrawer reasoningTab
 
   -- Run graph audit at session start (normalization + taxonomy)
   _ <- runEden env runSessionStartAudit

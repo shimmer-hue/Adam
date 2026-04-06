@@ -366,13 +366,13 @@ export
 regardUsesBounded : (w : RegardWeights) -> (ns : NodeState) -> (gm : GraphMetrics)
                  -> (regardBreakdown w ns gm).totalRegard
                   = bounded (-8.0) 8.0
-                      ( w.wReward * rewardScore ns.nsRewardEma ns.nsRiskEma
-                      + w.wEvidence * evidenceScore ns.nsEvidenceN
+                      ( w.wReward * rewardScore ns.nsRewardEma ns.nsEditEma
+                      + w.wEvidence * evidenceScore ns.nsEvidenceN ns.nsUsageCount ns.nsFeedbackCount
                       + w.wCoherence * coherenceFromMetrics gm.clustering gm.normDegree gm.trianglePart
                       + w.wPersistence * persistenceScore ns.nsUsageCount ns.nsEvidenceN (activationDecay ns.nsDeltaSec ns.nsActivTau)
                       - w.wDecay * (1.0 - activationDecay ns.nsDeltaSec ns.nsActivTau)
                       - w.wIsolation * isolationPenalty gm.normDegree
-                      - w.wRisk * riskScore ns.nsRiskEma )
+                      - w.wRisk * riskScore ns.nsRiskEma ns.nsContradictionCount ns.nsMembraneConflicts )
 regardUsesBounded w ns gm = Refl
 
 ------------------------------------------------------------------------

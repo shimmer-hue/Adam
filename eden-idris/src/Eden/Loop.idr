@@ -77,7 +77,7 @@ showD d =
 
 showMemeRegard : Meme -> IO ()
 showMemeRegard m =
-  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
       gm = MkGraphMetrics 0.5 0.4 0.3
       rb = regardBreakdown defaultRegardWeights ns gm
   in putStrLn $ "  " ++ m.label ++ " [" ++ show m.domain ++ "]"

@@ -60,7 +60,9 @@ runInvariantDemo = do
   putStrLn "--- Regard Breakdown ---"
   let w  = defaultRegardWeights
   let ns = MkNodeState { nsRewardEma = 0.3, nsRiskEma = 0.1, nsEvidenceN = 5.0
-                       , nsUsageCount = 10, nsActivTau = 86400.0, nsDeltaSec = 3600.0 }
+                       , nsUsageCount = 10, nsActivTau = 86400.0, nsDeltaSec = 3600.0
+                       , nsFeedbackCount = 0, nsEditEma = 0.0
+                       , nsContradictionCount = 0, nsMembraneConflicts = 0 }
   let gm = MkGraphMetrics { clustering = 0.6, normDegree = 0.4, trianglePart = 0.3 }
   let rb = regardBreakdown w ns gm
   putStrLn $ "  reward:      " ++ showDouble rb.reward
@@ -169,7 +171,7 @@ runInvariantDemo = do
 
 showMemeRegard : Meme -> IO ()
 showMemeRegard m =
-  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
       gm = MkGraphMetrics 0.5 0.4 0.3
       rb = regardBreakdown defaultRegardWeights ns gm
   in putStrLn $ "  " ++ m.label ++ " [" ++ show m.domain ++ "]: regard=" ++ showDouble rb.totalRegard

@@ -79,6 +79,8 @@ parseScope s = case isPrefixOf "session:" s of
 
 parseEdgeType : String -> EdgeType
 parseEdgeType "SUPPORTS"        = Supports
+parseEdgeType "REINFORCES"      = Reinforces
+parseEdgeType "REFINES"         = Refines
 parseEdgeType "CONTRADICTS"     = ContradictsEdge
 parseEdgeType "CO_OCCURS_WITH"  = CoOccursWith
 parseEdgeType "AUTHOR_OF"       = AuthorOf
@@ -92,6 +94,9 @@ parseEdgeType "HAS_TURN"            = HasTurn
 parseEdgeType "HAS_FEEDBACK"        = HasFeedback
 parseEdgeType "BELONGS_TO_SESSION"  = BelongsToSession
 parseEdgeType "BELONGS_TO_AGENT"    = BelongsToAgent
+parseEdgeType "CONTEXTUALIZES_DOCUMENT" = ContextualizesDocument
+parseEdgeType "FED_BACK_BY"         = FedBackBy
+parseEdgeType "OCCURS_IN"           = OccursIn
 parseEdgeType _                     = RelatesTo
 
 parseNodeKind : String -> NodeKind
@@ -165,20 +170,22 @@ serializeEdge e =
   joinBy "\t" [ "EDGE", show e.id, show e.experimentId
               , show e.srcKind, e.srcId, show e.dstKind, e.dstId
               , show e.edgeType, show e.weight
+              , escField e.provenanceJson
               , show e.createdAt, show e.updatedAt
               ]
 
 export
 deserializeEdge : List String -> Maybe Edge
 deserializeEdge fields =
-  if length fields /= 11 then Nothing
+  if length fields /= 12 then Nothing
   else
     let idx : Nat -> String
         idx i = fromMaybe "" (head' (drop i fields))
     in Just (MkEdge (MkId (idx 1)) (MkId (idx 2))
       (parseNodeKind (idx 3)) (idx 4) (parseNodeKind (idx 5)) (idx 6)
       (parseEdgeType (idx 7)) (myParseDouble (idx 8))
-      (MkTimestamp (idx 9)) (MkTimestamp (idx 10)))
+      (unescField (idx 9))
+      (MkTimestamp (idx 10)) (MkTimestamp (idx 11)))
 
 ------------------------------------------------------------------------
 -- Turn serialization
@@ -339,11 +346,12 @@ deserializeActiveSetEntry fields =
 ||| Deserialize turn metadata from tab-separated fields.
 ||| Format: TMETA turnId inferenceModeReq inferenceModeEff budgetMode
 |||   budgetPressure budgetUsedTokens budgetRemainingTokens activeSetSize
-|||   reasoningText temperature maxOutput responseCap createdAt (14 fields)
+|||   reasoningText temperature maxOutput responseCap
+|||   profileName selectionSource countMethod createdAt (17 fields)
 export
 deserializeTurnMetadata : List String -> Maybe TurnMetadata
 deserializeTurnMetadata fields =
-  if length fields /= 14 then Nothing
+  if length fields /= 17 then Nothing
   else
     let idx : Nat -> String
         idx i = fromMaybe "" (head' (drop i fields))
@@ -352,7 +360,8 @@ deserializeTurnMetadata fields =
       (parseNat (idx 6)) (parseNat (idx 7)) (parseNat (idx 8))
       (unescField (idx 9))
       (myParseDouble (idx 10)) (parseNat (idx 11)) (parseNat (idx 12))
-      (MkTimestamp (idx 13)))
+      (idx 13) (idx 14) (idx 15)
+      (MkTimestamp (idx 16)))
 
 ------------------------------------------------------------------------
 -- Chunk / Document / MeasurementEvent deserializers
@@ -386,24 +395,26 @@ parseMeasurementState _           = Previewed
 export
 deserializeChunk : List String -> Maybe Chunk
 deserializeChunk fields =
-  if length fields < 7 then Nothing
+  if length fields < 8 then Nothing
   else
     let idx : Nat -> String
         idx i = fromMaybe "" (head' (drop i fields))
         mpg = let s = idx 4 in if s == "" then Nothing else Just (parseNat s)
     in Just (MkChunk (MkId (idx 0)) (MkId (idx 1)) (MkId (idx 2))
-             (parseNat (idx 3)) mpg (unescField (idx 5)) (MkTimestamp (idx 6)))
+             (parseNat (idx 3)) mpg (unescField (idx 5)) (unescField (idx 6))
+             (MkTimestamp (idx 7)))
 
 export
 deserializeDocument : List String -> Maybe Document
 deserializeDocument fields =
-  if length fields < 8 then Nothing
+  if length fields < 9 then Nothing
   else
     let idx : Nat -> String
         idx i = fromMaybe "" (head' (drop i fields))
     in Just (MkDocument (MkId (idx 0)) (MkId (idx 1)) (idx 2)
              (parseDocKind (idx 3)) (unescField (idx 4)) (idx 5)
-             (parseDocStatus (idx 6)) (MkTimestamp (idx 7)))
+             (parseDocStatus (idx 6)) (unescField (idx 7))
+             (MkTimestamp (idx 8)))
 
 export
 deserializeMeasurementEvent : List String -> Maybe MeasurementEvent
@@ -788,7 +799,7 @@ humToJson hp = jsonObj
 
 memeRegardToJson : Meme -> String
 memeRegardToJson m =
-  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
       gm = MkGraphMetrics 0.5 0.4 0.3
       rb = regardBreakdown defaultRegardWeights ns gm
   in jsonObj
@@ -1073,7 +1084,7 @@ exportSessionLog st eid sid = do
 ||| Compute current regard for a meme and format as a CSV row.
 memeRegardCsvRow : Meme -> String
 memeRegardCsvRow m =
-  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
       gm = MkGraphMetrics 0.5 0.4 0.3
       rb = regardBreakdown defaultRegardWeights ns gm
   in show m.id ++ ","
@@ -1164,7 +1175,7 @@ exportMemeIndex st eid = do
 ||| Compute regard for a meme (reused helper).
 memeRegard : Meme -> Double
 memeRegard m =
-  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
       gm = MkGraphMetrics 0.5 0.4 0.3
       rb = regardBreakdown defaultRegardWeights ns gm
   in rb.totalRegard

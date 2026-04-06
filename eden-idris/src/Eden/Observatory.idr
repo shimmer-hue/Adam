@@ -169,7 +169,7 @@ feedbackJson fb = jObj
 
 regardJson : Meme -> String
 regardJson m =
-  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
       gm = MkGraphMetrics 0.5 0.4 0.3
       rb = regardBreakdown defaultRegardWeights ns gm
   in jObj
@@ -278,10 +278,15 @@ parseEdgeType "CO_OCCURS_WITH"    = CoOccursWith
 parseEdgeType "AUTHOR_OF"         = AuthorOf
 parseEdgeType "INFLUENCES"        = Influences
 parseEdgeType "SUPPORTS"          = Supports
+parseEdgeType "REINFORCES"        = Reinforces
+parseEdgeType "REFINES"           = Refines
 parseEdgeType "CONTRADICTS"       = ContradictsEdge
 parseEdgeType "DERIVED_FROM"      = DerivedFrom
 parseEdgeType "RELATES_TO"        = RelatesTo
 parseEdgeType "MEMBER_OF"         = MemberOf
+parseEdgeType "CONTEXTUALIZES_DOCUMENT" = ContextualizesDocument
+parseEdgeType "FED_BACK_BY"       = FedBackBy
+parseEdgeType "OCCURS_IN"         = OccursIn
 parseEdgeType _                   = RelatesTo
 
 ------------------------------------------------------------------------
@@ -318,7 +323,7 @@ notifySSE eventType entityId = do
 
 memeRegard : Meme -> Double
 memeRegard m =
-  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
       gm = MkGraphMetrics 0.5 0.4 0.3
       rb = regardBreakdown defaultRegardWeights ns gm
   in rb.totalRegard
@@ -817,7 +822,7 @@ handlePostPreview st eid pvRef fd body = do
   let beforeState = geometryJson beforeGeom
   let proposedEdges = case action of
         EdgeAdd    => MkEdge (MkId "preview") eid MemeNode src MemeNode target
-                        (parseEdgeType relation) weight
+                        (parseEdgeType relation) weight ""
                         (MkTimestamp "") (MkTimestamp "") :: edges
         EdgeRemove => filter (\e => show e.id /= edgeId) edges
         _          => edges

@@ -360,11 +360,16 @@ parseEdgeType : String -> Maybe EdgeType
 parseEdgeType s =
   let s' = toUpper (trim s)
   in if s' == "SUPPORTS" then Just Supports
+     else if s' == "REINFORCES" then Just Reinforces
+     else if s' == "REFINES" then Just Refines
      else if s' == "RELATES_TO" then Just RelatesTo
      else if s' == "INFLUENCES" then Just Influences
      else if s' == "CO_OCCURS_WITH" then Just CoOccursWith
      else if s' == "DERIVED_FROM" then Just DerivedFrom
      else if s' == "CONTRADICTS" then Just ContradictsEdge
+     else if s' == "CONTEXTUALIZES_DOCUMENT" then Just ContextualizesDocument
+     else if s' == "FED_BACK_BY" then Just FedBackBy
+     else if s' == "OCCURS_IN" then Just OccursIn
      else Nothing
 
 ||| Parse an EDGE line: "EDGE src|dst|type|weight" -> parsed tuple.

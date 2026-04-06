@@ -431,7 +431,7 @@ createEdge : StoreState -> ExperimentId -> NodeKind -> String -> NodeKind -> Str
           -> EdgeType -> Double -> Timestamp -> IO Edge
 createEdge st eid sk sid dk did et w now = do
   edgeId <- genId st "edge"
-  let edge = MkEdge (MkId edgeId) eid sk sid dk did et w now now
+  let edge = MkEdge (MkId edgeId) eid sk sid dk did et w "" now now
   modifyIORef st.edges (edge ::)
   withDB st (\db => wt_ (primIO (prim__wt_edge db edgeId (show eid)
     (show sk) sid (show dk) did (show et) w (show now) (show now))))
@@ -495,7 +495,7 @@ export
 createDocument : StoreState -> ExperimentId -> String -> DocKind -> String -> String -> Timestamp -> IO Document
 createDocument st eid path kind title sha now = do
   did <- genId st "doc"
-  let doc = MkDocument (MkId did) eid path kind title sha Processing now
+  let doc = MkDocument (MkId did) eid path kind title sha Processing "" now
   modifyIORef st.documents (doc ::)
   withDB st (\db => wt_ (primIO (prim__wt_doc db did (show eid) path (show kind) title sha (show Processing) (show now))))
   pure doc
@@ -504,7 +504,7 @@ export
 createChunk : StoreState -> ExperimentId -> DocumentId -> Nat -> Maybe Nat -> String -> Timestamp -> IO Chunk
 createChunk st eid did idx pageNum text now = do
   cid <- genId st "chunk"
-  let chunk = MkChunk (MkId cid) eid did idx pageNum text now
+  let chunk = MkChunk (MkId cid) eid did idx pageNum text "" now
       pn : Int = case pageNum of Just p => cast p; Nothing => 0
   modifyIORef st.chunks (chunk ::)
   withDB st (\db => wt_ (primIO (prim__wt_chunk db cid (show eid) (show did) (cast idx) pn text (show now))))
@@ -622,7 +622,9 @@ recordTurnMetadata st meta = do
                     , show meta.budgetUsedTokens, show meta.budgetRemainingTokens
                     , show meta.activeSetSize, meta.reasoningText
                     , show meta.temperature, show meta.maxOutput
-                    , show meta.responseCap, show meta.createdAt ]
+                    , show meta.responseCap
+                    , meta.profileName, meta.selectionSource, meta.countMethod
+                    , show meta.createdAt ]
   withDB st (\db => wt_ (primIO (prim__wt_tmeta_tsv db tsv)))
 
 ------------------------------------------------------------------------

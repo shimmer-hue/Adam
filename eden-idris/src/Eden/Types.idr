@@ -198,6 +198,8 @@ data EdgeType
   | AuthorOf
   | Influences
   | Supports
+  | Reinforces
+  | Refines
   | ContradictsEdge
   | DerivedFrom
   | RelatesTo
@@ -208,6 +210,9 @@ data EdgeType
   | HasFeedback
   | BelongsToSession
   | BelongsToAgent
+  | ContextualizesDocument
+  | FedBackBy
+  | OccursIn
 
 public export
 Show EdgeType where
@@ -215,6 +220,8 @@ Show EdgeType where
   show AuthorOf        = "AUTHOR_OF"
   show Influences      = "INFLUENCES"
   show Supports        = "SUPPORTS"
+  show Reinforces      = "REINFORCES"
+  show Refines         = "REFINES"
   show ContradictsEdge = "CONTRADICTS"
   show DerivedFrom     = "DERIVED_FROM"
   show RelatesTo       = "RELATES_TO"
@@ -225,6 +232,9 @@ Show EdgeType where
   show HasFeedback     = "HAS_FEEDBACK"
   show BelongsToSession = "BELONGS_TO_SESSION"
   show BelongsToAgent  = "BELONGS_TO_AGENT"
+  show ContextualizesDocument = "CONTEXTUALIZES_DOCUMENT"
+  show FedBackBy       = "FED_BACK_BY"
+  show OccursIn        = "OCCURS_IN"
 
 public export
 Eq EdgeType where
@@ -232,6 +242,8 @@ Eq EdgeType where
   AuthorOf        == AuthorOf        = True
   Influences      == Influences      = True
   Supports        == Supports        = True
+  Reinforces      == Reinforces      = True
+  Refines         == Refines         = True
   ContradictsEdge == ContradictsEdge = True
   DerivedFrom     == DerivedFrom     = True
   RelatesTo       == RelatesTo       = True
@@ -242,6 +254,9 @@ Eq EdgeType where
   HasFeedback     == HasFeedback     = True
   BelongsToSession == BelongsToSession = True
   BelongsToAgent  == BelongsToAgent  = True
+  ContextualizesDocument == ContextualizesDocument = True
+  FedBackBy       == FedBackBy       = True
+  OccursIn        == OccursIn        = True
   _               == _               = False
 
 public export
@@ -339,16 +354,17 @@ data AdmissibleMemode : Type where
 public export
 record Edge where
   constructor MkEdge
-  id           : EdgeId
-  experimentId : ExperimentId
-  srcKind      : NodeKind
-  srcId        : String
-  dstKind      : NodeKind
-  dstId        : String
-  edgeType     : EdgeType
-  weight       : Double
-  createdAt    : Timestamp
-  updatedAt    : Timestamp
+  id             : EdgeId
+  experimentId   : ExperimentId
+  srcKind        : NodeKind
+  srcId          : String
+  dstKind        : NodeKind
+  dstId          : String
+  edgeType       : EdgeType
+  weight         : Double
+  provenanceJson : String
+  createdAt      : Timestamp
+  updatedAt      : Timestamp
 
 ------------------------------------------------------------------------
 -- Session, Turn, Experiment
@@ -440,6 +456,7 @@ record Document where
   title        : String
   sha256       : String
   status       : DocStatus
+  metadataJson : String
   createdAt    : Timestamp
 
 public export
@@ -451,6 +468,7 @@ record Chunk where
   chunkIndex   : Nat
   pageNumber   : Maybe Nat
   text         : String
+  metadataJson : String
   createdAt    : Timestamp
 
 ------------------------------------------------------------------------
@@ -497,6 +515,10 @@ data TraceEventType
   | TraceHumRefresh
   | TraceObservatoryCommit
   | TraceObservatoryRevert
+  | TraceGraphNormalization
+  | TraceGraphTaxonomy
+  | TraceGraphCoherence
+  | TraceGraphWakeup
 
 public export
 Show TraceEventType where
@@ -508,6 +530,10 @@ Show TraceEventType where
   show TraceHumRefresh        = "HUM_REFRESH"
   show TraceObservatoryCommit = "OBSERVATORY_COMMIT"
   show TraceObservatoryRevert = "OBSERVATORY_REVERT"
+  show TraceGraphNormalization = "GRAPH_NORMALIZATION"
+  show TraceGraphTaxonomy     = "GRAPH_TAXONOMY_AUDIT"
+  show TraceGraphCoherence    = "GRAPH_COHERENCE_REWEAVE"
+  show TraceGraphWakeup       = "GRAPH_WAKEUP_AUDIT"
 
 ------------------------------------------------------------------------
 -- Measurement events (observatory)
@@ -692,4 +718,7 @@ record TurnMetadata where
   temperature           : Double
   maxOutput             : Nat
   responseCap           : Nat
+  profileName           : String
+  selectionSource       : String
+  countMethod           : String
   createdAt             : Timestamp

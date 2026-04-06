@@ -480,7 +480,7 @@ buildCandidateScore : SelectionWeights -> SessionId
                    -> Meme -> CandidateScore
 buildCandidateScore w curSess sim deltaSec m =
   let act  = activationDecay deltaSec m.activationTau
-      ns   = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau deltaSec
+      ns   = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau deltaSec m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
       gm   = MkGraphMetrics 0.5 0.4 0.3
       rb   = regardBreakdown defaultRegardWeights ns gm
       reg  = rb.totalRegard

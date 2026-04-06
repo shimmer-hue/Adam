@@ -60,13 +60,19 @@ mRetrieve userText = do
   pure (assembleActiveSet sw sid' 3600.0 5 userText memes)
 
 ||| Step 2: Assemble the prompt.
+||| Uses the provided history depth (from session profile) instead of a hardcoded value.
 export
-mAssemble : List CandidateScore -> String -> EdenM AssemblyResult
-mAssemble activeSet userText = do
-  history <- eGetRecentTurns 3
+mAssembleWith : Nat -> List CandidateScore -> String -> EdenM AssemblyResult
+mAssembleWith histDepth activeSet userText = do
+  history <- eGetRecentTurns histDepth
   princ <- asks principles
   pure (assemblePrompt "Adam" princ
           activeSet history "" userText)
+
+||| Step 2 (default): Assemble with default history depth of 3.
+export
+mAssemble : List CandidateScore -> String -> EdenM AssemblyResult
+mAssemble = mAssembleWith 3
 
 ||| Strip ANSI escape sequences and control characters from subprocess output.
 ||| Newlines become spaces; ESC[... sequences are removed entirely.
@@ -220,6 +226,9 @@ mExecuteTurnWith be mp idx userText = do
         assembly.arProfile.rpTemp
         assembly.arProfile.rpMaxOutput
         assembly.arProfile.rpRespCap
+        "default"
+        "retrieval"
+        "word_count"
         ts'
   eRecordTurnMetadata tmeta
   -- Step 6: Index (model-aware when backend supports it)

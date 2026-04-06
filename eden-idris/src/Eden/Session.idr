@@ -510,7 +510,7 @@ sessionStats st sid = do
       -- Top regard memes (up to 5, from memes associated with this session)
       allExpMemes = allMemes
       memeRegards = map (\m =>
-        let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+        let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
             gm = MkGraphMetrics 0.5 0.4 0.3
             rb = regardBreakdown defaultRegardWeights ns gm
         in (m.label, rb.totalRegard)) allExpMemes
