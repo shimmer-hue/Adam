@@ -114,3 +114,7 @@ The RefC backend generates a monolithic C file (`build/exec/eden.c`). Because it
 ## Web Observatory
 
 The React/TypeScript frontend lives in `web/observatory/` (Vite + Graphology/Sigma). It has its own `package.json` and Playwright E2E tests.
+
+## Multi-Agent Collaboration
+
+Read and follow the instructions in CLAUDE_COLLAB.md for multi-agent coordination.

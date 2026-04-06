@@ -25,6 +25,7 @@ modules = Eden.Analytics
         , Eden.Models.Base
         , Eden.Models.Mock
         , Eden.Indexer
+        , Eden.Ingest.Extractors
         , Eden.Ingest.Pipeline
         , Eden.Trace
         , Eden.SemanticRelations
@@ -37,4 +38,7 @@ modules = Eden.Analytics
         , Eden.TUI
         , Eden.Export
         , Eden.SQLite
+        , Eden.Tanakh
+        , Eden.GraphAudit
+        , Eden.Session
         , Eden.Proofs

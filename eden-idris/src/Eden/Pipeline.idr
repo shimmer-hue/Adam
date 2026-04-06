@@ -132,12 +132,20 @@ mRecordTurn : Nat -> String -> String -> String -> String -> EdenM Turn
 mRecordTurn idx userText convPrompt rawResp cleaned =
   eRecordTurn idx userText convPrompt rawResp cleaned
 
-||| Step 6: Index concepts from turn text.
+||| Step 6: Index concepts from turn text (keyword fallback).
 export
 mIndex : String -> String -> EdenM IndexOutcome
 mIndex userText cleanedText = do
   env <- ask
   liftIO (indexTurn env.store env.eid userText cleanedText env.ts)
+
+||| Step 6 (model-aware): Index concepts using Claude when available.
+export
+mIndexWith : Backend -> String -> String -> EdenM IndexOutcome
+mIndexWith Claude userText cleanedText = do
+  env <- ask
+  liftIO (indexTurnWithModel env.store env.eid userText cleanedText env.ts)
+mIndexWith _ userText cleanedText = mIndex userText cleanedText
 
 ||| Step 7: Extract semantic relations.
 export
@@ -214,8 +222,8 @@ mExecuteTurnWith be mp idx userText = do
         assembly.arProfile.rpRespCap
         ts'
   eRecordTurnMetadata tmeta
-  -- Step 6: Index
-  idxResult <- mIndex userText mo.moCleanedText
+  -- Step 6: Index (model-aware when backend supports it)
+  idxResult <- mIndexWith be userText mo.moCleanedText
   eTraceTurn turnId ("index: concepts=" ++ show idxResult.ioConceptNames
                    ++ " edges=" ++ show idxResult.ioNewEdges)
   -- Step 7-9: Relations, materialization, projection

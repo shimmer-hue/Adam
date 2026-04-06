@@ -305,16 +305,18 @@ loadAgentProfile = do
 -- Document ingestion
 ------------------------------------------------------------------------
 
-ingestOneFile : StoreState -> ExperimentId -> Eden.Types.Timestamp -> String -> IO ()
-ingestOneFile store eid ts path = do
+ingestOneFile : Backend -> StoreState -> ExperimentId -> Eden.Types.Timestamp -> String -> IO ()
+ingestOneFile be store eid ts path = do
   Right content <- readFile path
     | Left _ => putStrLn ("  SKIP " ++ path ++ " (read error)")
-  result <- ingestText store eid path path content ts
+  result <- case be of
+    Claude => ingestTextWithModel store eid path path content ts
+    _      => ingestText store eid path path content ts
   putStrLn ("  " ++ show result.irMemeCount ++ " concepts, "
          ++ show result.irChunkCount ++ " chunks <- " ++ path)
 
-runIngest : String -> IO ()
-runIngest dir = do
+runIngest : Backend -> String -> IO ()
+runIngest be dir = do
   store <- newStore
   ts <- currentTimestamp
 
@@ -335,7 +337,7 @@ runIngest dir = do
     | Left _ => putStrLn ("ERROR: cannot read directory " ++ dir)
   let files = map (\f => dir ++ "/" ++ f) (filter (isSuffixOf ".md") entries)
   putStrLn ("=== Ingesting " ++ show (length files) ++ " files from " ++ dir ++ " ===")
-  traverse_ (ingestOneFile store exp.id ts) files
+  traverse_ (ingestOneFile be store exp.id ts) files
   memes <- readIORef store.memes
   edges <- readIORef store.edges
   putStrLn ("=== Done: " ++ show (length memes) ++ " memes, "
@@ -382,7 +384,7 @@ main = do
     ("--repl"   :: _) => runREPLWith be mp principles
     ("--demo"   :: _) => runStoreDemo be mp principles
     ("--tui"    :: _) => runTUIWith be mp principles
-    ("--ingest" :: d :: _) => runIngest d
+    ("--ingest" :: d :: _) => runIngest be d
     ("--export" :: _) => do
       -- Export the graph from existing DB, or generate a demo
       putStrLn "=== Generating graph export for observatory ==="
