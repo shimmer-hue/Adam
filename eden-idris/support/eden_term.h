@@ -11,6 +11,9 @@ int eden_term_read_key(int timeout_ms);
 void eden_term_write(char *s);
 void eden_term_flush(void);
 
+/* Paste drain: read all available chars with short timeout */
+char *eden_term_drain_paste(int timeout_ms);
+
 /* Subprocess execution — returns "<exit_code>\n<output>" */
 char *eden_run_cmd(const char *cmd);
 

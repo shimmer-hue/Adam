@@ -1077,3 +1077,100 @@ int eden_db_commit(void *db) {
     if (!db) return -1;
     return sqlite3_exec((sqlite3 *)db, "COMMIT", NULL, NULL, NULL) == SQLITE_OK ? 0 : -1;
 }
+
+/* ================================================================
+ *  Schema migration support
+ * ================================================================ */
+
+int eden_db_exec_sql(void *db, const char *sql) {
+    if (!db || !sql) return -1;
+    return sqlite3_exec((sqlite3 *)db, sql, NULL, NULL, NULL) == SQLITE_OK ? 0 : -1;
+}
+
+/* ================================================================
+ *  Document SHA deduplication
+ * ================================================================ */
+
+int eden_db_document_exists_sha(void *db, const char *experiment_id, const char *sha256) {
+    if (!db || !experiment_id || !sha256) return 0;
+    sqlite3_stmt *s;
+    const char *sql = "SELECT COUNT(*) FROM documents WHERE experiment_id=? AND sha256=?";
+    if (sqlite3_prepare_v2((sqlite3*)db, sql, -1, &s, NULL) != SQLITE_OK)
+        return 0;
+    sqlite3_bind_text(s, 1, experiment_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(s, 2, sha256, -1, SQLITE_TRANSIENT);
+    int count = 0;
+    if (sqlite3_step(s) == SQLITE_ROW)
+        count = sqlite3_column_int(s, 0);
+    sqlite3_finalize(s);
+    return count;
+}
+
+/* ================================================================
+ *  Load functions for chunks, documents, measurement events
+ * ================================================================ */
+
+char *eden_db_load_chunks(void *db) {
+    strbuf sb; sb_init(&sb);
+    if (!db) return sb.data;
+    sqlite3_stmt *s;
+    const char *sql = "SELECT id,experiment_id,document_id,chunk_index,page_number,text,created_at FROM chunks ORDER BY document_id,chunk_index";
+    if (sqlite3_prepare_v2((sqlite3*)db, sql, -1, &s, NULL) != SQLITE_OK)
+        return sb.data;
+    while (sqlite3_step(s) == SQLITE_ROW) {
+        sb_cat(&sb, "CHUNK");
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 0));
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 1));
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 2));
+        sb_tab(&sb); sb_i64(&sb, sqlite3_column_int64(s, 3));
+        sb_tab(&sb); sb_i64(&sb, sqlite3_column_int64(s, 4));
+        sb_tab(&sb); sb_esc(&sb, col_s(s, 5));
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 6));
+        sb_nl(&sb);
+    }
+    sqlite3_finalize(s);
+    return sb.data;
+}
+
+char *eden_db_load_documents(void *db) {
+    strbuf sb; sb_init(&sb);
+    if (!db) return sb.data;
+    sqlite3_stmt *s;
+    const char *sql = "SELECT id,experiment_id,path,kind,title,sha256,status,created_at FROM documents ORDER BY created_at";
+    if (sqlite3_prepare_v2((sqlite3*)db, sql, -1, &s, NULL) != SQLITE_OK)
+        return sb.data;
+    while (sqlite3_step(s) == SQLITE_ROW) {
+        sb_cat(&sb, "DOC");
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 0));
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 1));
+        sb_tab(&sb); sb_esc(&sb, col_s(s, 2));
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 3));
+        sb_tab(&sb); sb_esc(&sb, col_s(s, 4));
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 5));
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 6));
+        sb_tab(&sb); sb_cat(&sb, col_s(s, 7));
+        sb_nl(&sb);
+    }
+    sqlite3_finalize(s);
+    return sb.data;
+}
+
+char *eden_db_load_measurement_events(void *db) {
+    strbuf sb; sb_init(&sb);
+    if (!db) return sb.data;
+    sqlite3_stmt *s;
+    const char *sql = "SELECT id,experiment_id,session_id,action_type,state,operator,evidence,"
+        "before_state,proposed_state,committed_state,revert_of,created_at "
+        "FROM measurement_events ORDER BY created_at";
+    if (sqlite3_prepare_v2((sqlite3*)db, sql, -1, &s, NULL) != SQLITE_OK)
+        return sb.data;
+    while (sqlite3_step(s) == SQLITE_ROW) {
+        sb_cat(&sb, "MEAS");
+        for (int i = 0; i < 12; i++) {
+            sb_tab(&sb); sb_esc(&sb, col_s(s, i));
+        }
+        sb_nl(&sb);
+    }
+    sqlite3_finalize(s);
+    return sb.data;
+}

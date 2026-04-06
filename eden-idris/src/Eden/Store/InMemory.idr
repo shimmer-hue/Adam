@@ -84,6 +84,31 @@ record FeedbackRecord where
   frSignal       : FeedbackSignal
 
 ------------------------------------------------------------------------
+-- Inverted index for FTS
+------------------------------------------------------------------------
+
+||| A single posting: a meme ID that contains a given term.
+public export
+record Posting where
+  constructor MkPosting
+  postingMemeId : MemeId
+  postingField  : String  -- "label" or "text"
+
+||| Inverted index: maps lowercased terms to lists of postings.
+||| Backed by a flat association list (sufficient for in-memory use).
+public export
+record InvertedIndex where
+  constructor MkInvertedIndex
+  iiEntries : IORef (List (String, List Posting))
+
+||| Create a fresh empty inverted index.
+export
+newInvertedIndex : IO InvertedIndex
+newInvertedIndex = do
+  ref <- newIORef []
+  pure (MkInvertedIndex ref)
+
+------------------------------------------------------------------------
 -- Store state
 ------------------------------------------------------------------------
 
@@ -108,6 +133,9 @@ record StoreState where
   measurements   : IORef (List MeasurementEvent)
   exportArtifacts: IORef (List ExportArtifact)
   turnMetadata   : IORef (List TurnMetadata)
+  chunks         : IORef (List Chunk)
+  documents      : IORef (List Document)
+  ftsIndex       : InvertedIndex
 
 ------------------------------------------------------------------------
 -- Create a fresh store
@@ -132,7 +160,47 @@ newStore = do
   msev  <- newIORef []
   exart <- newIORef []
   tmeta <- newIORef []
-  pure (MkStoreState exps sess trns mms mds eds fbs mbes tres nid dbh ags asets msev exart tmeta)
+  chnks <- newIORef []
+  docs  <- newIORef []
+  fts   <- newInvertedIndex
+  pure (MkStoreState exps sess trns mms mds eds fbs mbes tres nid dbh ags asets msev exart tmeta chnks docs fts)
+
+------------------------------------------------------------------------
+-- FTS tokenization helpers
+------------------------------------------------------------------------
+
+||| Check if a character is a word boundary (not alphanumeric).
+isWordChar : Char -> Bool
+isWordChar c = isAlphaNum c || c == '_'
+
+||| Tokenize a string into lowercased terms, splitting on non-word chars.
+||| Filters out terms shorter than 2 characters.
+tokenize : String -> List String
+tokenize s = filter (\t => length t >= 2) (go (unpack (toLower s)) [] [])
+  where
+    go : List Char -> List Char -> List String -> List String
+    go []          acc toks = reverse (if acc == [] then toks else pack (reverse acc) :: toks)
+    go (c :: rest) acc toks =
+      if isWordChar c
+        then go rest (c :: acc) toks
+        else go rest [] (if acc == [] then toks else pack (reverse acc) :: toks)
+
+||| Add postings for a meme to the inverted index.
+indexMemeTerms : InvertedIndex -> MemeId -> String -> String -> IO ()
+indexMemeTerms idx mid label text = do
+  let labelTerms = map (\t => (t, MkPosting mid "label")) (tokenize label)
+      textTerms  = map (\t => (t, MkPosting mid "text"))  (tokenize text)
+      allTerms   = labelTerms ++ textTerms
+  entries <- readIORef idx.iiEntries
+  let updated = foldl addPosting entries allTerms
+  writeIORef idx.iiEntries updated
+  where
+    addPosting : List (String, List Posting) -> (String, Posting) -> List (String, List Posting)
+    addPosting [] (term, posting) = [(term, [posting])]
+    addPosting ((k, ps) :: rest) (term, posting) =
+      if k == term
+        then (k, posting :: ps) :: rest
+        else (k, ps) :: addPosting rest (term, posting)
 
 ------------------------------------------------------------------------
 -- Write-through helpers
@@ -277,6 +345,7 @@ upsertMeme st eid label text domain sk scope now = do
                         0.0 1 0.0 0.0 0.0 0 0 0 0 86400.0 now now now
       modifyIORef st.memes (meme ::)
       wtMeme st meme
+      indexMemeTerms st.ftsIndex (MkId mid) label text
       pure meme
 
 export
@@ -419,6 +488,7 @@ createDocument : StoreState -> ExperimentId -> String -> DocKind -> String -> St
 createDocument st eid path kind title sha now = do
   did <- genId st "doc"
   let doc = MkDocument (MkId did) eid path kind title sha Processing now
+  modifyIORef st.documents (doc ::)
   withDB st (\db => wt_ (primIO (prim__wt_doc db did (show eid) path (show kind) title sha (show Processing) (show now))))
   pure doc
 
@@ -426,9 +496,11 @@ export
 createChunk : StoreState -> ExperimentId -> DocumentId -> Nat -> Maybe Nat -> String -> Timestamp -> IO Chunk
 createChunk st eid did idx pageNum text now = do
   cid <- genId st "chunk"
-  let pn : Int = case pageNum of Just p => cast p; Nothing => 0
+  let chunk = MkChunk (MkId cid) eid did idx pageNum text now
+      pn : Int = case pageNum of Just p => cast p; Nothing => 0
+  modifyIORef st.chunks (chunk ::)
   withDB st (\db => wt_ (primIO (prim__wt_chunk db cid (show eid) (show did) (cast idx) pn text (show now))))
-  pure (MkChunk (MkId cid) eid did idx pageNum text now)
+  pure chunk
 
 ------------------------------------------------------------------------
 -- Graph counts
@@ -544,3 +616,140 @@ recordTurnMetadata st meta = do
                     , show meta.temperature, show meta.maxOutput
                     , show meta.responseCap, show meta.createdAt ]
   withDB st (\db => wt_ (primIO (prim__wt_tmeta_tsv db tsv)))
+
+------------------------------------------------------------------------
+-- Chunk CRUD operations
+------------------------------------------------------------------------
+
+||| Get a chunk by ID.
+export
+getChunk : StoreState -> ChunkId -> IO (Maybe Chunk)
+getChunk st cid = do
+  allChunks <- readIORef st.chunks
+  pure (find (\c => c.id == cid) allChunks)
+
+||| Get all chunks (filtered by experiment).
+export
+getChunks : StoreState -> ExperimentId -> IO (List Chunk)
+getChunks st eid = do
+  allChunks <- readIORef st.chunks
+  pure (filter (\c => c.experimentId == eid) allChunks)
+
+||| Get chunks belonging to a specific document.
+export
+getChunksByDocument : StoreState -> DocumentId -> IO (List Chunk)
+getChunksByDocument st did = do
+  allChunks <- readIORef st.chunks
+  pure (sortBy (\a, b => compare a.chunkIndex b.chunkIndex)
+    (filter (\c => c.documentId == did) allChunks))
+
+------------------------------------------------------------------------
+-- Document read operations
+------------------------------------------------------------------------
+
+||| Get a document by ID.
+export
+getDocument : StoreState -> DocumentId -> IO (Maybe Document)
+getDocument st did = do
+  allDocs <- readIORef st.documents
+  pure (find (\d => d.id == did) allDocs)
+
+||| Get all documents for an experiment.
+export
+getDocuments : StoreState -> ExperimentId -> IO (List Document)
+getDocuments st eid = do
+  allDocs <- readIORef st.documents
+  pure (filter (\d => d.experimentId == eid) allDocs)
+
+------------------------------------------------------------------------
+-- Document SHA deduplication
+------------------------------------------------------------------------
+
+||| Check whether a document with the given SHA256 hash already exists
+||| in the experiment. Prevents duplicate ingestion of the same content.
+export
+documentExistsBySha : StoreState -> ExperimentId -> String -> IO Bool
+documentExistsBySha st eid sha = do
+  allDocs <- readIORef st.documents
+  pure (any (\d => d.experimentId == eid && d.sha256 == sha) allDocs)
+
+------------------------------------------------------------------------
+-- FTS search
+------------------------------------------------------------------------
+
+||| Search memes using the inverted index.
+||| Tokenizes the query, looks up each term in the index,
+||| and returns memes that match any query term, ranked by hit count.
+export
+ftsSearchMemes : StoreState -> ExperimentId -> String -> IO (List Meme)
+ftsSearchMemes st eid query = do
+  let queryTerms = tokenize query
+  entries <- readIORef st.ftsIndex.iiEntries
+  allMemes <- readIORef st.memes
+  -- Collect all matching meme IDs with hit counts
+  let matchedPostings = concatMap (\qt =>
+        case lookup qt entries of
+          Nothing => []
+          Just ps => map (\p => p.postingMemeId) ps) queryTerms
+      -- Count occurrences per meme ID
+      memeIdStrs = map show matchedPostings
+      uniqueIds  = nub memeIdStrs
+      -- Sort by hit count (descending)
+      ranked = sortBy (\a, b => compare (countHits b memeIdStrs) (countHits a memeIdStrs)) uniqueIds
+      -- Resolve to actual memes in this experiment
+      results = mapMaybe (\idStr =>
+        find (\m => show m.id == idStr && m.experimentId == eid) allMemes) ranked
+  pure results
+  where
+    countHits : String -> List String -> Nat
+    countHits target xs = length (filter (== target) xs)
+
+||| Rebuild the FTS index from all memes currently in the store.
+||| Called after bulk loading from SQLite.
+export
+rebuildFtsIndex : StoreState -> IO ()
+rebuildFtsIndex st = do
+  writeIORef st.ftsIndex.iiEntries []
+  allMemes <- readIORef st.memes
+  traverse_ (\m => indexMemeTerms st.ftsIndex m.id m.label m.text) allMemes
+
+------------------------------------------------------------------------
+-- Measurement event queries
+------------------------------------------------------------------------
+
+||| Get all measurement events for an experiment.
+export
+getMeasurementEvents : StoreState -> ExperimentId -> IO (List MeasurementEvent)
+getMeasurementEvents st eid = do
+  allEvts <- readIORef st.measurements
+  pure (filter (\e => e.experimentId == eid) allEvts)
+
+||| Get measurement events targeting specific node IDs.
+||| Checks the beforeState and proposedState fields for the target ID string.
+export
+getMeasurementEventsByTarget : StoreState -> ExperimentId -> String -> IO (List MeasurementEvent)
+getMeasurementEventsByTarget st eid targetId = do
+  allEvts <- readIORef st.measurements
+  pure (filter (\e => e.experimentId == eid
+                   && (isInfixOf targetId e.beforeState
+                    || isInfixOf targetId e.proposedState
+                    || isInfixOf targetId e.committedState)) allEvts)
+
+||| Revert a measurement event by creating a new revert event.
+||| Reversion is itself part of the measurement ledger — history is never
+||| silently mutated.
+export
+revertMeasurementEvent : StoreState -> ExperimentId -> SessionId
+                      -> String -> Timestamp -> IO (Maybe MeasurementEvent)
+revertMeasurementEvent st eid sid originalEventId now = do
+  allEvts <- readIORef st.measurements
+  case find (\e => e.id == originalEventId && e.experimentId == eid) allEvts of
+    Nothing => pure Nothing
+    Just orig => do
+      -- Create a revert event that references the original
+      revEvt <- recordMeasurementEvent st eid sid
+                  MeasurementRevert Committed
+                  orig.operator orig.evidence
+                  orig.committedState orig.beforeState orig.beforeState
+                  originalEventId now
+      pure (Just revEvt)

@@ -2,6 +2,11 @@
 |||
 ||| The active set is the bounded retrieval and prompt-compilation slice.
 ||| It is NOT a hidden governor or planning layer.
+|||
+||| Similarity methods:
+|||   - Jaccard: word-level set overlap (original, fast)
+|||   - TFIDF: term frequency-inverse document frequency with cosine similarity
+|||   - Bigram: character bigram overlap (useful for Hebrew and other scripts)
 module Eden.Retrieval
 
 import Data.List
@@ -13,38 +18,260 @@ import Eden.Regard
 %default total
 
 ------------------------------------------------------------------------
+-- Similarity method selection
+------------------------------------------------------------------------
+
+||| Available similarity computation methods.
+public export
+data SimilarityMethod = Jaccard | TFIDF | Bigram
+
+public export
+Eq SimilarityMethod where
+  Jaccard == Jaccard = True
+  TFIDF   == TFIDF   = True
+  Bigram  == Bigram  = True
+  _       == _       = False
+
+public export
+Show SimilarityMethod where
+  show Jaccard = "jaccard"
+  show TFIDF   = "tfidf"
+  show Bigram  = "bigram"
+
+------------------------------------------------------------------------
+-- Stopword filtering
+------------------------------------------------------------------------
+
+||| Common English stopwords that carry little semantic content.
+stopwords : List String
+stopwords =
+  [ "the", "a", "an", "is", "are", "was", "were", "be", "been", "being"
+  , "have", "has", "had", "do", "does", "did", "will", "would", "shall"
+  , "should", "may", "might", "must", "can", "could"
+  , "i", "me", "my", "we", "our", "you", "your", "he", "him", "his"
+  , "she", "her", "it", "its", "they", "them", "their"
+  , "this", "that", "these", "those"
+  , "in", "on", "at", "to", "for", "of", "with", "by", "from", "as"
+  , "into", "about", "between", "through", "during", "before", "after"
+  , "and", "but", "or", "nor", "not", "so", "yet", "both", "either"
+  , "if", "then", "else", "when", "where", "while", "because", "since"
+  , "what", "which", "who", "whom", "how", "why"
+  , "all", "each", "every", "some", "any", "no", "more", "most", "very"
+  , "just", "also", "than", "too", "only"
+  ]
+
+||| Check whether a word is a stopword.
+isStopword : String -> Bool
+isStopword w = elem w stopwords
+
+||| Filter stopwords from a word list.
+filterStopwords : List String -> List String
+filterStopwords = filter (not . isStopword)
+
+------------------------------------------------------------------------
+-- Basic stemming
+------------------------------------------------------------------------
+
+||| Check if a string ends with a given suffix.
+endsWithSuffix : String -> String -> Bool
+endsWithSuffix s suffix =
+  let slen = length s
+      suflen = length suffix
+  in if suflen > slen then False
+     else substr (minus slen suflen) suflen s == suffix
+
+||| Strip a suffix from the end of a string.
+stripSuffix : String -> String -> String
+stripSuffix s suffix =
+  let slen = length s
+      suflen = length suffix
+  in substr 0 (minus slen suflen) s
+
+||| Basic English stemmer: strips common suffixes.
+||| Not a full Porter stemmer, but effective for retrieval improvement.
+public export
+stemWord : String -> String
+stemWord w =
+  if length w < 4 then w
+  else if endsWithSuffix w "tion" && length w > 6 then stripSuffix w "tion"
+  else if endsWithSuffix w "sion" && length w > 6 then stripSuffix w "sion"
+  else if endsWithSuffix w "ment" && length w > 6 then stripSuffix w "ment"
+  else if endsWithSuffix w "ness" && length w > 6 then stripSuffix w "ness"
+  else if endsWithSuffix w "able" && length w > 6 then stripSuffix w "able"
+  else if endsWithSuffix w "ible" && length w > 6 then stripSuffix w "ible"
+  else if endsWithSuffix w "less" && length w > 6 then stripSuffix w "less"
+  else if endsWithSuffix w "ious" && length w > 6 then stripSuffix w "ious"
+  else if endsWithSuffix w "eous" && length w > 6 then stripSuffix w "eous"
+  else if endsWithSuffix w "ing" && length w > 5 then stripSuffix w "ing"
+  else if endsWithSuffix w "ous" && length w > 5 then stripSuffix w "ous"
+  else if endsWithSuffix w "ive" && length w > 5 then stripSuffix w "ive"
+  else if endsWithSuffix w "ful" && length w > 5 then stripSuffix w "ful"
+  else if endsWithSuffix w "ity" && length w > 5 then stripSuffix w "ity"
+  else if endsWithSuffix w "est" && length w > 5 then stripSuffix w "est"
+  else if endsWithSuffix w "ly" && length w > 4 then stripSuffix w "ly"
+  else if endsWithSuffix w "ed" && length w > 4 then stripSuffix w "ed"
+  else if endsWithSuffix w "er" && length w > 4 then stripSuffix w "er"
+  else if endsWithSuffix w "al" && length w > 4 then stripSuffix w "al"
+  else w
+
+------------------------------------------------------------------------
+-- Text normalization
+------------------------------------------------------------------------
+
+||| Normalize a word: lowercase and stem.
+public export
+normWord : String -> String
+normWord w = stemWord (toLower w)
+
+||| Tokenize text into normalized, filtered words.
+public export
+tokenize : String -> List String
+tokenize text =
+  let raw = map normWord (words text)
+  in filterStopwords (filter (\w => length w > 1) raw)
+
+------------------------------------------------------------------------
 -- Term-overlap similarity (Jaccard)
 ------------------------------------------------------------------------
 
-||| Normalize a word for comparison: lowercase, strip short noise words.
-normWord : String -> String
-normWord = toLower
-
-||| Compute Jaccard similarity between a query and a meme's combined text.
-||| Returns a value in [0.0, 1.0].
 wordOverlap : List String -> List String -> Nat
 wordOverlap qs ms = length (filter (\w => elem w ms) qs)
 
-||| Compute Jaccard similarity between a query and a meme's combined text.
-||| Returns a value in [0.0, 1.0].
+||| Jaccard similarity: |intersection| / |union|.
+public export
+jaccardSimilarity : String -> String -> Double
+jaccardSimilarity query memeText =
+  let qWords = nub (tokenize query)
+      mWords = nub (tokenize memeText)
+      unionSize = length (nub (qWords ++ mWords))
+  in if unionSize == 0 then 0.0
+     else cast (wordOverlap qWords mWords) / cast unionSize
+
+||| Legacy alias for backward compatibility.
 public export
 termSimilarity : String -> String -> Double
-termSimilarity query memeText =
-  let qWords = nub (map normWord (words query))
-      mWords = nub (map normWord (words memeText))
-  in simFromWords qWords mWords
+termSimilarity = jaccardSimilarity
+
+------------------------------------------------------------------------
+-- Character bigrams (n-gram overlap)
+------------------------------------------------------------------------
+
+||| Extract character bigrams from a string.
+public export
+bigrams : String -> List (Char, Char)
+bigrams s = go (unpack (toLower s))
   where
-    simFromWords : List String -> List String -> Double
-    simFromWords qs ms =
-      let unionSize = length (nub (qs ++ ms))
-      in if unionSize == 0 then 0.0
-         else cast (wordOverlap qs ms) / cast unionSize
+    go : List Char -> List (Char, Char)
+    go [] = []
+    go [_] = []
+    go (a :: b :: rest) = (a, b) :: go (b :: rest)
+
+bigramElem : (Char, Char) -> List (Char, Char) -> Bool
+bigramElem _ [] = False
+bigramElem (a, b) ((c, d) :: rest) =
+  if a == c && b == d then True
+  else bigramElem (a, b) rest
+
+bigramNub : List (Char, Char) -> List (Char, Char)
+bigramNub [] = []
+bigramNub (x :: xs) =
+  if bigramElem x xs then bigramNub xs
+  else x :: bigramNub xs
+
+||| Bigram Jaccard similarity for Hebrew and similar scripts.
+public export
+bigramSimilarity : String -> String -> Double
+bigramSimilarity query memeText =
+  let qBigrams = bigramNub (bigrams query)
+      mBigrams = bigramNub (bigrams memeText)
+      intersection = length (filter (\bg => bigramElem bg mBigrams) qBigrams)
+      unionSize = length (bigramNub (qBigrams ++ mBigrams))
+  in if unionSize == 0 then 0.0
+     else cast intersection / cast unionSize
+
+------------------------------------------------------------------------
+-- TF-IDF similarity
+------------------------------------------------------------------------
+
+termCount : String -> List String -> Nat
+termCount _ [] = 0
+termCount term (w :: ws) =
+  if term == w then S (termCount term ws)
+  else termCount term ws
+
+tf : String -> List String -> Double
+tf term doc =
+  let docLen = length doc
+  in if docLen == 0 then 0.0
+     else cast (termCount term doc) / cast docLen
+
+idf : String -> List (List String) -> Double
+idf term corpus =
+  let n = length corpus
+      df = length (filter (\doc => termCount term doc > 0) corpus)
+  in if df == 0 || n == 0 then 0.0
+     else log (cast n / cast df)
+
+tfidfWeight : String -> List String -> List (List String) -> Double
+tfidfWeight term doc corpus = tf term doc * idf term corpus
+
+dotProduct : List Double -> List Double -> Double
+dotProduct [] _ = 0.0
+dotProduct _ [] = 0.0
+dotProduct (a :: as) (b :: bs) = a * b + dotProduct as bs
+
+magnitude : List Double -> Double
+magnitude v = sqrt (dotProduct v v)
+
+cosineSim : List Double -> List Double -> Double
+cosineSim v1 v2 =
+  let magA = magnitude v1
+      magB = magnitude v2
+  in if magA == 0.0 || magB == 0.0 then 0.0
+     else dotProduct v1 v2 / (magA * magB)
+
+||| Cosine similarity using TF-IDF vectors.
+public export
+tfidfSimilarity : String -> String -> Double
+tfidfSimilarity query memeText =
+  let qTokens  = tokenize query
+      mTokens  = tokenize memeText
+      corpus   = [qTokens, mTokens]
+      allTerms = nub (qTokens ++ mTokens)
+      qVec     = map (\t => tfidfWeight t qTokens corpus) allTerms
+      mVec     = map (\t => tfidfWeight t mTokens corpus) allTerms
+  in cosineSim qVec mVec
+
+||| Multi-document TF-IDF similarity with full corpus IDF.
+public export
+tfidfSimilarityCorpus : String -> String -> List (List String) -> Double
+tfidfSimilarityCorpus query memeText corpus =
+  let qTokens    = tokenize query
+      mTokens    = tokenize memeText
+      fullCorpus = qTokens :: corpus
+      allTerms   = nub (qTokens ++ mTokens)
+      qVec       = map (\t => tfidfWeight t qTokens fullCorpus) allTerms
+      mVec       = map (\t => tfidfWeight t mTokens fullCorpus) allTerms
+  in cosineSim qVec mVec
+
+------------------------------------------------------------------------
+-- Unified similarity dispatch
+------------------------------------------------------------------------
+
+public export
+computeSimilarity : SimilarityMethod -> String -> String -> Double
+computeSimilarity Jaccard q t = jaccardSimilarity q t
+computeSimilarity TFIDF   q t = tfidfSimilarity q t
+computeSimilarity Bigram  q t = bigramSimilarity q t
+
+public export
+defaultSimilarityMethod : SimilarityMethod
+defaultSimilarityMethod = TFIDF
 
 ------------------------------------------------------------------------
 -- Selection scoring
 ------------------------------------------------------------------------
 
-||| Composite selection score, bounded to [-12, 12].
 public export
 selectionScore : SelectionWeights
              -> (sim : Double) -> (act : Double) -> (reg : Double)
@@ -68,7 +295,8 @@ selectionScore w sim act reg sb ef sp mp =
 
 public export
 calcSessionBias : Scope -> SessionId -> Double
-calcSessionBias (SessionScoped sid) current = if sid == current then 1.0 else 0.0
+calcSessionBias (SessionScoped sid) current =
+  if sid == current then 1.0 else 0.0
 calcSessionBias Global              _       = 0.0
 
 public export
@@ -84,7 +312,8 @@ calcExplicitFeedback rw rk fc =
 
 public export
 calcScopePenalty : Scope -> SessionId -> Double
-calcScopePenalty (SessionScoped sid) current = if sid == current then 0.0 else 1.0
+calcScopePenalty (SessionScoped sid) current =
+  if sid == current then 0.0 else 1.0
 calcScopePenalty Global              _       = 0.0
 
 public export
@@ -116,8 +345,6 @@ scoreCandidate w curSess sim deltaSec tau reg scope rw rk fc mc =
 -- Candidate construction from a meme
 ------------------------------------------------------------------------
 
-||| Build a CandidateScore from a Meme and its graph context.
-||| This is the pure scoring step: takes precomputed metrics, returns a score.
 public export
 buildCandidateScore : SelectionWeights -> SessionId
                    -> (sim : Double) -> (deltaSec : Double)
@@ -125,7 +352,7 @@ buildCandidateScore : SelectionWeights -> SessionId
 buildCandidateScore w curSess sim deltaSec m =
   let act  = activationDecay deltaSec m.activationTau
       ns   = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau deltaSec
-      gm   = MkGraphMetrics 0.5 0.4 0.3  -- defaults until live graph metrics
+      gm   = MkGraphMetrics 0.5 0.4 0.3
       rb   = regardBreakdown defaultRegardWeights ns gm
       reg  = rb.totalRegard
       sb   = calcSessionBias m.scope curSess
@@ -166,15 +393,24 @@ selectTopK k candidates =
 -- Active-set assembly from memes
 ------------------------------------------------------------------------
 
-||| Score all memes and select the top k as the active set.
-||| Semantic similarity is computed via term overlap (Jaccard) between
-||| the query and each meme's label + text.
+||| Score all memes and select the top k, using the given similarity method.
+public export
+assembleActiveSetWith : SimilarityMethod -> SelectionWeights -> SessionId
+                     -> (deltaSec : Double) -> (k : Nat)
+                     -> (query : String) -> List Meme -> List CandidateScore
+assembleActiveSetWith method w curSess deltaSec k query memes =
+  let memeTexts = map (\m => tokenize (m.label ++ " " ++ m.text)) memes
+      simFn = case method of
+        TFIDF => \mText => tfidfSimilarityCorpus query mText memeTexts
+        _     => \mText => computeSimilarity method query mText
+      candidates = map (\m => buildCandidateScore w curSess
+                          (simFn (m.label ++ " " ++ m.text))
+                          deltaSec m) memes
+  in selectTopK k candidates
+
+||| Score all memes and select the top k (backward-compatible signature).
 public export
 assembleActiveSet : SelectionWeights -> SessionId
                  -> (deltaSec : Double) -> (k : Nat)
                  -> (query : String) -> List Meme -> List CandidateScore
-assembleActiveSet w curSess deltaSec k query memes =
-  let candidates = map (\m => buildCandidateScore w curSess
-                          (termSimilarity query (m.label ++ " " ++ m.text))
-                          deltaSec m) memes
-  in selectTopK k candidates
+assembleActiveSet = assembleActiveSetWith defaultSimilarityMethod

@@ -416,6 +416,51 @@ int eden_term_read_key(int timeout_ms) {
     return 27;
 }
 
+/* ================================================================== */
+/* Paste drain: read all available printable bytes with short timeout  */
+/* Returns malloc'd string of available chars (caller frees).         */
+/* Used by Idris TUI to detect paste bursts.                          */
+/* ================================================================== */
+
+char *eden_term_drain_paste(int timeout_ms) {
+    int cap = 1024, len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) return "";
+    while (1) {
+        int c = read_byte(timeout_ms > 0 ? timeout_ms : 5);
+        if (c < 0) break;
+        /* Skip escape sequences during paste */
+        if (c == 27) {
+            int b2 = read_byte(5);
+            if (b2 < 0) break;
+            if (b2 == '[') {
+                int b3 = read_byte(5);
+                if (b3 >= '0' && b3 <= '9') {
+                    int b4 = read_byte(5);
+                    if (b4 >= '0' && b4 <= '9') read_byte(5);
+                }
+            } else if (b2 == 'O') {
+                read_byte(5);
+            }
+            continue;
+        }
+        /* Collapse newlines to spaces for single-line composer */
+        if (c == 10 || c == 13) c = ' ';
+        /* Only accept printable ASCII + space */
+        if (c >= 32 && c <= 126) {
+            if (len + 2 > cap) {
+                cap *= 2;
+                char *nb = realloc(buf, cap);
+                if (!nb) break;
+                buf = nb;
+            }
+            buf[len++] = (char)c;
+        }
+    }
+    buf[len] = '\0';
+    return buf;
+}
+
 /* Raw fd write — bypasses stdio buffering */
 #ifdef _WIN32
 #define RAW_WRITE(buf, len) _write(1, (buf), (len))

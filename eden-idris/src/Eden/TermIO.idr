@@ -53,6 +53,9 @@ prim__screenPresent : PrimIO ()
 %foreign "C:eden_term_rearm,eden_term"
 prim__termRearm : PrimIO ()
 
+%foreign "C:eden_term_drain_paste,eden_term"
+prim__drainPaste : Int -> PrimIO String
+
 ------------------------------------------------------------------------
 -- Terminal size
 ------------------------------------------------------------------------
@@ -92,6 +95,13 @@ cleanupTerminal = primIO prim__termCleanup
 export
 rearmTerminal : IO ()
 rearmTerminal = primIO prim__termRearm
+
+||| Drain all available paste input with a short timeout (ms).
+||| Returns a string of printable characters found in the buffer.
+||| Newlines in pasted text are converted to spaces.
+export
+drainPaste : (timeout_ms : Int) -> IO String
+drainPaste t = primIO (prim__drainPaste t)
 
 ------------------------------------------------------------------------
 -- Key input

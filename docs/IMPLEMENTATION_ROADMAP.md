@@ -15,7 +15,7 @@ These must be complete before public announcement.
 | Why This Matters document | Done | Philosophical bridge with evidence |
 | Architecture Overview | Done | Technical map with diagrams |
 | Tradition Embedding Guide | Done | Replication pattern using Tanakh as worked example |
-| License selection | Pending | Recommend AGPL-3.0 (copyleft, protects community use) or Apache-2.0 (maximum adoption) |
+| License selection | Done | GPL-3.0 (copyleft, protects community use) |
 | Verify first-run experience | Done | Mock REPL, export, demo, REPL commands all verified; guide updated to match |
 | Remove machine-specific paths | Partial | Public-facing docs clean; historical audit docs still reference `/Users/brianray/` |
 

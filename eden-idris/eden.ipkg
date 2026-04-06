@@ -24,6 +24,8 @@ modules = Eden.Analytics
         , Eden.Ingest
         , Eden.Models.Base
         , Eden.Models.Mock
+        , Eden.Models.MLX
+        , Eden.Browser
         , Eden.Indexer
         , Eden.Ingest.Extractors
         , Eden.Ingest.Pipeline
@@ -41,4 +43,5 @@ modules = Eden.Analytics
         , Eden.Tanakh
         , Eden.GraphAudit
         , Eden.Session
+        , Eden.Observatory
         , Eden.Proofs

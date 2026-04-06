@@ -352,6 +352,67 @@ deserializeTurnMetadata fields =
       (MkTimestamp (idx 13)))
 
 ------------------------------------------------------------------------
+-- Chunk / Document / MeasurementEvent deserializers
+------------------------------------------------------------------------
+
+parseDocKind : String -> DocKind
+parseDocKind "pdf"      = PDF
+parseDocKind "markdown" = Markdown
+parseDocKind "csv"      = CSV
+parseDocKind _          = PlainText
+
+parseDocStatus : String -> DocStatus
+parseDocStatus "processing" = Processing
+parseDocStatus "ingested"   = Ingested
+parseDocStatus "failed"     = Failed
+parseDocStatus _            = Processing
+
+parseMeasurementAction : String -> MeasurementAction
+parseMeasurementAction "edge_add"    = EdgeAdd
+parseMeasurementAction "edge_remove" = EdgeRemove
+parseMeasurementAction "node_edit"   = NodeEdit
+parseMeasurementAction _             = MeasurementRevert
+
+parseMeasurementState : String -> MeasurementState
+parseMeasurementState "committed" = Committed
+parseMeasurementState "reverted"  = Reverted
+parseMeasurementState _           = Previewed
+
+export
+deserializeChunk : List String -> Maybe Chunk
+deserializeChunk fields =
+  if length fields < 7 then Nothing
+  else
+    let idx : Nat -> String
+        idx i = fromMaybe "" (head' (drop i fields))
+        mpg = let s = idx 4 in if s == "" then Nothing else Just (parseNat s)
+    in Just (MkChunk (MkId (idx 0)) (MkId (idx 1)) (MkId (idx 2))
+             (parseNat (idx 3)) mpg (unescField (idx 5)) (MkTimestamp (idx 6)))
+
+export
+deserializeDocument : List String -> Maybe Document
+deserializeDocument fields =
+  if length fields < 8 then Nothing
+  else
+    let idx : Nat -> String
+        idx i = fromMaybe "" (head' (drop i fields))
+    in Just (MkDocument (MkId (idx 0)) (MkId (idx 1)) (idx 2)
+             (parseDocKind (idx 3)) (unescField (idx 4)) (idx 5)
+             (parseDocStatus (idx 6)) (MkTimestamp (idx 7)))
+
+export
+deserializeMeasurementEvent : List String -> Maybe MeasurementEvent
+deserializeMeasurementEvent fields =
+  if length fields < 12 then Nothing
+  else
+    let idx : Nat -> String
+        idx i = fromMaybe "" (head' (drop i fields))
+    in Just (MkMeasurementEvent (idx 0) (MkId (idx 1)) (MkId (idx 2))
+             (parseMeasurementAction (idx 3)) (parseMeasurementState (idx 4))
+             (idx 5) (idx 6) (unescField (idx 7)) (unescField (idx 8))
+             (unescField (idx 9)) (idx 10) (MkTimestamp (idx 11)))
+
+------------------------------------------------------------------------
 -- Full graph save/load
 ------------------------------------------------------------------------
 
@@ -444,6 +505,17 @@ jsonObj fields =
 
 jsonArr : List String -> String
 jsonArr items = "[" ++ joinBy ", " items ++ "]"
+
+jsonBool : Bool -> String
+jsonBool True  = "true"
+jsonBool False = "false"
+
+jsonNull : String
+jsonNull = "null"
+
+jsonMaybeStr : Maybe String -> String
+jsonMaybeStr (Just s) = jsonStr s
+jsonMaybeStr Nothing  = jsonNull
 
 ------------------------------------------------------------------------
 -- Meme -> JSON
@@ -638,11 +710,112 @@ buildClusterSummaries memes =
      ]
 
 ------------------------------------------------------------------------
+-- Session summaries
+------------------------------------------------------------------------
+
+buildSessionSummary : List Turn -> List FeedbackRecord -> Session -> String
+buildSessionSummary allTurns allFb s =
+  let sessTurns = filter (\t => t.sessionId == s.id) allTurns
+      sessFb    = filter (\fb => fb.frSessionId == s.id) allFb
+  in jsonObj
+    [ ("session_id",     jsonStr (show s.id))
+    , ("title",          jsonStr s.title)
+    , ("agent_id",       jsonStr (show s.agentId))
+    , ("started_at",     jsonStr (show s.createdAt))
+    , ("ended_at",       jsonMaybeStr (map show s.endedAt))
+    , ("turn_count",     jsonNat (length sessTurns))
+    , ("feedback_count", jsonNat (length sessFb))
+    ]
+
+------------------------------------------------------------------------
+-- Membrane event summaries
+------------------------------------------------------------------------
+
+membraneEventToJson : (MembraneEventType, String, Eden.Types.Timestamp) -> String
+membraneEventToJson (evt, detail, ts) = jsonObj
+  [ ("type",        jsonStr (show evt))
+  , ("description", jsonStr (substr 0 500 detail))
+  , ("timestamp",   jsonStr (show ts))
+  ]
+
+------------------------------------------------------------------------
+-- Measurement event summaries
+------------------------------------------------------------------------
+
+measurementEventToJson : MeasurementEvent -> String
+measurementEventToJson m = jsonObj
+  [ ("id",        jsonStr m.id)
+  , ("action",    jsonStr (show m.action))
+  , ("state",     jsonStr (show m.state))
+  , ("operator",  jsonStr m.operator)
+  , ("evidence",  jsonStr (substr 0 300 m.evidence))
+  , ("timestamp", jsonStr (show m.createdAt))
+  ]
+
+------------------------------------------------------------------------
+-- Hum artifact JSON
+------------------------------------------------------------------------
+
+humMotifToJson : HumTokenRow -> String
+humMotifToJson r = jsonObj
+  [ ("token",     jsonStr r.htToken)
+  , ("frequency", jsonNat r.htFrequency)
+  , ("source",    jsonStr r.htSource)
+  ]
+
+humToJson : HumPayload -> String
+humToJson hp = jsonObj
+  [ ("version",     jsonStr hp.artifactVersion)
+  , ("status",      jsonStr (show hp.hpStatus))
+  , ("generated_at", jsonStr (show hp.generatedAt))
+  , ("turns_covered", jsonNat hp.metrics.turnsCovered)
+  , ("recurring_motifs", jsonNat hp.metrics.recurringItems)
+  , ("unique_motifs",    jsonNat hp.metrics.uniqueMotifs)
+  , ("surface_lines",   jsonNat hp.surfaceStats.lineCount)
+  , ("surface_words",   jsonNat hp.surfaceStats.wordCount)
+  , ("surface_chars",   jsonNat hp.surfaceStats.charCount)
+  , ("motifs",          jsonArr (map humMotifToJson hp.tokenTable))
+  ]
+
+------------------------------------------------------------------------
+-- Regard history (per-meme regard breakdown snapshot)
+------------------------------------------------------------------------
+
+memeRegardToJson : Meme -> String
+memeRegardToJson m =
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+      gm = MkGraphMetrics 0.5 0.4 0.3
+      rb = regardBreakdown defaultRegardWeights ns gm
+  in jsonObj
+    [ ("meme_id",     jsonStr (show m.id))
+    , ("label",       jsonStr m.label)
+    , ("reward",      jsonNum rb.reward)
+    , ("evidence",    jsonNum rb.evidence)
+    , ("coherence",   jsonNum rb.coherence)
+    , ("persistence", jsonNum rb.persistence)
+    , ("decay",       jsonNum rb.decay)
+    , ("isolation",   jsonNum rb.isolationPenalty)
+    , ("risk",        jsonNum rb.risk)
+    , ("activation",  jsonNum rb.activation)
+    , ("total",       jsonNum rb.totalRegard)
+    ]
+
+------------------------------------------------------------------------
+-- Export schema version
+------------------------------------------------------------------------
+
+||| Current export schema version.
+exportSchemaVersion : String
+exportSchemaVersion = "2.0.0"
+
+------------------------------------------------------------------------
 -- Full graph export (observatory payload)
 ------------------------------------------------------------------------
 
 ||| Export the full graph as a JSON string matching the observatory
 ||| GraphPayload contract (semantic_nodes, semantic_edges, assemblies, etc.).
+||| Enhanced with metadata header, session summaries, membrane events,
+||| measurement events, hum data, regard history, and ontology projection.
 export
 exportGraphJson : StoreState -> ExperimentId -> IO String
 exportGraphJson st eid = do
@@ -654,6 +827,8 @@ exportGraphJson st eid = do
   allAgents  <- readIORef st.agents
   allSess    <- readIORef st.sessions
   allAsets   <- readIORef st.activeSetSnaps
+  allMbe     <- readIORef st.membraneEvts
+  allMeas    <- readIORef st.measurements
   let memes    = filter (\m => m.experimentId == eid) allMemes
       edges    = filter (\e => e.experimentId == eid) allEdges
       memodes  = filter (\m => m.experimentId == eid) allMemodes
@@ -662,6 +837,8 @@ exportGraphJson st eid = do
       agents   = filter (\a => a.experimentId == eid) allAgents
       sessions = filter (\s => s.experimentId == eid) allSess
       asets    = filter (\a => a.experimentId == eid) allAsets
+      mbes     = allMbe  -- membrane events are not experiment-scoped in store
+      meas     = filter (\m => m.experimentId == eid) allMeas
       -- Semantic plane: memes as nodes
       semanticNodes = map memeToJson memes
       semanticEdges = map edgeToJson edges
@@ -702,10 +879,41 @@ exportGraphJson st eid = do
         , ("peripheral",   jsonNat roles.peripheralCount)
         , ("emergent",     jsonNat roles.emergentCount)
         ]
+      -- Export metadata header
+      metadata = jsonObj
+        [ ("schema_version",  jsonStr exportSchemaVersion)
+        , ("export_source",   jsonStr "idris2-refc")
+        , ("meme_count",      jsonNat (length memes))
+        , ("edge_count",      jsonNat (length edges))
+        , ("memode_count",    jsonNat (length memodes))
+        , ("turn_count",      jsonNat (length turns))
+        , ("feedback_count",  jsonNat (length fbs))
+        , ("session_count",   jsonNat (length sessions))
+        , ("agent_count",     jsonNat (length agents))
+        ]
+      -- Provenance
+      agentName = case agents of
+        (a :: _) => a.name
+        []       => "unknown"
+      provenance = jsonObj
+        [ ("experiment_id",  jsonStr (show eid))
+        , ("agent",          jsonStr agentName)
+        , ("session_ids",    jsonArr (map (\s => jsonStr (show s.id)) sessions))
+        ]
+      -- Session summaries
+      sessSummaries = map (buildSessionSummary turns fbs) sessions
+      -- Membrane events
+      mbeJson = map membraneEventToJson mbes
+      -- Measurement events
+      measJson = map measurementEventToJson meas
+      -- Regard history (current snapshot for each meme)
+      regardHist = map memeRegardToJson memes
   pure (jsonObj
     [ ("experiment_id",       jsonStr (show eid))
     , ("export_manifest_id",  jsonStr ("idris-" ++ show eid))
     , ("source_graph_hash",   jsonStr "")
+    , ("metadata",            metadata)
+    , ("provenance",          provenance)
     , ("graph_modes",         jsonArr (map jsonStr ["Semantic Map", "Assemblies", "Runtime", "Active Set", "Compare"]))
     , ("assembly_render_modes", jsonArr (map jsonStr ["hulls", "collapsed-meta-node", "hidden"]))
     , ("semantic_nodes",      jsonArr semanticNodes)
@@ -715,6 +923,10 @@ exportGraphJson st eid = do
     , ("assemblies",          jsonArr assemblies)
     , ("cluster_summaries",   jsonArr clusters)
     , ("active_set_slices",   jsonArr slices)
+    , ("session_summaries",   jsonArr sessSummaries)
+    , ("membrane_events",     jsonArr mbeJson)
+    , ("measurement_events",  jsonArr measJson)
+    , ("regard_history",      jsonArr regardHist)
     , ("counts",              counts)
     , ("ontology",            ontology)
     ])
@@ -779,3 +991,176 @@ writeGraphExport st eid = do
     | Left err => do putStrLn ("  (export write failed: " ++ show err ++ ")")
                      pure path
   pure path
+
+------------------------------------------------------------------------
+-- Session log export (markdown conversation log)
+------------------------------------------------------------------------
+
+||| Format a turn for a session log with full detail.
+fmtSessionLogTurn : List FeedbackRecord -> Turn -> String
+fmtSessionLogTurn sessionFb t =
+  let turnFb = filter (\fb => fb.frTurnId == t.id) sessionFb
+      fbSection = case turnFb of
+        []       => ""
+        (fb :: _) =>
+          "\n**Feedback:** " ++ show fb.frVerdict
+          ++ (if length fb.frExplanation > 0
+                then " -- " ++ fb.frExplanation
+                else "")
+          ++ "\n"
+  in "## Turn " ++ show t.turnIndex ++ "\n\n"
+  ++ "**User:** " ++ t.userText ++ "\n\n"
+  ++ "**Adam:** " ++ t.membraneText ++ "\n"
+  ++ fbSection ++ "\n---\n\n"
+
+||| Export a session as a detailed markdown conversation log.
+||| Includes session metadata, all turns with feedback, and a summary.
+export
+exportSessionLog : StoreState -> ExperimentId -> SessionId -> IO String
+exportSessionLog st eid sid = do
+  _ <- createDir "data"
+  _ <- createDir "data/export"
+  allTurns <- readIORef st.turns
+  allFb    <- readIORef st.feedbackEvents
+  allSess  <- readIORef st.sessions
+  allAg    <- readIORef st.agents
+  let turns    = sortBy (\a, b => compare a.turnIndex b.turnIndex)
+                   (filter (\t => t.sessionId == sid && t.experimentId == eid) allTurns)
+      fbs      = filter (\fb => fb.frSessionId == sid) allFb
+      mSess    = find (\s => s.id == sid) allSess
+      sessTitle = case mSess of
+        Just s  => s.title
+        Nothing => "Unknown Session"
+      sessCreated = case mSess of
+        Just s  => show s.createdAt
+        Nothing => "unknown"
+      agentName = case allAg of
+        (a :: _) => a.name
+        []       => "Adam"
+      acceptCount = length (filter (\fb => fb.frVerdict == Accept) fbs)
+      rejectCount = length (filter (\fb => fb.frVerdict == Reject) fbs)
+      editCount   = length (filter (\fb => fb.frVerdict == Edit) fbs)
+      header = "# Session Log: " ++ sessTitle ++ "\n\n"
+            ++ "- **Session ID:** " ++ show sid ++ "\n"
+            ++ "- **Experiment:** " ++ show eid ++ "\n"
+            ++ "- **Agent:** " ++ agentName ++ "\n"
+            ++ "- **Started:** " ++ sessCreated ++ "\n"
+            ++ "- **Turns:** " ++ show (length turns) ++ "\n"
+            ++ "- **Feedback:** " ++ show (length fbs)
+               ++ " (accept=" ++ show acceptCount
+               ++ ", reject=" ++ show rejectCount
+               ++ ", edit=" ++ show editCount ++ ")\n"
+            ++ "\n---\n\n"
+      body = case turns of
+        [] => "_No turns recorded._\n"
+        _  => concatMap (fmtSessionLogTurn fbs) turns
+      content = header ++ body
+      path = "data/export/" ++ show sid ++ "-log.md"
+  Right () <- writeFile path content
+    | Left err => do putStrLn ("  (session log write failed: " ++ show err ++ ")")
+                     pure path
+  pure path
+
+------------------------------------------------------------------------
+-- Regard timeline export (CSV)
+------------------------------------------------------------------------
+
+||| Compute current regard for a meme and format as a CSV row.
+memeRegardCsvRow : Meme -> String
+memeRegardCsvRow m =
+  let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+      gm = MkGraphMetrics 0.5 0.4 0.3
+      rb = regardBreakdown defaultRegardWeights ns gm
+  in show m.id ++ ","
+  ++ "\"" ++ escapeStr m.label ++ "\","
+  ++ show m.domain ++ ","
+  ++ jsonNum rb.reward ++ ","
+  ++ jsonNum rb.evidence ++ ","
+  ++ jsonNum rb.coherence ++ ","
+  ++ jsonNum rb.persistence ++ ","
+  ++ jsonNum rb.decay ++ ","
+  ++ jsonNum rb.isolationPenalty ++ ","
+  ++ jsonNum rb.risk ++ ","
+  ++ jsonNum rb.activation ++ ","
+  ++ jsonNum rb.totalRegard ++ ","
+  ++ show m.usageCount ++ ","
+  ++ show m.feedbackCount ++ ","
+  ++ show m.updatedAt
+
+||| Export regard scores as CSV for all memes in an experiment.
+||| Columns: meme_id, label, domain, reward, evidence, coherence,
+||| persistence, decay, isolation, risk, activation, total_regard,
+||| usage_count, feedback_count, updated_at
+export
+exportRegardTimeline : StoreState -> ExperimentId -> IO String
+exportRegardTimeline st eid = do
+  _ <- createDir "data"
+  _ <- createDir "data/export"
+  allMemes <- readIORef st.memes
+  let memes = filter (\m => m.experimentId == eid) allMemes
+      header = "meme_id,label,domain,reward,evidence,coherence,persistence,decay,isolation,risk,activation,total_regard,usage_count,feedback_count,updated_at"
+      rows   = map memeRegardCsvRow memes
+      content = unlines (header :: rows)
+      path = "data/export/" ++ show eid ++ "-regard.csv"
+  Right () <- writeFile path content
+    | Left err => do putStrLn ("  (regard timeline write failed: " ++ show err ++ ")")
+                     pure path
+  pure path
+
+------------------------------------------------------------------------
+-- Meme index export (text)
+------------------------------------------------------------------------
+
+||| Format a single meme for the text index.
+fmtMemeIndexEntry : Meme -> String
+fmtMemeIndexEntry m =
+  let proj = projectMeme m
+  in show m.id ++ "  " ++ m.label
+  ++ "  [" ++ show m.domain ++ "/" ++ show proj.mpRole ++ "]"
+  ++ "  usage=" ++ show m.usageCount
+  ++ "  feedback=" ++ show m.feedbackCount
+  ++ "  source=" ++ show m.sourceKind
+
+||| Export a simple text index of all memes with labels, domains, and roles.
+export
+exportMemeIndex : StoreState -> ExperimentId -> IO String
+exportMemeIndex st eid = do
+  _ <- createDir "data"
+  _ <- createDir "data/export"
+  allMemes <- readIORef st.memes
+  let memes = sortBy (\a, b => compare (show a.domain) (show b.domain))
+                (filter (\m => m.experimentId == eid) allMemes)
+      roles = countByRole memes
+      (constatives, performatives, runtimes) = partitionBySpeechAct memes
+      header = "EDEN Meme Index -- Experiment " ++ show eid ++ "\n"
+            ++ "Total: " ++ show (length memes) ++ " memes\n"
+            ++ "  Knowledge: " ++ show (length (filter (\m => m.domain == Knowledge) memes)) ++ "\n"
+            ++ "  Behavior:  " ++ show (length (filter (\m => m.domain == Behavior) memes)) ++ "\n"
+            ++ "Roles: core=" ++ show roles.coreCount
+               ++ " active=" ++ show roles.activeCount
+               ++ " peripheral=" ++ show roles.peripheralCount
+               ++ " emergent=" ++ show roles.emergentCount ++ "\n"
+            ++ "Speech acts: constative=" ++ show (length constatives)
+               ++ " performative=" ++ show (length performatives)
+               ++ " runtime=" ++ show (length runtimes) ++ "\n"
+            ++ "\n"
+      entries = map fmtMemeIndexEntry memes
+      content = header ++ unlines entries
+      path = "data/export/" ++ show eid ++ "-meme-index.txt"
+  Right () <- writeFile path content
+    | Left err => do putStrLn ("  (meme index write failed: " ++ show err ++ ")")
+                     pure path
+  pure path
+
+------------------------------------------------------------------------
+-- Combined export (all formats)
+------------------------------------------------------------------------
+
+||| Run all export formats for an experiment and return paths.
+export
+exportAll : StoreState -> ExperimentId -> IO (List String)
+exportAll st eid = do
+  p1 <- writeGraphExport st eid
+  p2 <- exportRegardTimeline st eid
+  p3 <- exportMemeIndex st eid
+  pure [p1, p2, p3]

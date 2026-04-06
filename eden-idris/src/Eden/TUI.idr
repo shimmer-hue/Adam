@@ -2,6 +2,8 @@
 |||
 ||| Matches Python Textual layout: action strip, status panels,
 ||| dialogue tape, memgraph, reasoning tabs, composer, footer.
+||| Includes help modal, config modal, atlas/archive browser,
+||| session profile wiring, graph audit, and paste handling.
 module Eden.TUI
 
 import Data.IORef
@@ -30,6 +32,8 @@ import Eden.Term
 import Eden.TermIO
 import Eden.Export
 import Eden.SQLite
+import Eden.Session
+import Eden.GraphAudit
 
 ------------------------------------------------------------------------
 -- Palette
@@ -58,6 +62,20 @@ colActBg : RGB
 colActBg = MkRGB 7 35 45
 colActBd : RGB
 colActBd = MkRGB 142 243 255
+colModalBg : RGB
+colModalBg = MkRGB 24 12 16
+colModalBd : RGB
+colModalBd = MkRGB 255 217 138
+
+------------------------------------------------------------------------
+-- UI Mode
+------------------------------------------------------------------------
+public export
+data UIMode
+  = Normal
+  | HelpModal
+  | ConfigModal Nat
+  | AtlasModal Nat Nat
 
 ------------------------------------------------------------------------
 -- UI State
@@ -66,7 +84,7 @@ public export
 record UIState where
   constructor MkUIState
   uiEnv        : EdenEnv
-  uiBackend    : Backend
+  uiBackend    : IORef Backend
   uiModelPath  : Maybe String
   uiTurnIdx    : IORef Nat
   uiComposer   : IORef String
@@ -81,6 +99,9 @@ record UIState where
   uiQuit       : IORef Bool
   uiWidth      : IORef Int
   uiHeight     : IORef Int
+  uiMode       : IORef UIMode
+  uiSessMeta   : SessionMetaStore
+  uiSessProf   : IORef SessionProfile
 
 ------------------------------------------------------------------------
 -- Rendering primitives
@@ -129,8 +150,29 @@ drawBox r c w h bc = do
               screenSetCP row ri cpV bc2 colBg False
               sides (row+1) rEnd l ri bc2
 
+drawBoxBg : Int -> Int -> Int -> Int -> RGB -> RGB -> IO ()
+drawBoxBg r c w h bc bg = do
+  clearRect r h c w bg
+  screenSetCP r c cpTL bc bg False
+  screenFillCP r (c+1) (w-2) cpH bc bg
+  screenSetCP r (c+w-1) cpTR bc bg False
+  screenSetCP (r+h-1) c cpBL bc bg False
+  screenFillCP (r+h-1) (c+1) (w-2) cpH bc bg
+  screenSetCP (r+h-1) (c+w-1) cpBR bc bg False
+  sidesBg (r+1) (r+h-1) c (c+w-1) bc bg
+  where
+    sidesBg : Int -> Int -> Int -> Int -> RGB -> RGB -> IO ()
+    sidesBg row rEnd l ri bc2 bg2 =
+      if row >= rEnd then pure ()
+      else do screenSetCP row l cpV bc2 bg2 False
+              screenSetCP row ri cpV bc2 bg2 False
+              sidesBg (row+1) rEnd l ri bc2 bg2
+
 boxTitle : Int -> Int -> String -> RGB -> IO ()
 boxTitle r c title fg = putText r (c+2) fg colBg True (cast (length title)) title
+
+boxTitleBg : Int -> Int -> String -> RGB -> RGB -> IO ()
+boxTitleBg r c title fg bg = putText r (c+2) fg bg True (cast (length title)) title
 
 showD : Double -> String
 showD d = let i = cast {to=Integer} (d * 100.0)
@@ -209,10 +251,11 @@ drawPanel r c w h title bc lns = do
 
 drawStatusPanels : UIState -> Int -> Int -> Int -> IO ()
 drawStatusPanels ui r c tw = do
-  let be = ui.uiBackend
+  be <- readIORef ui.uiBackend
   idx <- readIORef ui.uiTurnIdx
   counts <- runEden ui.uiEnv eGraphCounts
   active <- readIORef ui.uiLastActive
+  prof <- readIORef ui.uiSessProf
   let pw = tw `div` 3
   drawPanel r c pw 10 "Context" colAmber
     ["No estimate", "yet", "Type to arm.", "Deck=F6"]
@@ -220,7 +263,7 @@ drawStatusPanels ui r c tw = do
     [ "Adam status", "phase=start"
     , "Start here: type", "below, press Enter"
     , "to send, or press F9"
-    , "model=" ++ show be, "reasoning=quiet"
+    , "model=" ++ show be, "mode=" ++ show prof.spMode
     , "items=" ++ show (length active) ++ " review=clear"]
   let aLns = case active of
         [] => ["Aperture snapshot", "No active set yet. Type in", "the compose or ingest a", "document to arm the scan.", "Press F8 for the wide", "aperture drawer."]
@@ -232,11 +275,13 @@ drawStatusPanels ui r c tw = do
 ------------------------------------------------------------------------
 drawRuntimeLine : UIState -> Int -> Int -> IO ()
 drawRuntimeLine ui row w = do
-  let be = ui.uiBackend
+  be <- readIORef ui.uiBackend
   idx <- readIORef ui.uiTurnIdx
+  prof <- readIORef ui.uiSessProf
   clearRow row 0 w colPanel
   putText row 1 colIce colPanel False (w-1)
-    ("runtime=Adam / " ++ show be ++ " stage=n/a session=arming profile=pending focus=compos...")
+    ("runtime=Adam / " ++ show be ++ " mode=" ++ show prof.spMode
+     ++ " budget=" ++ show prof.spBudget ++ " session=active focus=composer")
 
 ------------------------------------------------------------------------
 -- Dialogue tape (bordered)
@@ -341,7 +386,7 @@ drawTabBar : Int -> Int -> Int -> IO ()
 drawTabBar row col w = do
   clearRow row col w colPanel
   let tw = w `div` 3
-  screenSetCP row (col+1) 9679 colAmber colPanel False  -- ● bullet
+  screenSetCP row (col+1) 9679 colAmber colPanel False
   putText row (col+3) colAmber colPanel True (tw-3) "Reasoning"
   putText row (col+tw) colMuted colPanel False tw "  Chain-Like"
   putText row (col+tw+tw) colMuted colPanel False (w-tw-tw) "  Hum Live"
@@ -388,7 +433,7 @@ drawComposer ui r c w h = do
         then do
           boxTitle r c " >> Composer " colNeon
           putText (r+1) (c+2) colMuted colBg False (w-4)
-            "Message Adam here. Ask a question, continue the session, or correct the draft. Enter sends."
+            "Message Adam here. ?/h=help  /config  /atlas  /archive. Enter sends."
           if h > 2
             then putText (r+2) (c+2) colMuted colBg False (w-4) "F9 ingests a document first if needed."
             else pure ()
@@ -419,6 +464,152 @@ drawFooter row w = do
   fItem row 99 "f10" " Archive  "
   fItem row 111 "f11" " Runtime Chyron  "
   fItem row 131 "Ap" " palette"
+
+------------------------------------------------------------------------
+-- Help modal overlay
+------------------------------------------------------------------------
+drawHelpModal : Int -> Int -> IO ()
+drawHelpModal scrW scrH = do
+  let mw = min 72 (scrW - 4)
+  let mh = min 28 (scrH - 4)
+  let mr = max 1 ((scrH - mh) `div` 2)
+  let mc = max 1 ((scrW - mw) `div` 2)
+  drawBoxBg mr mc mw mh colModalBd colModalBg
+  boxTitleBg mr mc " EDEN/Adam Help " colAmber colModalBg
+  let cw = mw - 4
+  let cc = mc + 2
+  let r0 = mr + 1
+  putText r0 cc colNeon colModalBg True cw "Keybindings"
+  putText (r0+1) cc colAmber colModalBg True cw "  Ctrl+Q / F12"
+  putText (r0+1) (cc+16) colText colModalBg False (cw-16) "Quit"
+  putText (r0+2) cc colAmber colModalBg True cw "  Esc"
+  putText (r0+2) (cc+16) colText colModalBg False (cw-16) "Dismiss modal / Quit"
+  putText (r0+3) cc colAmber colModalBg True cw "  Enter"
+  putText (r0+3) (cc+16) colText colModalBg False (cw-16) "Send message to Adam"
+  putText (r0+4) cc colAmber colModalBg True cw "  Backspace"
+  putText (r0+4) (cc+16) colText colModalBg False (cw-16) "Delete last character"
+  putText (r0+5) cc colAmber colModalBg True cw "  Ctrl+S"
+  putText (r0+5) (cc+16) colText colModalBg False (cw-16) "Open config modal"
+  putText (r0+7) cc colNeon colModalBg True cw "Feedback (after Adam responds)"
+  putText (r0+8) cc colAmber colModalBg True cw "  a"
+  putText (r0+8) (cc+16) colText colModalBg False (cw-16) "Accept response"
+  putText (r0+9) cc colAmber colModalBg True cw "  r"
+  putText (r0+9) (cc+16) colText colModalBg False (cw-16) "Reject response"
+  putText (r0+10) cc colAmber colModalBg True cw "  e"
+  putText (r0+10) (cc+16) colText colModalBg False (cw-16) "Edit response"
+  putText (r0+11) cc colAmber colModalBg True cw "  s"
+  putText (r0+11) (cc+16) colText colModalBg False (cw-16) "Skip feedback"
+  putText (r0+13) cc colNeon colModalBg True cw "Commands (type in composer)"
+  putText (r0+14) cc colIce colModalBg False cw "  /help      Show this help screen"
+  putText (r0+15) cc colIce colModalBg False cw "  /quit      Quit the TUI"
+  putText (r0+16) cc colIce colModalBg False cw "  /config    Session configuration"
+  putText (r0+17) cc colIce colModalBg False cw "  /stats     Show graph statistics"
+  putText (r0+18) cc colIce colModalBg False cw "  /memes     List all memes"
+  putText (r0+19) cc colIce colModalBg False cw "  /regard    Show regard scores"
+  putText (r0+20) cc colIce colModalBg False cw "  /hum       Show hum status"
+  putText (r0+21) cc colIce colModalBg False cw "  /export    Export graph JSON"
+  putText (r0+22) cc colIce colModalBg False cw "  /atlas     Browse conversation archive"
+  putText (r0+23) cc colIce colModalBg False cw "  /archive   Browse conversation archive"
+  if r0+25 < mr+mh-1
+    then putText (r0+25) cc colMuted colModalBg False cw "Press any key to dismiss"
+    else pure ()
+
+------------------------------------------------------------------------
+-- Config modal overlay
+------------------------------------------------------------------------
+showConfigItems : UIState -> Nat -> Int -> Int -> Int -> Int -> IO ()
+showConfigItems ui cursor r0 cc cw rEnd = do
+  be <- readIORef ui.uiBackend
+  prof <- readIORef ui.uiSessProf
+  let items : List (String, String)
+      items = [ ("Backend",          show be)
+              , ("Inference Mode",   show prof.spMode)
+              , ("Token Budget",     show prof.spBudget)
+              , ("Retrieval Depth",  show prof.spRetrDepth)
+              , ("Max Output",       show prof.spMaxOutput)
+              , ("Temperature",      showD prof.spTemp)
+              , ("Response Cap",     show prof.spRespCap)
+              , ("History Turns",    show prof.spHistTurns)
+              , ("Low Motion",       show prof.spLowMotion)
+              , ("Debug",            show prof.spDebug)
+              ]
+  drawItemsAt r0 cc cw 0 cursor items rEnd
+  where
+    drawItemsAt : Int -> Int -> Int -> Nat -> Nat -> List (String, String) -> Int -> IO ()
+    drawItemsAt row cc' cw' idx cur [] rEnd' = pure ()
+    drawItemsAt row cc' cw' idx cur ((lbl, val) :: rest) rEnd' =
+      if row >= rEnd' then pure ()
+      else do
+        let sel = idx == cur
+        let fg = if sel then colAmber else colText
+        let marker = if sel then "> " else "  "
+        putText row cc' fg colModalBg sel cw' (marker ++ lbl ++ ": " ++ val)
+        drawItemsAt (row+1) cc' cw' (idx+1) cur rest rEnd'
+
+drawConfigModal : UIState -> Nat -> Int -> Int -> IO ()
+drawConfigModal ui cursor scrW scrH = do
+  let mw = min 64 (scrW - 4)
+  let mh = min 18 (scrH - 4)
+  let mr = max 1 ((scrH - mh) `div` 2)
+  let mc = max 1 ((scrW - mw) `div` 2)
+  drawBoxBg mr mc mw mh colModalBd colModalBg
+  boxTitleBg mr mc " Session Config " colNeon colModalBg
+  let cw = mw - 4
+  let cc = mc + 2
+  let r0 = mr + 1
+  showConfigItems ui cursor r0 cc cw (mr+mh-2)
+  let hintRow = mr + mh - 2
+  putText hintRow cc colMuted colModalBg False cw "Up/Down=navigate  Enter=toggle  Esc=dismiss"
+
+------------------------------------------------------------------------
+-- Atlas/Archive modal overlay
+------------------------------------------------------------------------
+drawAtlasItems : Int -> Int -> Int -> Nat -> Nat -> List (String, String, String, String) -> Int -> IO ()
+drawAtlasItems row cc cw idx cur [] rEnd = pure ()
+drawAtlasItems row cc cw idx cur ((sid, title, tc, created) :: rest) rEnd =
+  if row >= rEnd then pure ()
+  else do
+    let sel = idx == cur
+    let fg = if sel then colAmber else colText
+    let marker = if sel then "> " else "  "
+    let line = marker ++ padRight 20 (substr 0 18 sid) ++ " "
+                      ++ padRight 18 (substr 0 16 title) ++ " "
+                      ++ padRight 6 tc ++ " "
+                      ++ substr 0 20 created
+    putText row cc fg colModalBg sel cw line
+    drawAtlasItems (row+1) cc cw (idx+1) cur rest rEnd
+
+drawAtlasModal : UIState -> Nat -> Nat -> Int -> Int -> IO ()
+drawAtlasModal ui cursor soff scrW scrH = do
+  let mw = min 80 (scrW - 4)
+  let mh = min 22 (scrH - 4)
+  let mr = max 1 ((scrH - mh) `div` 2)
+  let mc = max 1 ((scrW - mw) `div` 2)
+  drawBoxBg mr mc mw mh colModalBd colModalBg
+  boxTitleBg mr mc " Conversation Atlas " colViolet colModalBg
+  let cw = mw - 4
+  let cc = mc + 2
+  let r0 = mr + 1
+  -- Load sessions from store
+  sessions <- readIORef ui.uiEnv.store.sessions
+  turns <- readIORef ui.uiEnv.store.turns
+  let mkItem : Session -> (String, String, String, String)
+      mkItem sess = (show sess.id, sess.title,
+                     show (length (filter (\t => t.sessionId == sess.id) turns)),
+                     show sess.createdAt)
+  let items = map mkItem sessions
+  case items of
+    [] => do
+      putText r0 cc colMuted colModalBg False cw "No sessions found."
+      putText (r0+2) cc colMuted colModalBg False cw "Start a conversation to create a session."
+    _ => do
+      putText r0 cc colIce colModalBg True cw "ID                    Title              Turns  Created"
+      sectionTitle (r0+1) cc cw "" colMuted
+      let visibleH = mh - 5
+      let visible = take (cast visibleH) (drop soff items)
+      drawAtlasItems (r0+2) cc cw 0 (minus cursor soff) visible (mr+mh-2)
+  let hintRow = mr + mh - 2
+  putText hintRow cc colMuted colModalBg False cw "Up/Down=navigate  Esc=dismiss"
 
 ------------------------------------------------------------------------
 -- Full frame render
@@ -466,10 +657,27 @@ renderFrame ui = do
   -- Composer inside chat_deck at bottom
   drawComposer ui compRow 1 (lW - 2) compH
   drawFooter fRow w
+
+  -- Render modal overlays on top
+  mode <- readIORef ui.uiMode
+  case mode of
+    Normal => pure ()
+    HelpModal => drawHelpModal w h
+    ConfigModal cur => drawConfigModal ui cur w h
+    AtlasModal cur soff => drawAtlasModal ui cur soff w h
+
   screenPresent
 
 ------------------------------------------------------------------------
--- Input handling
+-- Command parsing
+------------------------------------------------------------------------
+isCommand : String -> Maybe String
+isCommand s =
+  let t = trim s
+  in if isPrefixOf "/" t then Just (toLower t) else Nothing
+
+------------------------------------------------------------------------
+-- Input handling: Normal mode
 ------------------------------------------------------------------------
 parseVerdict : Char -> Maybe Verdict
 parseVerdict 'a' = Just Accept
@@ -478,62 +686,228 @@ parseVerdict 'e' = Just Edit
 parseVerdict 's' = Just Skip
 parseVerdict _   = Nothing
 
-handleKey : UIState -> KeyEvent -> IO ()
-handleKey ui KeyF12 = writeIORef ui.uiQuit True
-handleKey ui (KeyCtrl 'q') = writeIORef ui.uiQuit True
-handleKey ui (KeyCtrl 'c') = writeIORef ui.uiQuit True
-handleKey ui KeyEscape = writeIORef ui.uiQuit True
-handleKey ui KeyEnter = do
+handleNormalKey : UIState -> KeyEvent -> IO ()
+handleNormalKey ui KeyF12 = writeIORef ui.uiQuit True
+handleNormalKey ui (KeyCtrl 'q') = writeIORef ui.uiQuit True
+handleNormalKey ui (KeyCtrl 'c') = writeIORef ui.uiQuit True
+handleNormalKey ui (KeyCtrl 's') = writeIORef ui.uiMode (ConfigModal 0)
+handleNormalKey ui KeyEscape = writeIORef ui.uiQuit True
+handleNormalKey ui KeyEnter = do
   text <- readIORef ui.uiComposer
   if text == ""
     then pure ()
-    else do
-    idx <- readIORef ui.uiTurnIdx
-    writeIORef ui.uiTurnIdx (idx + 1)
-    -- Clear composer and show thinking indicator before blocking call
-    writeIORef ui.uiComposer ""
-    writeIORef ui.uiFeedback (Just "Adam is thinking...")
-    renderFrame ui
-    let be = ui.uiBackend
-    let mp = ui.uiModelPath
-    tr <- runEden ui.uiEnv (mExecuteTurnWith be mp idx text)
-    entries <- readIORef ui.uiDialogue
-    writeIORef ui.uiDialogue ((text, tr.mrResponse) :: entries)
-    activeSet <- runEden ui.uiEnv (mRetrieve text)
-    writeIORef ui.uiLastActive activeSet
-    projs <- runEden ui.uiEnv mProject
-    writeIORef ui.uiLastProj projs
-    writeIORef ui.uiFeedback Nothing
-    renderFrame ui
-    fbKey <- readKey 10000
-    case fbKey of
-      KeyChar c => case parseVerdict c of
-        Just v => do
-          let turnId = MkId {a=TurnTag} ("turn-" ++ show (idx + 3))
-          runEden ui.uiEnv (mProcessFeedback turnId v "")
-          writeIORef ui.uiFeedback (Just ("recorded: " ++ show v))
-          hum <- runEden ui.uiEnv mBuildHum
-          writeHumFile hum
-          writeIORef ui.uiLastHum (Just hum)
-        Nothing => writeIORef ui.uiFeedback (Just "skipped")
-      _ => writeIORef ui.uiFeedback (Just "skipped")
-    renderFrame ui
-    -- Brief pause so user sees feedback result, then clear it
-    _ <- readKey 1500
-    writeIORef ui.uiFeedback Nothing
-handleKey ui KeyBackspace = do
+    else case isCommand text of
+      Just "/quit" => writeIORef ui.uiQuit True
+      Just "/help" => do
+        writeIORef ui.uiComposer ""
+        writeIORef ui.uiMode HelpModal
+      Just "/config" => do
+        writeIORef ui.uiComposer ""
+        writeIORef ui.uiMode (ConfigModal 0)
+      Just "/atlas" => do
+        writeIORef ui.uiComposer ""
+        writeIORef ui.uiMode (AtlasModal 0 0)
+      Just "/archive" => do
+        writeIORef ui.uiComposer ""
+        writeIORef ui.uiMode (AtlasModal 0 0)
+      Just "/stats" => do
+        writeIORef ui.uiComposer ""
+        counts <- runEden ui.uiEnv eGraphCounts
+        writeIORef ui.uiFeedback (Just
+          ("memes=" ++ show counts.memeCount
+          ++ " memodes=" ++ show counts.memodeCount
+          ++ " edges=" ++ show counts.edgeCount
+          ++ " turns=" ++ show counts.turnCount
+          ++ " feedback=" ++ show counts.feedbackCount))
+      Just "/memes" => do
+        writeIORef ui.uiComposer ""
+        memes <- runEden ui.uiEnv eGetMemes
+        let labels = map (\m => m.label ++ "[" ++ show m.domain ++ "]") (take 10 memes)
+        writeIORef ui.uiFeedback (Just (concat (intersperse ", " labels)))
+      Just "/regard" => do
+        writeIORef ui.uiComposer ""
+        memes <- runEden ui.uiEnv eGetMemes
+        let labels = map (\m =>
+              let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0
+                  gm = MkGraphMetrics 0.5 0.4 0.3
+                  rb = regardBreakdown defaultRegardWeights ns gm
+              in m.label ++ "=" ++ showD rb.totalRegard) (take 8 memes)
+        writeIORef ui.uiFeedback (Just (concat (intersperse " " labels)))
+      Just "/hum" => do
+        writeIORef ui.uiComposer ""
+        hum <- runEden ui.uiEnv mBuildHum
+        writeIORef ui.uiFeedback (Just
+          ("hum: status=" ++ show hum.hpStatus
+          ++ " turns=" ++ show hum.metrics.turnsCovered
+          ++ " motifs=" ++ show hum.metrics.recurringItems))
+      Just "/export" => do
+        writeIORef ui.uiComposer ""
+        path <- writeGraphExport ui.uiEnv.store ui.uiEnv.eid
+        writeIORef ui.uiFeedback (Just ("exported: " ++ path))
+      _ => do
+        -- Normal message: execute turn
+        idx <- readIORef ui.uiTurnIdx
+        writeIORef ui.uiTurnIdx (idx + 1)
+        writeIORef ui.uiComposer ""
+        writeIORef ui.uiFeedback (Just "Adam is thinking...")
+        renderFrame ui
+        be <- readIORef ui.uiBackend
+        let mp = ui.uiModelPath
+        tr <- runEden ui.uiEnv (mExecuteTurnWith be mp idx text)
+        entries <- readIORef ui.uiDialogue
+        writeIORef ui.uiDialogue ((text, tr.mrResponse) :: entries)
+        activeSet <- runEden ui.uiEnv (mRetrieve text)
+        writeIORef ui.uiLastActive activeSet
+        projs <- runEden ui.uiEnv mProject
+        writeIORef ui.uiLastProj projs
+        writeIORef ui.uiFeedback Nothing
+        renderFrame ui
+        fbKey <- readKey 10000
+        case fbKey of
+          KeyChar c => case parseVerdict c of
+            Just v => do
+              let turnId = MkId {a=TurnTag} ("turn-" ++ show (idx + 3))
+              runEden ui.uiEnv (mProcessFeedback turnId v "")
+              writeIORef ui.uiFeedback (Just ("recorded: " ++ show v))
+              hum <- runEden ui.uiEnv mBuildHum
+              writeHumFile hum
+              writeIORef ui.uiLastHum (Just hum)
+            Nothing => writeIORef ui.uiFeedback (Just "skipped")
+          _ => writeIORef ui.uiFeedback (Just "skipped")
+        renderFrame ui
+        -- Brief pause so user sees feedback result, then clear it
+        _ <- readKey 1500
+        writeIORef ui.uiFeedback Nothing
+handleNormalKey ui KeyBackspace = do
   text <- readIORef ui.uiComposer
   case strM text of
     StrNil => pure ()
     StrCons _ _ =>
       let l = length text
       in writeIORef ui.uiComposer (substr 0 (cast (minus l 1)) text)
-handleKey ui (KeyChar c) = do
+handleNormalKey ui (KeyChar c) = do
   text <- readIORef ui.uiComposer
-  writeIORef ui.uiComposer (text ++ singleton c)
-handleKey ui KeyF1 =
-  writeIORef ui.uiFeedback (Just "EDEN/Adam TUI | Esc/Ctrl+Q=quit | Enter=send")
-handleKey _ _ = pure ()
+  -- Check for help shortcut: ? or h when composer is empty
+  if text == "" && (c == '?' || c == 'h')
+    then writeIORef ui.uiMode HelpModal
+    else do
+      let newText = text ++ singleton c
+      writeIORef ui.uiComposer newText
+      -- Paste detection: drain any rapid input burst
+      pasted <- drainPaste 10
+      if pasted == ""
+        then pure ()
+        else do
+          cur <- readIORef ui.uiComposer
+          writeIORef ui.uiComposer (cur ++ pasted)
+handleNormalKey ui KeyF1 = writeIORef ui.uiMode HelpModal
+handleNormalKey _ _ = pure ()
+
+------------------------------------------------------------------------
+-- Input handling: Help modal
+------------------------------------------------------------------------
+handleHelpKey : UIState -> KeyEvent -> IO ()
+handleHelpKey ui _ = writeIORef ui.uiMode Normal
+
+------------------------------------------------------------------------
+-- Input handling: Config modal
+------------------------------------------------------------------------
+handleConfigKey : UIState -> Nat -> KeyEvent -> IO ()
+handleConfigKey ui cursor KeyEscape = writeIORef ui.uiMode Normal
+handleConfigKey ui cursor (KeyCtrl 'q') = writeIORef ui.uiQuit True
+handleConfigKey ui cursor KeyUp =
+  if cursor > 0
+    then writeIORef ui.uiMode (ConfigModal (minus cursor 1))
+    else pure ()
+handleConfigKey ui cursor KeyDown =
+  if cursor < 9
+    then writeIORef ui.uiMode (ConfigModal (cursor + 1))
+    else pure ()
+handleConfigKey ui cursor KeyEnter = do
+  be <- readIORef ui.uiBackend
+  prof <- readIORef ui.uiSessProf
+  case cursor of
+    0 => do
+      let newBe = case be of Mock => Claude; Claude => MLX; MLX => Mock
+      writeIORef ui.uiBackend newBe
+    1 => do
+      let newMode = case prof.spMode of
+            Manual => RuntimeAuto; RuntimeAuto => AdamAuto; AdamAuto => Manual
+      writeIORef ui.uiSessProf ({ spMode := newMode } prof)
+      updateSessionProfile ui.uiSessMeta ui.uiEnv.sid "mode" (show newMode)
+    2 => do
+      let newBudget = case prof.spBudget of
+            Tight => Balanced; Balanced => Wide; Wide => Tight
+      writeIORef ui.uiSessProf ({ spBudget := newBudget } prof)
+      updateSessionProfile ui.uiSessMeta ui.uiEnv.sid "budget_mode" (show newBudget)
+    3 => do
+      let nd = if prof.spRetrDepth >= 20 then 4 else prof.spRetrDepth + 1
+      writeIORef ui.uiSessProf ({ spRetrDepth := nd } prof)
+    4 => do
+      let no = if prof.spMaxOutput >= 4096 then 256 else prof.spMaxOutput + 256
+      writeIORef ui.uiSessProf ({ spMaxOutput := no } prof)
+    5 => do
+      let nt = if prof.spTemp >= 1.95 then 0.1 else prof.spTemp + 0.1
+      writeIORef ui.uiSessProf ({ spTemp := nt } prof)
+    6 => do
+      let nr = if prof.spRespCap >= 10000 then 500 else prof.spRespCap + 500
+      writeIORef ui.uiSessProf ({ spRespCap := nr } prof)
+    7 => do
+      let nh = if prof.spHistTurns >= 20 then 1 else prof.spHistTurns + 1
+      writeIORef ui.uiSessProf ({ spHistTurns := nh } prof)
+    8 => writeIORef ui.uiSessProf ({ spLowMotion := not prof.spLowMotion } prof)
+    9 => writeIORef ui.uiSessProf ({ spDebug := not prof.spDebug } prof)
+    _ => pure ()
+handleConfigKey ui _ _ = pure ()
+
+------------------------------------------------------------------------
+-- Input handling: Atlas modal
+------------------------------------------------------------------------
+handleAtlasKey : UIState -> Nat -> Nat -> KeyEvent -> IO ()
+handleAtlasKey ui cursor soff KeyEscape = writeIORef ui.uiMode Normal
+handleAtlasKey ui cursor soff (KeyCtrl 'q') = writeIORef ui.uiQuit True
+handleAtlasKey ui cursor soff KeyUp = do
+  if cursor > 0
+    then do
+      let nc = minus cursor 1
+      let ns = if nc < soff then nc else soff
+      writeIORef ui.uiMode (AtlasModal nc ns)
+    else pure ()
+handleAtlasKey ui cursor soff KeyDown = do
+  sessions <- readIORef ui.uiEnv.store.sessions
+  let maxIdx = minus (length sessions) 1
+  if cursor < maxIdx
+    then do
+      let nc = cursor + 1
+      h <- readIORef ui.uiHeight
+      let visH = cast {to=Nat} (max 1 (h - 10))
+      let ns = if nc >= soff + visH then soff + 1 else soff
+      writeIORef ui.uiMode (AtlasModal nc ns)
+    else pure ()
+handleAtlasKey ui cursor soff KeyEnter = do
+  sessions <- readIORef ui.uiEnv.store.sessions
+  case drop cursor sessions of
+    (sess :: _) => do
+      turns <- readIORef ui.uiEnv.store.turns
+      let tc = length (filter (\t => t.sessionId == sess.id) turns)
+      writeIORef ui.uiFeedback (Just
+        ("Session: " ++ sess.title ++ " (" ++ show sess.id ++ ") "
+        ++ show tc ++ " turns"))
+      writeIORef ui.uiMode Normal
+    [] => pure ()
+handleAtlasKey ui _ _ _ = pure ()
+
+------------------------------------------------------------------------
+-- Top-level key dispatch
+------------------------------------------------------------------------
+handleKey : UIState -> KeyEvent -> IO ()
+handleKey ui key = do
+  mode <- readIORef ui.uiMode
+  case mode of
+    Normal => handleNormalKey ui key
+    HelpModal => handleHelpKey ui key
+    ConfigModal cur => handleConfigKey ui cur key
+    AtlasModal cur soff => handleAtlasKey ui cur soff key
 
 ------------------------------------------------------------------------
 -- Main loop
@@ -588,6 +962,13 @@ runTUIWith be mp principles = do
   sess <- createSession store eid agentId "TUI session" ts
   turns <- readIORef store.turns
   env <- newEdenEnv store eid sess.id ts principles
+
+  -- Session metadata and profile
+  sessMeta <- newSessionMetaStore
+  sessProf <- getSessionProfile sessMeta sess.id
+  sessProfRef <- newIORef sessProf
+
+  -- UI state refs
   turnIdx <- newIORef (the Nat 0)
   composer <- newIORef ""
   dialogue <- newIORef (the (List (String, String)) [])
@@ -601,9 +982,17 @@ runTUIWith be mp principles = do
   quit <- newIORef False
   uiW <- newIORef (the Int 120)
   uiH <- newIORef (the Int 30)
-  let ui = MkUIState env be mp turnIdx composer dialogue feedback
+  uiModeRef <- newIORef Normal
+  beRef <- newIORef be
+
+  let ui = MkUIState env beRef mp turnIdx composer dialogue feedback
                      lastActive lastHum lastBudget lastProj
-                     focusPanel scrollOff quit uiW uiH
+                     focusPanel scrollOff quit uiW uiH uiModeRef
+                     sessMeta sessProfRef
+
+  -- Run graph audit at session start (normalization + taxonomy)
+  _ <- runEden env runSessionStartAudit
+
   ok <- enterTUI
   if ok
     then do renderFrame ui; tuiLoop ui; leaveTUI

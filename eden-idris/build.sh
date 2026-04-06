@@ -120,7 +120,7 @@ echo "=== Phase 2: GCC compile + link ==="
 
 # Build include/library flags
 CFLAGS="-Wno-error=implicit-function-declaration"
-IFLAGS="-include support/eden_term.h -include support/eden_sqlite.h"
+IFLAGS="-include support/eden_term.h -include support/eden_sqlite.h -include support/eden_http.h"
 LDFLAGS="-lm -lpthread $PLAT_LDFLAGS"
 
 # Add Idris2 support paths if they exist
@@ -165,6 +165,7 @@ $CC -o "$EDEN_BIN" \
     "$EDEN_C" \
     support/eden_term.c \
     support/eden_sqlite.c \
+    support/eden_http.c \
     $IFLAGS $CFLAGS \
     -lidris2_refc -lidris2_support \
     $LDFLAGS

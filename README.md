@@ -122,4 +122,4 @@ tests/                 Python test suite
 
 ## License
 
-License has not yet been chosen. The project's design values (local-first, community-owned, tradition-embeddable) will inform the license selection.
+This project is licensed under the [GNU General Public License v3.0](LICENSE).

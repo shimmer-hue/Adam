@@ -127,4 +127,15 @@ char *eden_db_get_config(void *db, const char *key);
 int eden_db_begin(void *db);
 int eden_db_commit(void *db);
 
+/* Schema migration support */
+int eden_db_exec_sql(void *db, const char *sql);
+
+/* Document SHA deduplication */
+int eden_db_document_exists_sha(void *db, const char *experiment_id, const char *sha256);
+
+/* New entity loads (chunks, documents, measurement events) */
+char *eden_db_load_chunks(void *db);
+char *eden_db_load_documents(void *db);
+char *eden_db_load_measurement_events(void *db);
+
 #endif

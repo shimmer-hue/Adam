@@ -37,6 +37,9 @@ import Eden.TermIO
 import Eden.TUI
 import Eden.Export
 import Eden.SQLite
+import Eden.Observatory
+import Eden.Models.MLX
+import Eden.Browser
 
 -- Helper for display
 showDouble : Double -> String
@@ -421,6 +424,7 @@ main = do
                      pure exp.id
 
       path <- writeGraphExport store eid
+      _ <- if elem "--open" cliArgs then openBrowser path else pure False
       putStrLn ("  -> " ++ path)
 
       -- Close DB

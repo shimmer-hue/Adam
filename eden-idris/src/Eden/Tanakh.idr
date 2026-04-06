@@ -336,3 +336,397 @@ showAnalysis a =
           , "  Sofei:    " ++ a.sofeiResult
           , "  At-Bash:  " ++ a.atBashResult
           ]
+
+------------------------------------------------------------------------
+-- Multiple gematria schemes
+------------------------------------------------------------------------
+
+||| Gematria calculation schemes.
+||| - Standard: mispar hechrachi (standard values, finals normalized)
+||| - Gadol: final letter forms retain full hundreds values
+||| - Katan: each letter reduced to single digit (1-9)
+||| - Ordinal: positional value (aleph=1, bet=2, ..., tav=22)
+public export
+data GematriaScheme = Standard | Gadol | Katan | Ordinal
+
+public export
+Show GematriaScheme where
+  show Standard = "standard"
+  show Gadol    = "gadol"
+  show Katan    = "katan"
+  show Ordinal  = "ordinal"
+
+public export
+Eq GematriaScheme where
+  Standard == Standard = True
+  Gadol    == Gadol    = True
+  Katan    == Katan    = True
+  Ordinal  == Ordinal  = True
+  _        == _        = False
+
+||| Gematria gadol: final letter forms at their full extended values.
+||| kaf sofit=500, mem sofit=600, nun sofit=700, pe sofit=800, tsadi sofit=900.
+||| Standard letters use their normal values.
+gematriaGadolValue : Char -> Int
+gematriaGadolValue c =
+  let cp = ord c
+  in if      cp == 0x05DA then 500   -- kaf sofit
+     else if cp == 0x05DD then 600   -- mem sofit
+     else if cp == 0x05DF then 700   -- nun sofit
+     else if cp == 0x05E3 then 800   -- pe sofit
+     else if cp == 0x05E5 then 900   -- tsadi sofit
+     else gematriaTable (ord (normalizeFinal c))
+
+||| Gematria katan: reduce each standard letter value to a single digit.
+||| 1-9 -> 1-9, 10-90 -> 1-9, 100-400 -> 1-4.
+gematriaKatanValue : Char -> Int
+gematriaKatanValue c =
+  let v = letterValue c
+  in if v == 0 then 0
+     else let reduced = if v >= 100 then v `div` 100
+                        else if v >= 10 then v `div` 10
+                        else v
+          in reduced
+
+||| Gematria ordinal: positional value in the alphabet.
+||| aleph=1, bet=2, ..., tav=22.
+gematriaOrdinalTable : Int -> Int
+gematriaOrdinalTable cp =
+  if      cp == 0x05D0 then 1   -- aleph
+  else if cp == 0x05D1 then 2   -- bet
+  else if cp == 0x05D2 then 3   -- gimel
+  else if cp == 0x05D3 then 4   -- dalet
+  else if cp == 0x05D4 then 5   -- he
+  else if cp == 0x05D5 then 6   -- vav
+  else if cp == 0x05D6 then 7   -- zayin
+  else if cp == 0x05D7 then 8   -- chet
+  else if cp == 0x05D8 then 9   -- tet
+  else if cp == 0x05D9 then 10  -- yod
+  else if cp == 0x05DB then 11  -- kaf
+  else if cp == 0x05DC then 12  -- lamed
+  else if cp == 0x05DE then 13  -- mem
+  else if cp == 0x05E0 then 14  -- nun
+  else if cp == 0x05E1 then 15  -- samekh
+  else if cp == 0x05E2 then 16  -- ayin
+  else if cp == 0x05E4 then 17  -- pe
+  else if cp == 0x05E6 then 18  -- tsadi
+  else if cp == 0x05E7 then 19  -- qof
+  else if cp == 0x05E8 then 20  -- resh
+  else if cp == 0x05E9 then 21  -- shin
+  else if cp == 0x05EA then 22  -- tav
+  else 0
+
+gematriaOrdinalValue : Char -> Int
+gematriaOrdinalValue c = gematriaOrdinalTable (ord (normalizeFinal c))
+
+||| Compute the gematria value of a single character under a given scheme.
+public export
+letterValueWith : GematriaScheme -> Char -> Int
+letterValueWith Standard c = letterValue c
+letterValueWith Gadol    c = gematriaGadolValue c
+letterValueWith Katan    c = gematriaKatanValue c
+letterValueWith Ordinal  c = gematriaOrdinalValue c
+
+||| Compute the gematria of a word or phrase under a given scheme.
+||| Non-Hebrew characters are skipped.
+public export
+gematriaWith : GematriaScheme -> String -> Int
+gematriaWith scheme = foldl (\acc, c => acc + letterValueWith scheme c) 0 . unpack
+
+||| Compute gematria gadol of a word or phrase.
+||| Final letter forms use extended values (500-900).
+public export
+gematriaGadol : String -> Int
+gematriaGadol = gematriaWith Gadol
+
+||| Compute gematria katan of a word or phrase.
+||| Each letter is reduced to a single digit (1-9).
+public export
+gematriaKatan : String -> Int
+gematriaKatan = gematriaWith Katan
+
+||| Compute gematria ordinal of a word or phrase.
+||| Each letter is valued by its position: aleph=1 through tav=22.
+public export
+gematriaOrdinal : String -> Int
+gematriaOrdinal = gematriaWith Ordinal
+
+------------------------------------------------------------------------
+-- Gematria equivalence search
+------------------------------------------------------------------------
+
+||| Check if two strings have equal gematria under the standard scheme.
+public export
+areGematriaEqual : String -> String -> Bool
+areGematriaEqual a b = gematria a == gematria b
+
+||| Check if two strings have equal gematria under a given scheme.
+public export
+areGematriaEqualWith : GematriaScheme -> String -> String -> Bool
+areGematriaEqualWith scheme a b = gematriaWith scheme a == gematriaWith scheme b
+
+||| Find all strings in a corpus that have a given gematria value
+||| under the standard scheme.
+public export
+findEquivalent : Int -> List String -> List String
+findEquivalent target = filter (\s => gematria s == target)
+
+||| Find all strings in a corpus that have a given gematria value
+||| under a specified scheme.
+public export
+findEquivalentWith : GematriaScheme -> Int -> List String -> List String
+findEquivalentWith scheme target = filter (\s => gematriaWith scheme s == target)
+
+------------------------------------------------------------------------
+-- Enhanced analysis: per-word and per-letter breakdowns
+------------------------------------------------------------------------
+
+||| Compute gematria for each word in a phrase, returning (word, value) pairs.
+||| Words with no Hebrew letters are excluded.
+public export
+wordGematria : String -> List (String, Int)
+wordGematria s =
+  let ws = words s
+  in mapMaybe (\w =>
+       let letters = hebrewLetters w
+       in case letters of
+            [] => Nothing
+            _  => Just (w, gematria w)
+     ) ws
+
+||| Compute gematria for each word under a given scheme.
+public export
+wordGematriaWith : GematriaScheme -> String -> List (String, Int)
+wordGematriaWith scheme s =
+  let ws = words s
+  in mapMaybe (\w =>
+       let letters = hebrewLetters w
+       in case letters of
+            [] => Nothing
+            _  => Just (w, gematriaWith scheme w)
+     ) ws
+
+||| Per-letter breakdown: for each Hebrew letter in a string, return
+||| (character, letter name, standard gematria value).
+||| Non-Hebrew characters are skipped.
+public export
+letterBreakdown : String -> List (Char, String, Int)
+letterBreakdown s =
+  let chars = filter isHebrew (unpack s)
+  in map (\c => (c, hebrewLetterName c, letterValue c)) chars
+
+||| Per-letter breakdown under a given scheme.
+public export
+letterBreakdownWith : GematriaScheme -> String -> List (Char, String, Int)
+letterBreakdownWith scheme s =
+  let chars = filter isHebrew (unpack s)
+  in map (\c => (c, hebrewLetterName c, letterValueWith scheme c)) chars
+
+------------------------------------------------------------------------
+-- Scene compiler types (foundation for 3D visualization)
+------------------------------------------------------------------------
+
+||| Spatial coordinate in scene space.
+public export
+record Vec3 where
+  constructor MkVec3
+  vx : Double
+  vy : Double
+  vz : Double
+
+||| A passage with its analysis attached.
+public export
+record AnalyzedPassage where
+  constructor MkAnalyzedPassage
+  apText       : String
+  apAnalysis   : HebrewAnalysis
+  apScheme     : GematriaScheme
+  apGadolVal   : Int
+  apKatanVal   : Int
+  apOrdinalVal : Int
+
+||| A scene element: an analyzed passage with spatial placement.
+public export
+record SceneElement where
+  constructor MkSceneElement
+  sePassage  : AnalyzedPassage
+  sePosition : Vec3
+  seScale    : Double
+  seLayer    : Nat
+
+||| A compiled scene: passages analyzed and placed for visualization.
+public export
+record Scene where
+  constructor MkScene
+  scTitle      : String
+  scElements   : List SceneElement
+  scTotalGem   : Int
+  scPassageCount : Nat
+
+||| Analyze a passage under all gematria schemes.
+public export
+analyzePassage : String -> AnalyzedPassage
+analyzePassage text =
+  MkAnalyzedPassage
+    text
+    (analyzeHebrew text)
+    Standard
+    (gematriaGadol text)
+    (gematriaKatan text)
+    (gematriaOrdinal text)
+
+||| Simple layout: place passages along a vertical axis, spaced by index.
+placeElements : List AnalyzedPassage -> List SceneElement
+placeElements passages = go 0 passages
+  where
+    go : Nat -> List AnalyzedPassage -> List SceneElement
+    go _ []        = []
+    go n (p :: ps) =
+      let y = cast {to=Double} n * 2.0
+          pos = MkVec3 0.0 y 0.0
+      in MkSceneElement p pos 1.0 n :: go (S n) ps
+
+||| Compile a list of passage strings into a scene.
+||| Each passage is analyzed under all gematria schemes and placed
+||| in a linear vertical layout for frontend consumption.
+public export
+compileScene : String -> List String -> Scene
+compileScene title passages =
+  let analyzed = map analyzePassage passages
+      elements = placeElements analyzed
+      totalGem = foldl (\acc, p => acc + p.apAnalysis.gematriaValue) 0 analyzed
+  in MkScene title elements totalGem (length passages)
+
+------------------------------------------------------------------------
+-- Scene JSON serialization
+------------------------------------------------------------------------
+
+||| Minimal JSON helpers (self-contained to keep Tanakh pure/importless).
+scJsonStr : String -> String
+scJsonStr s = "\"" ++ s ++ "\""
+
+scJsonNum : Double -> String
+scJsonNum d =
+  let i = cast {to=Integer} (d * 1000.0)
+  in show (cast {to=Double} i / 1000.0)
+
+scJsonInt : Int -> String
+scJsonInt = show
+
+scJsonNat : Nat -> String
+scJsonNat = show
+
+scJsonObj : List (String, String) -> String
+scJsonObj fields =
+  "{" ++ joinFields fields ++ "}"
+  where
+    joinFields : List (String, String) -> String
+    joinFields [] = ""
+    joinFields [(k, v)] = scJsonStr k ++ ": " ++ v
+    joinFields ((k, v) :: rest) = scJsonStr k ++ ": " ++ v ++ ", " ++ joinFields rest
+
+scJsonArr : List String -> String
+scJsonArr items = "[" ++ joinItems items ++ "]"
+  where
+    joinItems : List String -> String
+    joinItems [] = ""
+    joinItems [x] = x
+    joinItems (x :: rest) = x ++ ", " ++ joinItems rest
+
+||| Serialize a Vec3 to JSON.
+vec3ToJson : Vec3 -> String
+vec3ToJson v = scJsonObj
+  [ ("x", scJsonNum v.vx)
+  , ("y", scJsonNum v.vy)
+  , ("z", scJsonNum v.vz)
+  ]
+
+||| Serialize an AnalyzedPassage to JSON.
+passageToJson : AnalyzedPassage -> String
+passageToJson p = scJsonObj
+  [ ("text",         scJsonStr p.apText)
+  , ("gematria",     scJsonInt p.apAnalysis.gematriaValue)
+  , ("gadol",        scJsonInt p.apGadolVal)
+  , ("katan",        scJsonInt p.apKatanVal)
+  , ("ordinal",      scJsonInt p.apOrdinalVal)
+  , ("letter_count", scJsonNat p.apAnalysis.letterCount)
+  , ("roshei",       scJsonStr p.apAnalysis.rosheiResult)
+  , ("sofei",        scJsonStr p.apAnalysis.sofeiResult)
+  , ("atbash",       scJsonStr p.apAnalysis.atBashResult)
+  ]
+
+||| Serialize a SceneElement to JSON.
+elementToJson : SceneElement -> String
+elementToJson se = scJsonObj
+  [ ("passage",  passageToJson se.sePassage)
+  , ("position", vec3ToJson se.sePosition)
+  , ("scale",    scJsonNum se.seScale)
+  , ("layer",    scJsonNat se.seLayer)
+  ]
+
+||| Serialize a Scene to JSON for frontend consumption.
+public export
+sceneToJSON : Scene -> String
+sceneToJSON sc = scJsonObj
+  [ ("title",         scJsonStr sc.scTitle)
+  , ("passage_count", scJsonNat sc.scPassageCount)
+  , ("total_gematria", scJsonInt sc.scTotalGem)
+  , ("elements",      scJsonArr (map elementToJson sc.scElements))
+  ]
+
+------------------------------------------------------------------------
+-- Enhanced HebrewAnalysis with multi-scheme results
+------------------------------------------------------------------------
+
+||| Extended analysis including all gematria schemes.
+public export
+record HebrewAnalysisExt where
+  constructor MkHebrewAnalysisExt
+  haeBase     : HebrewAnalysis
+  haeGadol    : Int
+  haeKatan    : Int
+  haeOrdinal  : Int
+  haeWords    : List (String, Int)
+  haeLetters  : List (Char, String, Int)
+
+||| Perform extended analysis on Hebrew text including all gematria schemes,
+||| per-word breakdown, and per-letter breakdown.
+public export
+analyzeHebrewExt : String -> HebrewAnalysisExt
+analyzeHebrewExt input =
+  let base = analyzeHebrew input
+      stripped = base.strippedText
+  in MkHebrewAnalysisExt
+       base
+       (gematriaGadol stripped)
+       (gematriaKatan stripped)
+       (gematriaOrdinal stripped)
+       (wordGematria stripped)
+       (letterBreakdown stripped)
+
+||| Format an extended analysis as a human-readable summary.
+public export
+showAnalysisExt : HebrewAnalysisExt -> String
+showAnalysisExt a =
+  let base = a.haeBase
+      wordLines = map (\p => "    " ++ fst p ++ " = " ++ show (snd p)) a.haeWords
+      letterLines = map (\t =>
+        let c = fst t
+            nm = fst (snd t)
+            v = snd (snd t)
+        in "    " ++ singleton c ++ " (" ++ nm ++ ") = " ++ show v) a.haeLetters
+  in unlines ([ "Hebrew Analysis (Extended)"
+              , "  Input:       " ++ base.inputText
+              , "  Stripped:    " ++ base.strippedText
+              , "  Letters:     " ++ show base.letterCount
+              , "  Standard:    " ++ show base.gematriaValue
+              , "  Gadol:       " ++ show a.haeGadol
+              , "  Katan:       " ++ show a.haeKatan
+              , "  Ordinal:     " ++ show a.haeOrdinal
+              , "  Roshei:      " ++ base.rosheiResult
+              , "  Sofei:       " ++ base.sofeiResult
+              , "  At-Bash:     " ++ base.atBashResult
+              , "  Word breakdown:"
+              ] ++ wordLines
+              ++ ["  Letter breakdown:"]
+              ++ letterLines)

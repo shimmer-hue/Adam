@@ -1,7 +1,8 @@
 ||| SQLite3 FFI bindings for graph persistence.
 |||
 ||| Lifecycle (open/close/schema), bulk load at startup,
-||| and write-through helpers called from Store.InMemory.
+||| schema migration framework, and write-through helpers
+||| called from Store.InMemory.
 module Eden.SQLite
 
 import Data.IORef
@@ -126,11 +127,119 @@ prim__dbBegin : AnyPtr -> PrimIO Int
 %foreign "C:eden_db_commit,eden_sqlite"
 prim__dbCommit : AnyPtr -> PrimIO Int
 
+-- Schema migration support
+%foreign "C:eden_db_exec_sql,eden_sqlite"
+prim__dbExecSql : AnyPtr -> String -> PrimIO Int
+
+-- Document SHA lookup
+%foreign "C:eden_db_document_exists_sha,eden_sqlite"
+prim__dbDocExistsSha : AnyPtr -> String -> String -> PrimIO Int
+
+-- Chunk loading
+%foreign "C:eden_db_load_chunks,eden_sqlite"
+prim__dbLoadChunks : AnyPtr -> PrimIO String
+
+-- Document loading
+%foreign "C:eden_db_load_documents,eden_sqlite"
+prim__dbLoadDocuments : AnyPtr -> PrimIO String
+
+-- Measurement event loading
+%foreign "C:eden_db_load_measurement_events,eden_sqlite"
+prim__dbLoadMeasurementEvents : AnyPtr -> PrimIO String
+
+------------------------------------------------------------------------
+-- Schema migration framework
+------------------------------------------------------------------------
+
+||| A single migration step: version number, description, SQL to execute.
+record Migration where
+  constructor MkMigration
+  mgVersion     : Int
+  mgDescription : String
+  mgSql         : String
+
+||| The ordered list of schema migrations.
+||| Migration 1 = baseline schema (created by eden_db_init_schema).
+||| Migration 2 = add schema_version tracking + ensure chunks/measurements tables.
+migrations : List Migration
+migrations =
+  [ MkMigration 2 "add schema_version tracking and ensure new tables"
+      (  "CREATE TABLE IF NOT EXISTS schema_version "
+      ++ "(version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT);"
+      ++ "INSERT OR IGNORE INTO schema_version (version, description, applied_at) "
+      ++ "VALUES (1, 'baseline schema', datetime('now'));"
+      ++ "CREATE TABLE IF NOT EXISTS chunks "
+      ++ "(id TEXT PRIMARY KEY, experiment_id TEXT, document_id TEXT, "
+      ++ "chunk_index INTEGER, page_number INTEGER, text TEXT, created_at TEXT);"
+      ++ "CREATE TABLE IF NOT EXISTS measurement_events "
+      ++ "(id TEXT PRIMARY KEY, experiment_id TEXT, session_id TEXT, "
+      ++ "action_type TEXT, state TEXT, operator TEXT, evidence TEXT, "
+      ++ "before_state TEXT, proposed_state TEXT, committed_state TEXT, "
+      ++ "revert_of TEXT, created_at TEXT);"
+      ++ "CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);"
+      ++ "CREATE INDEX IF NOT EXISTS idx_chunks_experiment ON chunks(experiment_id);"
+      ++ "CREATE INDEX IF NOT EXISTS idx_meas_experiment ON measurement_events(experiment_id);"
+      ++ "CREATE INDEX IF NOT EXISTS idx_docs_sha ON documents(sha256);")
+  , MkMigration 3 "add document and chunk FTS indexes"
+      (  "CREATE INDEX IF NOT EXISTS idx_docs_experiment ON documents(experiment_id);"
+      ++ "CREATE INDEX IF NOT EXISTS idx_memes_canonical ON memes(experiment_id, canonical_label, domain);"
+      ++ "CREATE INDEX IF NOT EXISTS idx_edges_src ON edges(experiment_id, src_id);"
+      ++ "CREATE INDEX IF NOT EXISTS idx_edges_dst ON edges(experiment_id, dst_id);")
+  ]
+
+||| Get the current schema version from the database.
+||| Returns 1 if no schema_version table exists (baseline).
+export
+getCurrentVersion : HasIO io => AnyPtr -> io Int
+getCurrentVersion db = do
+  verStr <- liftIO $ primIO (prim__dbGetConfig db "schema_version")
+  case the (Maybe Integer) (parsePositive verStr) of
+    Just v  => pure (cast v)
+    Nothing => pure 1  -- baseline: no version tracked yet
+
+||| Apply a single migration.
+applyMigration : AnyPtr -> Migration -> IO Bool
+applyMigration db mig = do
+  rc <- primIO (prim__dbExecSql db mig.mgSql)
+  if rc == 0
+    then do
+      _ <- primIO (prim__dbExecSql db
+        (  "INSERT OR REPLACE INTO schema_version "
+        ++ "(version, description, applied_at) VALUES ("
+        ++ show mig.mgVersion ++ ", '"
+        ++ mig.mgDescription ++ "', datetime('now'))"))
+      _ <- primIO (prim__dbSetConfig db "schema_version" (show mig.mgVersion))
+      putStrLn ("  [db] migration " ++ show mig.mgVersion
+             ++ ": " ++ mig.mgDescription)
+      pure True
+    else do
+      putStrLn ("  [db] migration " ++ show mig.mgVersion
+             ++ " FAILED")
+      pure False
+
+||| Run all pending migrations against the database.
+||| Checks current version and applies any migrations with higher version numbers.
+export
+runMigrations : HasIO io => AnyPtr -> io ()
+runMigrations db = liftIO $ do
+  currentVer <- getCurrentVersion db
+  let pending = filter (\m => m.mgVersion > currentVer) migrations
+      sorted  = sortBy (\a, b => compare a.mgVersion b.mgVersion) pending
+  case sorted of
+    [] => pure ()
+    _  => do
+      putStrLn ("  [db] running " ++ show (length sorted)
+             ++ " migration(s) from v" ++ show currentVer ++ "...")
+      _ <- primIO (prim__dbBegin db)
+      results <- traverse (applyMigration db) sorted
+      _ <- primIO (prim__dbCommit db)
+      pure ()
+
 ------------------------------------------------------------------------
 -- High-level lifecycle
 ------------------------------------------------------------------------
 
-||| Open the database, initialize schema, return handle.
+||| Open the database, initialize schema, run migrations, return handle.
 export
 openDB : String -> IO (Maybe AnyPtr)
 openDB path = do
@@ -144,7 +253,9 @@ openDB path = do
       if rc /= 0
         then do _ <- primIO (prim__dbClose db)
                 pure Nothing
-        else pure (Just db)
+        else do
+          runMigrations db
+          pure (Just db)
 
 ||| Close database handle.
 export
@@ -306,15 +417,50 @@ loadFromDB db st = do
   tmetas <- pure $ mapMaybe (\l => deserializeTurnMetadata (splitTabs l)) tmetaLines
   writeIORef st.turnMetadata tmetas
 
+  -- Load chunks
+  chunkStr <- primIO (prim__dbLoadChunks db)
+  let chunkLines = filter (\l => length l > 0) (lines chunkStr)
+  chunks <- pure $ mapMaybe (\l => deserializeChunk (splitTabs l)) chunkLines
+  writeIORef st.chunks chunks
+
+  -- Load documents
+  docStr <- primIO (prim__dbLoadDocuments db)
+  let docLines = filter (\l => length l > 0) (lines docStr)
+  docs <- pure $ mapMaybe (\l => deserializeDocument (splitTabs l)) docLines
+  writeIORef st.documents docs
+
+  -- Load measurement events
+  measStr <- primIO (prim__dbLoadMeasurementEvents db)
+  let measLines = filter (\l => length l > 0) (lines measStr)
+  meass <- pure $ mapMaybe (\l => deserializeMeasurementEvent (splitTabs l)) measLines
+  writeIORef st.measurements meass
+
   -- Restore next_id from config
   nidStr <- primIO (prim__dbGetConfig db "next_id")
   let nid = case the (Maybe Integer) (parsePositive nidStr) of
               Just n  => the Nat (cast n)
               Nothing => 1
   writeIORef st.nextId nid
+
+  -- Rebuild FTS index from loaded memes
+  rebuildFtsIndex st
+
   putStrLn ("  [db] loaded: " ++ show (length memes) ++ " memes, "
          ++ show (length edges) ++ " edges, "
          ++ show (length turns) ++ " turns, "
          ++ show (length fbs) ++ " feedback, "
-         ++ show (length agents) ++ " agents")
+         ++ show (length agents) ++ " agents, "
+         ++ show (length chunks) ++ " chunks, "
+         ++ show (length docs) ++ " documents")
   pure nid
+
+------------------------------------------------------------------------
+-- Document SHA deduplication (SQLite-backed)
+------------------------------------------------------------------------
+
+||| Check if a document with the given SHA256 exists in the database.
+export
+dbDocumentExistsBySha : AnyPtr -> ExperimentId -> String -> IO Bool
+dbDocumentExistsBySha db eid sha = do
+  rc <- primIO (prim__dbDocExistsSha db (show eid) sha)
+  pure (rc > 0)

@@ -267,6 +267,85 @@ eRecordExportArtifact artType path graphHash = do
   liftIO (recordExportArtifact env.store env.eid artType path graphHash env.ts)
 
 ------------------------------------------------------------------------
+-- Convenience: chunk operations
+------------------------------------------------------------------------
+
+||| Get all chunks for the current experiment.
+public export
+eGetChunks : EdenM (List Chunk)
+eGetChunks = do
+  env <- ask
+  liftIO (getChunks env.store env.eid)
+
+||| Get chunks belonging to a specific document.
+public export
+eGetChunksByDocument : DocumentId -> EdenM (List Chunk)
+eGetChunksByDocument did = do
+  st <- getStore
+  liftIO (getChunksByDocument st did)
+
+||| Create a chunk in EdenM.
+public export
+eCreateChunk : DocumentId -> Nat -> Maybe Nat -> String -> EdenM Chunk
+eCreateChunk did idx pageNum text = do
+  env <- ask
+  liftIO (createChunk env.store env.eid did idx pageNum text env.ts)
+
+------------------------------------------------------------------------
+-- Convenience: document operations
+------------------------------------------------------------------------
+
+||| Get all documents for the current experiment.
+public export
+eGetDocuments : EdenM (List Document)
+eGetDocuments = do
+  env <- ask
+  liftIO (getDocuments env.store env.eid)
+
+||| Check whether a document with the given SHA256 already exists.
+public export
+eDocumentExistsBySha : String -> EdenM Bool
+eDocumentExistsBySha sha = do
+  env <- ask
+  liftIO (documentExistsBySha env.store env.eid sha)
+
+------------------------------------------------------------------------
+-- Convenience: FTS search
+------------------------------------------------------------------------
+
+||| Search memes using the inverted full-text index.
+public export
+eFtsSearchMemes : String -> EdenM (List Meme)
+eFtsSearchMemes query = do
+  env <- ask
+  liftIO (ftsSearchMemes env.store env.eid query)
+
+------------------------------------------------------------------------
+-- Convenience: measurement event queries
+------------------------------------------------------------------------
+
+||| Get all measurement events for the current experiment.
+public export
+eGetMeasurementEvents : EdenM (List MeasurementEvent)
+eGetMeasurementEvents = do
+  env <- ask
+  liftIO (getMeasurementEvents env.store env.eid)
+
+||| Get measurement events targeting a specific node ID.
+public export
+eGetMeasurementEventsByTarget : String -> EdenM (List MeasurementEvent)
+eGetMeasurementEventsByTarget targetId = do
+  env <- ask
+  liftIO (getMeasurementEventsByTarget env.store env.eid targetId)
+
+||| Revert a measurement event by creating a new revert event.
+public export
+eRevertMeasurementEvent : String -> EdenM (Maybe MeasurementEvent)
+eRevertMeasurementEvent originalEventId = do
+  env <- ask
+  liftIO (revertMeasurementEvent env.store env.eid env.sid originalEventId env.ts)
+
+------------------------------------------------------------------------
 -- Convenience: lifted trace operations
 ------------------------------------------------------------------------
 
