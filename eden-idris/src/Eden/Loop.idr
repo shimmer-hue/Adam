@@ -160,7 +160,7 @@ handleChat be mp env turnIdx msg = do
   writeIORef turnIdx (idx + 1)
 
   -- Execute turn via monadic pipeline
-  tr <- runEden env (mExecuteTurnWith be mp idx msg)
+  tr <- runEden env (mExecuteTurnWith be mp 5 idx msg)
   putStrLn $ "\n[adam] " ++ tr.mrResponse
   case tr.mrConcepts of
     [] => pure ()

@@ -156,7 +156,9 @@ record UIState where
   uiActionSel    : IORef Nat
   uiChyronVisible : IORef Bool
   uiApertureDrawer : IORef Bool
-  uiReasoningTab   : IORef Nat
+  uiReasoningTab    : IORef Nat
+  uiReasoningScroll : IORef Int
+  uiTurnPhase       : IORef String
 
 ------------------------------------------------------------------------
 -- Rendering primitives
@@ -317,15 +319,26 @@ drawStatusPanels ui r c tw = do
   counts <- runEden ui.uiEnv eGraphCounts
   active <- readIORef ui.uiLastActive
   prof <- readIORef ui.uiSessProf
+  mBudget <- readIORef ui.uiLastBudget
+  let budgetLns = case mBudget of
+        Nothing => ["No estimate yet", "Type to arm.", "Deck=F6"]
+        Just b  => [ "pressure=" ++ show b.pressure
+                   , "used=" ++ show b.usedPromptTokens ++ "t"
+                   , "remain=" ++ show b.remainingInputTokens ++ "t"
+                   , "items=" ++ show (length active)
+                   , "budget=" ++ show prof.spBudget
+                   , "hist=" ++ show prof.spHistTurns ++ "t"]
   let pw = tw `div` 3
-  drawPanel r c pw 10 "Context" colAmber
-    ["No estimate", "yet", "Type to arm.", "Deck=F6"]
+  drawPanel r c pw 10 "Context Budget" colAmber budgetLns
   drawPanel r (c+pw) pw 10 "Live Turn Status" colAmber
-    [ "Adam status", "phase=start"
-    , "Start here: type", "below, press Enter"
-    , "to send, or press F9"
-    , "model=" ++ show be, "mode=" ++ show prof.spMode
-    , "items=" ++ show (length active) ++ " review=clear"]
+    [ "model=" ++ show be
+    , "mode=" ++ show prof.spMode
+    , "temp=" ++ showD prof.spTemp
+    , "top_p=" ++ showD prof.spTopP
+    , "rep_pen=" ++ showD prof.spRepPen
+    , "items=" ++ show (length active)
+    , "turn=" ++ show idx
+    , "resp_cap=" ++ show prof.spRespCap ]
   let aLns = case active of
         [] => ["Aperture snapshot", "No active set yet. Type in", "the compose or ingest a", "document to arm the scan.", "Press F8 for the wide", "aperture drawer."]
         _  => map (\x => x.label ++ " " ++ showD x.regard) (take 6 active)
@@ -339,10 +352,17 @@ drawRuntimeLine ui row w = do
   be <- readIORef ui.uiBackend
   idx <- readIORef ui.uiTurnIdx
   prof <- readIORef ui.uiSessProf
+  phase <- readIORef ui.uiTurnPhase
   clearRow row 0 w colPanel
+  mBudget <- readIORef ui.uiLastBudget
+  let budgetStr = case mBudget of
+        Nothing => "budget=--"
+        Just b  => "budget=" ++ show b.pressure ++ " used=" ++ show b.usedPromptTokens ++ "t"
+  -- §3.11: Show generation phase indicator
+  let phaseStr = if phase == "idle" then "" else " [" ++ phase ++ "]"
   putText row 1 colIce colPanel False (w-1)
     ("runtime=Adam / " ++ show be ++ " mode=" ++ show prof.spMode
-     ++ " budget=" ++ show prof.spBudget ++ " session=active focus=composer")
+     ++ " " ++ budgetStr ++ phaseStr ++ " session=" ++ show ui.uiEnv.sid)
 
 ------------------------------------------------------------------------
 -- Dialogue tape (bordered)
@@ -402,9 +422,9 @@ drawDialogue ui r c w h = do
       if row + 1 >= s + ch
         then pure ()
         else do
-          -- User line (single line with tag)
+          -- User line (single line with tag, operator prefix)
           clearRow row c' cw colBg
-          let tag = "[you T" ++ show idx ++ "] "
+          let tag = "[operator T" ++ show idx ++ "] "
           let tl = cast (length tag)
           putText row (c'+1) colAmber colBg True (cw-1) tag
           putText row (c' + 1 + tl) colText colBg False (cw - 1 - tl) u
@@ -475,14 +495,16 @@ drawTabBar ui row col w = do
 drawReasoning : UIState -> Int -> Int -> Int -> Int -> IO ()
 drawReasoning ui r c w h = do
   tab <- readIORef ui.uiReasoningTab
+  scrollOff <- readIORef ui.uiReasoningScroll
   let tabName = if tab == 1 then "Chain-Like" else if tab == 2 then "Hum Live" else "Reasoning"
   sectionTitle r c w tabName colMuted
   clearRect (r+1) (h-1) c w colBg
   if tab == 1
-    then do -- Chain-Like: numbered beats from last answer
+    then do -- Chain-Like: numbered beats from last answer (§3.12: scrollable)
       lastResp <- readIORef ui.uiLastResponse
-      let beats = if lastResp == "" then ["(no answer yet)"]
-                  else zipWith (\n, l => show n ++ ". " ++ l) [1..10] (take 10 (lines lastResp))
+      let allBeats = if lastResp == "" then ["(no answer yet)"]
+                     else zipWith (\n, l => show n ++ ". " ++ l) [1..50] (lines lastResp)
+          beats = drop (cast {to=Nat} scrollOff) allBeats
       drawBeatLines (r+1) (c+1) (w-1) (min (cast (h - 1)) (cast (length beats))) beats
     else if tab == 2
       then do -- Hum Live: hum summary
@@ -848,23 +870,49 @@ parseVerdict _   = Nothing
 handleFKey : UIState -> Nat -> IO ()
 handleFKey ui 1 = writeIORef ui.uiMode HelpModal
 handleFKey ui 2 = do
-  path <- writeGraphExport ui.uiEnv.store ui.uiEnv.eid
-  writeIORef ui.uiFeedback (Just ("exported: " ++ path))
+  let outPath = "data/export/" ++ show ui.uiEnv.sid ++ "-conversation.md"
+  result <- writeConversationLog ui.uiEnv.store ui.uiSessMeta ui.uiEnv.sid outPath
+  case result of
+    Right p => writeIORef ui.uiFeedback (Just ("conversation log: " ++ p))
+    Left err => writeIORef ui.uiFeedback (Just ("log export failed: " ++ err))
 handleFKey ui 3 = writeIORef ui.uiFeedback (Just "observatory: use --export to generate data")
 handleFKey ui 4 = do
   lm <- readIORef ui.uiLowMotion
   writeIORef ui.uiLowMotion (not lm)
   writeIORef ui.uiFeedback (Just ("low motion: " ++ show (not lm)))
 handleFKey ui 5 = do
+  ts <- currentTimestamp
+  let agentId = MkId {a=AgentTag} "adam-01"
+  newSess <- createSession ui.uiEnv.store ui.uiEnv.eid agentId "New session" ts
   writeIORef ui.uiDialogue []
   writeIORef ui.uiTurnIdx 0
   writeIORef ui.uiTapeScroll 0
-  writeIORef ui.uiFeedback (Just "dialogue cleared")
+  writeIORef ui.uiFeedback (Just ("new session: " ++ show newSess.id))
+  writeIORef ui.uiMode (ConfigModal 0)
 handleFKey ui 6 = writeIORef ui.uiMode (ConfigModal 0)
 handleFKey ui 7 = do
   lastResp <- readIORef ui.uiLastResponse
-  let buf = if lastResp == "" then [""] else lines lastResp
-  writeIORef ui.uiMode (EditModal buf 0 0)
+  if lastResp == ""
+    then writeIORef ui.uiFeedback (Just "no response to review yet")
+    else do
+      writeIORef ui.uiFeedback (Just "verdict? a=accept r=reject e=edit s=skip")
+      renderFrame ui
+      vk <- readKey 15000
+      case vk of
+        KeyChar 'e' => do
+          let buf = lines lastResp
+          writeIORef ui.uiMode (EditModal buf 0 0)
+        KeyChar c => case parseVerdict c of
+          Just v => do
+            idx <- readIORef ui.uiTurnIdx
+            let turnId = MkId {a=TurnTag} ("turn-" ++ show idx)
+            runEden ui.uiEnv (mProcessFeedback turnId v "")
+            hum <- runEden ui.uiEnv mBuildHum
+            writeHumFile hum
+            writeIORef ui.uiLastHum (Just hum)
+            writeIORef ui.uiFeedback (Just ("verdict recorded: " ++ show v))
+          Nothing => writeIORef ui.uiFeedback (Just "review cancelled")
+        _ => writeIORef ui.uiFeedback (Just "review cancelled")
 handleFKey ui 8 = do
   ad <- readIORef ui.uiApertureDrawer
   writeIORef ui.uiApertureDrawer (not ad)
@@ -913,9 +961,9 @@ handleEnterComposer ui = do
       Just "/regard" => do
         writeIORef ui.uiComposer ""
         memes <- runEden ui.uiEnv eGetMemes
+        gm <- computeGraphMetrics ui.uiEnv.store ui.uiEnv.eid
         let labels = map (\m =>
               let ns = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau 0.0 m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
-                  gm = MkGraphMetrics 0.5 0.4 0.3
                   rb = regardBreakdown defaultRegardWeights ns gm
               in m.label ++ "=" ++ showD rb.totalRegard) (take 8 memes)
         writeIORef ui.uiFeedback (Just (concat (intersperse " " labels)))
@@ -956,11 +1004,15 @@ handleEnterComposer ui = do
         idx <- readIORef ui.uiTurnIdx
         writeIORef ui.uiTurnIdx (idx + 1)
         writeIORef ui.uiComposer ""
+        writeIORef ui.uiTurnPhase "assembling"
         writeIORef ui.uiFeedback (Just "Adam is thinking...")
         renderFrame ui
         be <- readIORef ui.uiBackend
         let mp = ui.uiModelPath
-        tr <- runEden ui.uiEnv (mExecuteTurnWith be mp idx text)
+        prof' <- readIORef ui.uiSessProf
+        writeIORef ui.uiTurnPhase "generating"
+        tr <- runEden ui.uiEnv (mExecuteTurnWith be mp prof'.spHistTurns idx text)
+        writeIORef ui.uiTurnPhase "idle"
         entries <- readIORef ui.uiDialogue
         writeIORef ui.uiDialogue ((text, tr.mrResponse) :: entries)
         writeIORef ui.uiLastResponse tr.mrResponse
@@ -979,11 +1031,12 @@ handleEnterComposer ui = do
               writeIORef ui.uiMode (EditModal buf 0 0)
             Just v => do
               let turnId = MkId {a=TurnTag} ("turn-" ++ show (idx + 3))
+              ts' <- currentTimestamp
               runEden ui.uiEnv (mProcessFeedback turnId v "")
-              writeIORef ui.uiFeedback (Just ("recorded: " ++ show v))
               hum <- runEden ui.uiEnv mBuildHum
               writeHumFile hum
               writeIORef ui.uiLastHum (Just hum)
+              writeIORef ui.uiFeedback (Just ("feedback: " ++ show v ++ " @ " ++ show ts'))
             Nothing => writeIORef ui.uiFeedback (Just "skipped")
           _ => writeIORef ui.uiFeedback (Just "skipped")
         renderFrame ui
@@ -1015,6 +1068,11 @@ handleNormalKey ui (KeyCtrl 's') = do
 handleNormalKey ui (KeyCtrl 'r') = do
   tab <- readIORef ui.uiReasoningTab
   writeIORef ui.uiReasoningTab (if tab >= 2 then 0 else tab + 1)
+-- §3.12: Reasoning panel scroll via Ctrl+U (up) / Ctrl+D (down)
+handleNormalKey ui (KeyCtrl 'u') =
+  modifyIORef ui.uiReasoningScroll (\s => s + 3)
+handleNormalKey ui (KeyCtrl 'd') =
+  modifyIORef ui.uiReasoningScroll (\s => max 0 (s - 3))
 handleNormalKey ui KeyEscape = do
   af <- readIORef ui.uiActionFocus
   md <- readIORef ui.uiMode
@@ -1068,7 +1126,7 @@ handleNormalKey ui (KeyChar c) = handleChar ui c
     handleChar : UIState -> Char -> IO ()
     handleChar ui c = do
       af <- readIORef ui.uiActionFocus
-      if af then actionDigit ui c else composerChar ui c
+      if af && isDigit c then actionDigit ui c else composerChar ui c
 -- Dialogue tape scrolling
 handleNormalKey ui KeyUp = do
   text <- readIORef ui.uiComposer
@@ -1148,7 +1206,8 @@ handleConfigKey ui cursor KeyEnter = do
       let nd = if prof.spRetrDepth >= 20 then 4 else prof.spRetrDepth + 1
       writeIORef ui.uiSessProf ({ spRetrDepth := nd } prof)
     4 => do
-      let no = if prof.spMaxOutput >= 4096 then 128 else prof.spMaxOutput + 128
+      let raw = if prof.spMaxOutput >= 4096 then 128 else prof.spMaxOutput + 128
+      let no = max 128 (min 4096 raw)
       writeIORef ui.uiSessProf ({ spMaxOutput := no } prof)
     5 => do
       let nt = if prof.spTemp >= 1.95 then 0.1 else prof.spTemp + 0.1
@@ -1163,10 +1222,12 @@ handleConfigKey ui cursor KeyEnter = do
       let nc = if prof.spMaxCtx >= 20 then 3 else prof.spMaxCtx + 1
       writeIORef ui.uiSessProf ({ spMaxCtx := nc } prof)
     9 => do
-      let nr = if prof.spRespCap >= 12000 then 600 else prof.spRespCap + 500
+      let raw = if prof.spRespCap >= 12000 then 600 else prof.spRespCap + 500
+      let nr = max 600 (min 12000 raw)
       writeIORef ui.uiSessProf ({ spRespCap := nr } prof)
     10 => do
-      let nh = if prof.spHistTurns >= 256 then 1 else prof.spHistTurns + 1
+      let raw = if prof.spHistTurns >= 256 then 1 else prof.spHistTurns + 1
+      let nh = max 1 (min 256 raw)
       writeIORef ui.uiSessProf ({ spHistTurns := nh } prof)
     11 => do
       writeIORef ui.uiSessProf ({ spLowMotion := not prof.spLowMotion } prof)
@@ -1471,6 +1532,8 @@ runTUIWith be mp principles = do
   chyronVisible <- newIORef False
   apertureDrawer <- newIORef False
   reasoningTab <- newIORef (the Nat 0)
+  reasoningScroll <- newIORef (the Int 0)
+  turnPhase <- newIORef "idle"
 
   let ui = MkUIState env beRef mp turnIdx composer dialogue feedback
                      lastActive lastHum lastBudget lastProj
@@ -1479,6 +1542,7 @@ runTUIWith be mp principles = do
                      themeName lowMotion screenReader lastResponse
                      tapeScroll actionFocus actionSel
                      chyronVisible apertureDrawer reasoningTab
+                     reasoningScroll turnPhase
 
   -- Run graph audit at session start (normalization + taxonomy)
   _ <- runEden env runSessionStartAudit

@@ -16,10 +16,12 @@ import Data.IORef
 import Data.List
 import Data.Maybe
 import Data.String
+import System
 import Eden.Types
 import Eden.Config
 import Eden.Store.InMemory
 import Eden.Monad
+import Eden.Trace
 import Eden.TermIO
 import System.File.ReadWrite
 
@@ -45,6 +47,30 @@ record AuditReport where
 ||| Empty report for a given pipeline name.
 emptyReport : String -> AuditReport
 emptyReport name = MkAuditReport name "completed" 0 0 0 0 0 []
+
+||| Format an AuditReport as a one-line summary string for trace messages.
+formatReportSummary : AuditReport -> String
+formatReportSummary r =
+  r.arPipeline ++ ": status=" ++ r.arStatus
+  ++ " candidates=" ++ show r.arCandidates
+  ++ " processed=" ++ show r.arProcessed
+  ++ " merged=" ++ show r.arMerged
+  ++ " memodes=" ++ show r.arMemodesMade
+  ++ " edges=" ++ show r.arEdgesCreated
+  ++ case r.arErrors of
+       [] => ""
+       es => " errors=" ++ show (length es)
+
+||| Emit a trace event for an audit pipeline using a specific trace event type.
+emitAuditTrace : TraceEventType -> AuditReport -> EdenM ()
+emitAuditTrace evtType report = do
+  env <- ask
+  let lvl = case report.arStatus of
+               "error" => Error
+               _       => Info
+  liftIO (traceEvent env.trace evtType lvl
+            (formatReportSummary report)
+            (Just env.eid) (Just env.sid) Nothing env.ts)
 
 ||| Combined report for all four pipelines.
 public export
@@ -192,20 +218,27 @@ runGraphNormalization = do
   let groups = findDuplicateGroups memes
       report = emptyReport "normalization"
   if null groups
-    then pure report
+    then do
+      emitAuditTrace TraceGraphNormalization report
+      pure report
     else do
       let prompt = buildNormalizationPrompt groups
       result <- liftIO (callClaude prompt)
       case result of
-        Left err => pure ({ arStatus := "error", arErrors := [err] } report)
+        Left err => do
+          let errReport = { arStatus := "error", arErrors := [err] } report
+          emitAuditTrace TraceGraphNormalization errReport
+          pure errReport
         Right output => do
           let responseLines = lines output
               mergeLines = mapMaybe parseMergeLine responseLines
           -- For each merge directive, redirect edges from old memes to canonical
           mergeCount <- liftIO (processMerges env.store env.eid memes mergeLines env.ts)
-          pure ({ arCandidates := length groups
-                , arProcessed := length mergeLines
-                , arMerged := mergeCount } report)
+          let finalReport = { arCandidates := length groups
+                            , arProcessed := length mergeLines
+                            , arMerged := mergeCount } report
+          emitAuditTrace TraceGraphNormalization finalReport
+          pure finalReport
   where
     ||| Find meme by label (case-insensitive) in the meme list.
     findByLabel : List Meme -> String -> Maybe Meme
@@ -275,20 +308,29 @@ runBehaviorTaxonomy = do
   let behaviorMemes = filter (\m => m.domain == Behavior) memes
       report = emptyReport "taxonomy"
   if length behaviorMemes < 2
-    then pure report
+    then do
+      emitAuditTrace TraceGraphTaxonomy report
+      pure report
     else do
       let prompt = buildTaxonomyPrompt behaviorMemes
       result <- liftIO (callClaude prompt)
       case result of
-        Left err => pure ({ arStatus := "error", arErrors := [err] } report)
+        Left err => do
+          let errReport = { arStatus := "error", arErrors := [err] } report
+          emitAuditTrace TraceGraphTaxonomy errReport
+          pure errReport
         Right output => do
           let responseLines = lines output
               memodeLines = mapMaybe parseMemodeLine responseLines
-          -- Materialize each memode grouping
-          madeCount <- materializeGroups env.store env.eid behaviorMemes memodeLines env.ts
-          pure ({ arCandidates := length behaviorMemes
-                , arProcessed := length memodeLines
-                , arMemodesMade := madeCount } report)
+          -- Materialize each memode grouping (with admissibility validation)
+          allEdges <- liftIO (readIORef env.store.edges)
+          let expEdges = filter (\e => e.experimentId == env.eid) allEdges
+          madeCount <- materializeGroups env.store env.eid behaviorMemes expEdges memodeLines env.ts
+          let finalReport = { arCandidates := length behaviorMemes
+                            , arProcessed := length memodeLines
+                            , arMemodesMade := madeCount } report
+          emitAuditTrace TraceGraphTaxonomy finalReport
+          pure finalReport
   where
     ||| Find a behavior meme by label (case-insensitive).
     findBehaviorMeme : List Meme -> String -> Maybe Meme
@@ -296,10 +338,36 @@ runBehaviorTaxonomy = do
       let target = toLower (trim lbl)
       in find (\m => m.domain == Behavior && toLower m.label == target) ms
 
+    ||| Edge types that qualify as support edges for memode admissibility.
+    isSupportEdgeType : EdgeType -> Bool
+    isSupportEdgeType Supports     = True
+    isSupportEdgeType Reinforces   = True
+    isSupportEdgeType CoOccursWith = True
+    isSupportEdgeType RelatesTo    = True
+    isSupportEdgeType Influences   = True
+    isSupportEdgeType DerivedFrom  = True
+    isSupportEdgeType _            = False
+
+    ||| Check whether a meme has at least one qualifying support edge.
+    hasSupportEdge : List Edge -> MemeId -> Bool
+    hasSupportEdge edges mid =
+      let midStr = show mid
+      in any (\e => (e.srcId == midStr || e.dstId == midStr)
+                 && isSupportEdgeType e.edgeType) edges
+
+    ||| Check if all member memes have at least one support edge.
+    ||| Returns the list of member IDs that lack a support edge.
+    findInadmissible : List Edge -> List MemeId -> List MemeId
+    findInadmissible edges mids =
+      filter (\mid => not (hasSupportEdge edges mid)) mids
+
     ||| Materialize memode groupings from Claude's response.
-    materializeGroups : StoreState -> ExperimentId -> List Meme
+    ||| Validates memode admissibility: each member must have at least
+    ||| one qualifying support edge (Supports, Reinforces, CoOccursWith,
+    ||| RelatesTo, Influences, or DerivedFrom).
+    materializeGroups : StoreState -> ExperimentId -> List Meme -> List Edge
                      -> List (String, List String) -> Timestamp -> EdenM Nat
-    materializeGroups st eid allBehavior groupings now = go 0 groupings
+    materializeGroups st eid allBehavior expEdges groupings now = go 0 groupings
       where
         go : Nat -> List (String, List String) -> EdenM Nat
         go n [] = pure n
@@ -309,13 +377,23 @@ runBehaviorTaxonomy = do
           if length memberIds < 2
             then go n rest  -- skip if fewer than 2 valid members
             else do
-              let summary = "Behavior cluster: " ++ concat (intersperse ", " memberLabels)
-              _ <- liftIO (upsertMemode st eid name summary Behavior memberIds now)
-              -- Create MemberOf edges from each member to the memode
-              _ <- traverse (\mid => do
-                _ <- eCreateEdge MemeNode (show mid) MemodeNode name MemberOf 1.0
-                pure ()) memberIds
-              go (n + 1) rest
+              -- Validate memode admissibility: each member needs a support edge
+              let inadmissible = findInadmissible expEdges memberIds
+              if not (null inadmissible)
+                then do
+                  -- Log and skip: some members lack support edges
+                  liftIO (putStrLn ("  [taxonomy] Skipping memode '" ++ name
+                    ++ "': members lack support edges: "
+                    ++ concat (intersperse ", " (map show inadmissible))))
+                  go n rest
+                else do
+                  let summary = "Behavior cluster: " ++ concat (intersperse ", " memberLabels)
+                  _ <- liftIO (upsertMemode st eid name summary Behavior memberIds now)
+                  -- Create MemberOf edges from each member to the memode
+                  _ <- traverse (\mid => do
+                    _ <- eCreateEdge MemeNode (show mid) MemodeNode name MemberOf 1.0
+                    pure ()) memberIds
+                  go (n + 1) rest
 
 ------------------------------------------------------------------------
 -- 3. Coherence Reweave
@@ -399,22 +477,29 @@ runCoherenceReweave = do
       weakMemes = findWeakMemes memes expEdges 2
       report = emptyReport "coherence"
   if null weakMemes
-    then pure report
+    then do
+      emitAuditTrace TraceGraphCoherence report
+      pure report
     else do
       let weakWithNeighbors = map (\m => (m, neighborLabels memes expEdges m.id))
                                   (take 20 weakMemes) -- limit to 20 to keep prompt manageable
           prompt = buildReweavePrompt weakWithNeighbors
       result <- liftIO (callClaude prompt)
       case result of
-        Left err => pure ({ arStatus := "error", arErrors := [err] } report)
+        Left err => do
+          let errReport = { arStatus := "error", arErrors := [err] } report
+          emitAuditTrace TraceGraphCoherence errReport
+          pure errReport
         Right output => do
           let responseLines = lines output
               edgeDirectives = mapMaybe parseEdgeLine responseLines
           -- Create each suggested edge
           edgeCount <- createSuggestedEdges env.store env.eid memes edgeDirectives env.ts
-          pure ({ arCandidates := length weakMemes
-                , arProcessed := length edgeDirectives
-                , arEdgesCreated := edgeCount } report)
+          let finalReport = { arCandidates := length weakMemes
+                            , arProcessed := length edgeDirectives
+                            , arEdgesCreated := edgeCount } report
+          emitAuditTrace TraceGraphCoherence finalReport
+          pure finalReport
   where
     ||| Find a meme by label (case-insensitive).
     findMemeByLabel : List Meme -> String -> Maybe Meme
@@ -523,9 +608,35 @@ runFullGraphAudit = do
   pure (MkFullAuditReport normReport taxReport cohReport ctxReport)
 
 ||| Run the session-start audit (normalization + taxonomy + coherence).
+||| Gated by the EDEN_ENABLE_MLX_WAKEUP_REVIEW environment variable.
+||| If the variable is not set to "1" or "true", returns an empty report.
 export
 runSessionStartAudit : EdenM FullAuditReport
-runSessionStartAudit = runFullGraphAudit
+runSessionStartAudit = do
+  envVar <- liftIO (getEnv "EDEN_ENABLE_MLX_WAKEUP_REVIEW")
+  let enabled = case envVar of
+                  Just "1"    => True
+                  Just "true" => True
+                  _           => False
+  if not enabled
+    then pure (MkFullAuditReport (emptyReport "normalization")
+                                 (emptyReport "taxonomy")
+                                 (emptyReport "coherence")
+                                 (emptyReport "contextualization"))
+    else do
+      fullReport <- runFullGraphAudit
+      -- Emit summary wakeup trace event
+      env <- ask
+      let summary = "Wakeup audit complete: "
+                  ++ "norm=" ++ fullReport.normalization.arStatus
+                  ++ " tax=" ++ fullReport.taxonomy.arStatus
+                  ++ " coh=" ++ fullReport.coherence.arStatus
+                  ++ " merged=" ++ show fullReport.normalization.arMerged
+                  ++ " memodes=" ++ show fullReport.taxonomy.arMemodesMade
+                  ++ " edges=" ++ show fullReport.coherence.arEdgesCreated
+      liftIO (traceEvent env.trace TraceGraphWakeup Info summary
+                (Just env.eid) (Just env.sid) Nothing env.ts)
+      pure fullReport
 
 ||| Run a post-ingest audit (all four pipelines including contextualization).
 export

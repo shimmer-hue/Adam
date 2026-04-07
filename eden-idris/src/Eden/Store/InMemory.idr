@@ -9,6 +9,7 @@ import Eden.Types
 import Eden.Config
 import Eden.Storage
 import Eden.Retrieval
+import Eden.Regard
 
 %hide Eden.Retrieval.tokenize
 
@@ -242,7 +243,8 @@ wtMeme st m =
                     , show m.skipCount, show m.contradictionCount
                     , show m.membraneConflicts, show m.feedbackCount
                     , show m.activationTau
-                    , show m.lastActiveAt, show m.createdAt, show m.updatedAt ]
+                    , show m.lastActiveAt, show m.createdAt, show m.updatedAt
+                    , m.metadataJson ]
   in withDB st (\db => wt_ (primIO (prim__wt_meme_tsv db tsv)))
 
 ------------------------------------------------------------------------
@@ -350,7 +352,7 @@ upsertMeme st eid label text domain sk scope now = do
     Nothing => do
       mid <- genId st "meme"
       let meme = MkMeme (MkId mid) eid label canonical text domain sk scope
-                        0.0 1 0.0 0.0 0.0 0 0 0 0 86400.0 now now now
+                        0.0 1 0.0 0.0 0.0 0 0 0 0 86400.0 now now now ""
       modifyIORef st.memes (meme ::)
       wtMeme st meme
       indexMemeTerms st.ftsIndex (MkId mid) label text
@@ -383,13 +385,13 @@ upsertMemode st eid lbl summary dom memberIds now = do
   mid <- genId st "memode"
   let hash = show (length memberIds) ++ ":" ++ show (map show memberIds)
       md = MkMemode (MkId mid) eid lbl hash summary dom Global
-                    0.0 1 0.0 0.0 0.0 0 86400.0 now now now
+                    0.0 1 0.0 0.0 0.0 0 86400.0 now now now ""
   modifyIORef st.memodes (md ::)
   let tsv = joinTSV [ mid, show eid, lbl, hash, summary
                     , show dom, show Global
                     , "0.0", "1", "0.0", "0.0", "0.0"
                     , "0", "86400.0"
-                    , show now, show now, show now ]
+                    , show now, show now, show now, "" ]
   withDB st (\db => wt_ (primIO (prim__wt_memode_tsv db tsv)))
   pure md
 
@@ -586,11 +588,12 @@ recordMeasurementEvent st eid sid action state operator evidence
                        before proposed committed revertOf now = do
   mid <- genId st "meas"
   let evt = MkMeasurementEvent mid eid sid action state operator evidence
-                               before proposed committed revertOf now
+                               before proposed committed revertOf
+                               "" "" "" "" "" 1.0 now
   modifyIORef st.measurements (evt ::)
   let tsv = joinTSV [ mid, show eid, show sid, show action, show state
                     , operator, evidence, before, proposed, committed
-                    , revertOf, show now ]
+                    , revertOf, "", "", "", "", "", "1.0", show now ]
   withDB st (\db => wt_ (primIO (prim__wt_meas_tsv db tsv)))
   pure evt
 
@@ -792,3 +795,206 @@ embeddingCacheSize st = do
 export
 clearEmbeddingCache : StoreState -> IO ()
 clearEmbeddingCache st = writeIORef st.embeddings.ecEntries []
+
+------------------------------------------------------------------------
+-- FTS search for memodes
+------------------------------------------------------------------------
+
+||| Search memodes using token matching against label and summary fields.
+||| Tokenizes the query, matches against each memode's label and summary,
+||| and returns memodes ranked by hit count (descending).
+export
+ftsSearchMemodes : StoreState -> ExperimentId -> String -> IO (List Memode)
+ftsSearchMemodes st eid query = do
+  let queryTerms = Eden.Store.InMemory.tokenize query
+  allMemodes <- readIORef st.memodes
+  let expMemodes = filter (\m => m.experimentId == eid) allMemodes
+      -- Score each memode by counting query term hits in its label + summary tokens
+      scored = map (\m =>
+        let labelToks = Eden.Store.InMemory.tokenize m.label
+            summToks  = Eden.Store.InMemory.tokenize m.summary
+            allToks   = Prelude.List.(++) labelToks summToks
+            hits      = foldl (\acc, qt => if any (== qt) allToks then acc + 1 else acc) 0 queryTerms
+        in (m, hits)) expMemodes
+      -- Filter to those with at least one hit, sort descending by hits
+      matched : List (Memode, Nat)
+      matched = filter (\p => snd p > 0) scored
+      ranked  = sortBy (\a, b => compare (snd b) (snd a)) matched
+  pure (map (\p => fst p) ranked)
+
+------------------------------------------------------------------------
+-- FTS search for chunks
+------------------------------------------------------------------------
+
+||| Search chunks using token matching against the chunk text field.
+||| Tokenizes the query, matches against each chunk's text tokens,
+||| and returns chunks ranked by hit count (descending).
+export
+ftsSearchChunks : StoreState -> ExperimentId -> String -> IO (List Chunk)
+ftsSearchChunks st eid query = do
+  let queryTerms = Eden.Store.InMemory.tokenize query
+  allChunks <- readIORef st.chunks
+  let expChunks = filter (\c => c.experimentId == eid) allChunks
+      scored = map (\c =>
+        let textToks = Eden.Store.InMemory.tokenize c.text
+            hits     = foldl (\acc, qt => if any (== qt) textToks then acc + 1 else acc) 0 queryTerms
+        in (c, hits)) expChunks
+      matched : List (Chunk, Nat)
+      matched = filter (\p => snd p > 0) scored
+      ranked  = sortBy (\a, b => compare (snd b) (snd a)) matched
+  pure (map (\p => fst p) ranked)
+
+------------------------------------------------------------------------
+-- Graph health report
+------------------------------------------------------------------------
+
+||| Report on structural health of the meme graph.
+public export
+record GraphHealthReport where
+  constructor MkGraphHealthReport
+  isolatedMemeCount : Nat
+  dyadRatio         : Double
+  feedbackCoverage  : Double
+  avgEdgesPerMeme   : Double
+  totalNodes        : Nat
+  totalEdges        : Nat
+
+------------------------------------------------------------------------
+-- Compute real graph metrics
+------------------------------------------------------------------------
+
+||| Compute real graph metrics (clustering coefficient, normalized degree,
+||| triangle participation) from the edge store.
+export
+computeGraphMetrics : StoreState -> ExperimentId -> IO GraphMetrics
+computeGraphMetrics st eid = do
+  allMemes <- readIORef st.memes
+  allEdges <- readIORef st.edges
+  let expMemes = filter (\m => m.experimentId == eid) allMemes
+      expEdges = filter (\e => e.experimentId == eid) allEdges
+      nodeIds  = map (\m => show m.id) expMemes
+      n        = length nodeIds
+  if n == 0
+    then pure (MkGraphMetrics 0.0 0.0 0.0)
+    else do
+      -- Build adjacency: for each node, collect its undirected neighbors
+      let neighbors : String -> List String
+          neighbors nid =
+            let outN = map (\e => e.dstId) (filter (\e => e.srcId == nid) expEdges)
+                inN  = map (\e => e.srcId) (filter (\e => e.dstId == nid) expEdges)
+            in nub (Prelude.List.(++) outN inN)
+
+          -- Degree of each node
+          degrees : List (String, Nat)
+          degrees = map (\nid => (nid, length (neighbors nid))) nodeIds
+
+          -- Max degree
+          maxDeg : Nat
+          maxDeg = foldl (\mx, p => max mx (snd p)) 0 degrees
+
+          -- Average degree
+          sumDeg : Nat
+          sumDeg = foldl (\s, p => s + snd p) 0 degrees
+
+          avgDeg : Double
+          avgDeg = cast sumDeg / cast n
+
+          -- Normalized degree: avg / max (0 if max is 0)
+          nd : Double
+          nd = if maxDeg == 0 then 0.0 else avgDeg / cast maxDeg
+
+          -- Check if an edge exists between two nodes (undirected)
+          hasEdge : String -> String -> Bool
+          hasEdge a b = any (\e => (e.srcId == a && e.dstId == b)
+                                || (e.srcId == b && e.dstId == a)) expEdges
+
+          -- Local clustering coefficient for a node
+          localClustering : String -> Double
+          localClustering nid =
+            let nbrs = neighbors nid
+                k    = length nbrs
+            in if k < 2 then 0.0
+               else
+                 let pairs = concatMap (\u => map (\v => (u, v))
+                               (filter (\v => v > u) nbrs)) nbrs
+                     edgeCount = foldl (\cnt, p =>
+                       if hasEdge (fst p) (snd p) then cnt + 1 else cnt) 0 pairs
+                     possible : Double
+                     possible  = cast (k * (minus k 1)) / 2.0
+                 in if possible <= 0.0 then 0.0
+                    else cast edgeCount / possible
+
+          -- Average clustering coefficient
+          clusterVals : List Double
+          clusterVals = map localClustering nodeIds
+
+          sumClust : Double
+          sumClust = foldl (+) 0.0 clusterVals
+
+          avgClust : Double
+          avgClust = sumClust / cast n
+
+          -- Triangle participation: fraction of nodes in at least one triangle
+          participatesInTriangle : String -> Bool
+          participatesInTriangle nid =
+            let nbrs = neighbors nid
+                pairs = concatMap (\u => map (\v => (u, v))
+                          (filter (\v => v > u) nbrs)) nbrs
+            in any (\p => hasEdge (fst p) (snd p)) pairs
+
+          triCount : Nat
+          triCount = length (filter participatesInTriangle nodeIds)
+
+          tp : Double
+          tp = cast triCount / cast n
+
+      pure (MkGraphMetrics avgClust nd tp)
+
+------------------------------------------------------------------------
+-- Graph health
+------------------------------------------------------------------------
+
+||| Compute a graph health report: isolated memes, dyad ratio,
+||| feedback coverage, average edges per meme, totals.
+export
+getGraphHealth : StoreState -> ExperimentId -> IO GraphHealthReport
+getGraphHealth st eid = do
+  allMemes <- readIORef st.memes
+  allEdges <- readIORef st.edges
+  let expMemes = filter (\m => m.experimentId == eid) allMemes
+      expEdges = filter (\e => e.experimentId == eid) allEdges
+      n        = length expMemes
+      eCount   = length expEdges
+  if n == 0
+    then pure (MkGraphHealthReport 0 0.0 0.0 0.0 0 0)
+    else do
+      let -- Count edges per meme (undirected: count as src or dst)
+          edgeCount : String -> Nat
+          edgeCount nid = length (filter (\e => e.srcId == nid || e.dstId == nid) expEdges)
+
+          -- Isolated: 0 edges
+          isolated : Nat
+          isolated = length (filter (\m => edgeCount (show m.id) == 0) expMemes)
+
+          -- Dyad: exactly 1 edge
+          dyads : Nat
+          dyads = length (filter (\m => edgeCount (show m.id) == 1) expMemes)
+
+          dyadR : Double
+          dyadR = cast dyads / cast n
+
+          -- Feedback coverage: fraction with feedbackCount > 0
+          withFb : Nat
+          withFb = length (filter (\m => m.feedbackCount > 0) expMemes)
+
+          fbCov : Double
+          fbCov = cast withFb / cast n
+
+          -- Average edges per meme
+          totalEdgeRefs : Nat
+          totalEdgeRefs = foldl (\s, m => s + edgeCount (show m.id)) 0 expMemes
+
+          avgE : Double
+          avgE = cast totalEdgeRefs / cast n
+
+      pure (MkGraphHealthReport isolated dyadR fbCov avgE n eCount)

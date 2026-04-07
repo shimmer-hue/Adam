@@ -73,13 +73,17 @@ record ArchiveRecord where
 -- Session metadata store (archive info + profile overrides)
 ------------------------------------------------------------------------
 
-||| Per-session mutable metadata: archive info and profile overrides.
+||| Per-session mutable metadata: archive info, profile overrides, and audit results.
 public export
 record SessionMeta where
   constructor MkSessionMeta
-  smFolder  : String
-  smTags    : List String
-  smProfile : SessionProfile
+  smFolder             : String
+  smTags               : List String
+  smProfile            : SessionProfile
+  smAuditNormalization : String
+  smAuditTaxonomy      : String
+  smAuditCoherence     : String
+  smAuditWakeup        : String
 
 ||| Global session metadata map, stored as a flat list of (SessionId, SessionMeta).
 public export
@@ -257,7 +261,7 @@ export
 updateSessionProfile : SessionMetaStore -> SessionId -> (field : String) -> (value : String) -> IO ()
 updateSessionProfile sms sid field value = do
   mmeta <- lookupMeta sms sid
-  let meta = fromMaybe (MkSessionMeta "inbox" [] defaultSessionProfile) mmeta
+  let meta = fromMaybe (MkSessionMeta "inbox" [] defaultSessionProfile "" "" "" "") mmeta
       newProf = updateProfileField meta.smProfile field value
   upsertMeta sms sid ({ smProfile := newProf } meta)
 
@@ -281,8 +285,22 @@ export
 archiveSession : SessionMetaStore -> SessionId -> (folder : String) -> (tags : List String) -> IO ()
 archiveSession sms sid folder tags = do
   mmeta <- lookupMeta sms sid
-  let meta = fromMaybe (MkSessionMeta "inbox" [] defaultSessionProfile) mmeta
+  let meta = fromMaybe (MkSessionMeta "inbox" [] defaultSessionProfile "" "" "" "") mmeta
   upsertMeta sms sid ({ smFolder := normFolder folder, smTags := normTags tags } meta)
+
+||| Store audit results into the session metadata.
+||| Each argument is a JSON summary string for the corresponding audit pipeline.
+export
+updateAuditFields : SessionMetaStore -> SessionId
+                 -> (normJson : String) -> (taxJson : String)
+                 -> (cohJson : String) -> (wakeupJson : String) -> IO ()
+updateAuditFields sms sid normJson taxJson cohJson wakeupJson = do
+  mmeta <- lookupMeta sms sid
+  let meta = fromMaybe (MkSessionMeta "inbox" [] defaultSessionProfile "" "" "" "") mmeta
+  upsertMeta sms sid ({ smAuditNormalization := normJson
+                      , smAuditTaxonomy := taxJson
+                      , smAuditCoherence := cohJson
+                      , smAuditWakeup := wakeupJson } meta)
 
 ||| List all sessions that have archive metadata.
 export

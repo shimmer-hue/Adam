@@ -221,7 +221,7 @@ runStoreDemo be mp principles = do
   env <- newEdenEnv store exp.id sess.id ts principles
 
   -- Turn 0 via monadic pipeline
-  tr0 <- runEden env (mExecuteTurnWith be mp 0 "What drives your thinking?")
+  tr0 <- runEden env (mExecuteTurnWith be mp 5 0 "What drives your thinking?")
   putStrLn $ "\n  [turn 0]"
   putStrLn $ "  user:  What drives your thinking?"
   putStrLn $ "  adam:  " ++ tr0.mrResponse
@@ -237,7 +237,7 @@ runStoreDemo be mp principles = do
   traverse_ showMemeRegard expMemes'
 
   -- Turn 1 via monadic pipeline
-  tr1 <- runEden env (mExecuteTurnWith be mp 1 "Tell me about honesty in reasoning.")
+  tr1 <- runEden env (mExecuteTurnWith be mp 5 1 "Tell me about honesty in reasoning.")
   putStrLn $ "\n  [turn 1]"
   putStrLn $ "  user:  Tell me about honesty in reasoning."
   putStrLn $ "  adam:  " ++ tr1.mrResponse
@@ -415,7 +415,7 @@ main = do
           _ <- upsertMeme store exp.id "Honesty" "Truthful communication" Behavior SeedSource Global ts
           _ <- upsertMeme store exp.id "Clarity" "Clear explanations" Behavior SeedSource Global ts
           env <- newEdenEnv store exp.id sess.id ts principles
-          _ <- runEden env (mExecuteTurnWith be mp 0 "Export test")
+          _ <- runEden env (mExecuteTurnWith be mp 5 0 "Export test")
           _ <- materializeMemodes store exp.id ts
           pure exp.id
         _ => do

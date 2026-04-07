@@ -51,13 +51,25 @@ record MTurnResult where
 
 ||| Step 1: Retrieve and score the active set.
 ||| Semantic similarity is computed against the user's query text.
+||| Graph metrics are computed from real graph topology (§1.6).
+||| Document chunks are included alongside memes (§2.8).
 export
 mRetrieve : String -> EdenM (List CandidateScore)
 mRetrieve userText = do
   sid' <- getSessId
+  env <- ask
   memes <- eGetMemes
+  chunks <- eGetChunks
+  -- §1.6: Compute real graph metrics from edge store
+  gm <- liftIO (computeGraphMetrics env.store env.eid)
   let sw = defaultSelectionWeights
-  pure (assembleActiveSet sw sid' 3600.0 5 userText memes)
+      memeCandidates = assembleActiveSet sw sid' gm 3600.0 5 userText memes
+      -- §2.8: Score document chunks alongside memes
+      chunkCandidates = map (\c => scoreChunkCandidate sw sid'
+                               (computeSimilarity defaultSimilarityMethod userText c.text) c) chunks
+      -- Merge meme and chunk candidates, re-select top-k
+      allCandidates = selectTopK 5 (memeCandidates ++ chunkCandidates)
+  pure allCandidates
 
 ||| Step 2: Assemble the prompt.
 ||| Uses the provided history depth (from session profile) instead of a hardcoded value.
@@ -110,12 +122,13 @@ cmdGenerateViaFile name prompt cmd = do
   pure (MkModelResult name (if exitCode /= 0 then "(" ++ name ++ " error)" else answer) toks answer "" answer)
 
 ||| Step 3: Generate a response via the specified backend.
+||| topP and repPen are taken from the resolved profile's sampling parameters.
 export
-mGenerateWith : Backend -> Maybe String -> AssemblyResult -> EdenM ModelResult
-mGenerateWith backend modelPath assembly = do
+mGenerateWith : Backend -> Maybe String -> Double -> Double -> AssemblyResult -> EdenM ModelResult
+mGenerateWith backend modelPath topP repPen assembly = do
   let params = MkGenerateParams assembly.arSysPrompt assembly.arConvPrompt
                  (cast assembly.arProfile.rpMaxOutput)
-                 assembly.arProfile.rpTemp 0.9 1.05
+                 assembly.arProfile.rpTemp topP repPen
   case backend of
     Mock => pure (mockGenerate params)
     Claude => cmdGenerateViaFile "claude"
@@ -188,10 +201,11 @@ mProject = do
 -- Full monadic turn pipeline
 ------------------------------------------------------------------------
 
-||| Execute a complete turn with explicit backend selection.
+||| Execute a complete turn with explicit backend selection and profile.
+||| The historyDepth parameter comes from the session profile (§2.1).
 export
-mExecuteTurnWith : Backend -> Maybe String -> Nat -> String -> EdenM MTurnResult
-mExecuteTurnWith be mp idx userText = do
+mExecuteTurnWith : Backend -> Maybe String -> Nat -> Nat -> String -> EdenM MTurnResult
+mExecuteTurnWith be mp historyDepth idx userText = do
   let turnId = MkId {a=TurnTag} ("turn-" ++ show idx)
   -- Step 1: Retrieve active set (similarity scored against user query)
   activeSet <- mRetrieve userText
@@ -199,12 +213,12 @@ mExecuteTurnWith be mp idx userText = do
   -- Step 1b: Snapshot active set
   traverse_ (\cs => eRecordActiveSetEntry turnId cs.nodeId cs.label cs.domain
     cs.selection cs.semanticSimilarity cs.activationVal cs.regard) activeSet
-  -- Step 2: Assemble prompt
-  assembly  <- mAssemble activeSet userText
+  -- Step 2: Assemble prompt (§2.1: profile-driven history depth)
+  assembly  <- mAssembleWith historyDepth activeSet userText
   eTraceTurn turnId ("assemble: profile=" ++ show assembly.arProfile.rpEffective
                    ++ " budget=" ++ show assembly.arBudget.pressure)
-  -- Step 3: Generate
-  genResult <- mGenerateWith be mp assembly
+  -- Step 3: Generate (pass profile sampling params)
+  genResult <- mGenerateWith be mp assembly.arProfile.rpTopP assembly.arProfile.rpRepPen assembly
   eTraceTurn turnId ("generate: backend=" ++ genResult.mrBackend
                    ++ " tokens=" ++ show genResult.mrTokenEstimate)
   -- Step 4: Membrane
@@ -244,37 +258,54 @@ mExecuteTurnWith be mp idx userText = do
                    ++ " projections=" ++ show (length projs))
   pure (MkMTurnResult mo.moCleanedText idxResult.ioConceptNames idxResult.ioNewEdges rels projs)
 
-||| Execute a complete turn (mock backend).
+||| Execute a complete turn (mock backend, default history depth 5).
 export
 mExecuteTurn : Nat -> String -> EdenM MTurnResult
-mExecuteTurn = mExecuteTurnWith Mock Nothing
+mExecuteTurn = mExecuteTurnWith Mock Nothing 5
 
 ------------------------------------------------------------------------
 -- Monadic feedback processing
 ------------------------------------------------------------------------
 
 ||| Process feedback in EdenM — no parameter threading needed.
+||| Propagates to memodes first, then to constituent memes (via MemberOf
+||| edges) with 0.85 attenuation, and non-constituent memes with 0.5.
 export
 mProcessFeedback : TurnId -> Verdict -> String -> EdenM ()
 mProcessFeedback tid verdict explanation = do
   let sig = feedbackSignal verdict
   _ <- eRecordFeedback tid verdict explanation "" sig
 
-  -- Propagate to all memes with distance-based attenuation
-  memes <- eGetMemes
+  env <- ask
   let scale = propagateScale verdict
-  propagateAll sig scale 1.0 memes
+
+  -- Step a: Read memodes and log feedback propagation
+  allMemodes <- liftIO (readIORef env.store.memodes)
+  eTraceFeedback tid ("memode_propagation: " ++ show (length allMemodes) ++ " memodes")
+
+  -- Step b: Find constituent meme IDs via MemberOf edges
+  allEdges <- liftIO (readIORef env.store.edges)
+  let memberEdges = filter (\e => e.edgeType == MemberOf) allEdges
+      constituentIds = map (\e => e.srcId) memberEdges
+
+  -- Step c: Propagate to memes with differentiated attenuation
+  memes <- eGetMemes
+  propagateAll sig scale constituentIds memes
 
   -- Trace the event
   eTraceFeedback tid ("verdict=" ++ show verdict)
   where
-    propagateAll : FeedbackSignal -> Double -> Double -> List Meme -> EdenM ()
-    propagateAll _   _     _      []        = pure ()
-    propagateAll sig scale atten (m :: ms)  = do
-      let s = scale * atten
+    isConstituent : List String -> Meme -> Bool
+    isConstituent cids m = elem (show m.id) cids
+
+    propagateAll : FeedbackSignal -> Double -> List String -> List Meme -> EdenM ()
+    propagateAll _   _     _    []        = pure ()
+    propagateAll sig scale cids (m :: ms) = do
+      let atten = if isConstituent cids m then 0.85 else 0.5
+          s = scale * atten
           (rw', rk', ed') = applyFeedback m.rewardEma m.riskEma m.editEma sig s
       eUpdateMemeChannels m.id rw' rk' ed'
-      propagateAll sig scale (atten * 0.85) ms
+      propagateAll sig scale cids ms
 
 ------------------------------------------------------------------------
 -- Monadic hum generation

@@ -202,6 +202,17 @@ measurementJson me = jObj
   , ("created_at",     jStr (show me.createdAt))
   ]
 
+experimentJson : Experiment -> String
+experimentJson exp = jObj
+  [ ("id",         jStr (show exp.id))
+  , ("name",       jStr exp.name)
+  , ("slug",       jStr exp.slug)
+  , ("mode",       jStr (show exp.mode))
+  , ("status",     jStr (show exp.status))
+  , ("created_at", jStr (show exp.createdAt))
+  , ("updated_at", jStr (show exp.updatedAt))
+  ]
+
 ------------------------------------------------------------------------
 -- Minimal JSON field extraction (for POST body parsing)
 ------------------------------------------------------------------------
@@ -528,6 +539,10 @@ indexHtml = unlines
   , "  <li><a href=\"/api/geometry\">/api/geometry</a></li>"
   , "  <li><a href=\"/api/measurements\">/api/measurements</a></li>"
   , "  <li><a href=\"/api/models\">/api/models</a></li>"
+  , "  <li><a href=\"/api/experiments\">/api/experiments</a></li>"
+  , "  <li>/api/experiments/:id/memes</li>"
+  , "  <li>/api/experiments/:id/sessions</li>"
+  , "  <li>/api/experiments/:id/graph</li>"
   , "  <li><a href=\"/api/runtime/status\">/api/runtime/status</a></li>"
   , "  <li><a href=\"/api/runtime/model\">/api/runtime/model</a></li>"
   , "  <li><a href=\"/api/tanakh\">/api/tanakh</a></li>"
@@ -654,6 +669,9 @@ serveGetRoute st eid fd "/api/tanakh" = do
 serveGetRoute st eid fd "/api/events" = do
   _ <- primIO (prim__httpSendSseHeaders fd)
   pure ()
+serveGetRoute st eid fd "/api/experiments" = do
+  allExps <- readIORef st.experiments
+  primIO (prim__httpSendResponse fd "application/json" (jArr (map experimentJson allExps)))
 serveGetRoute st eid fd path =
   if isPrefixOf "/api/memes/" path
     then do let memeIdStr = substr 11 (length path) path
@@ -663,6 +681,8 @@ serveGetRoute st eid fd path =
               []        => send404 fd path
   else if isPrefixOf "/api/sessions/" path
     then serveSessionRoute st fd path
+  else if isPrefixOf "/api/experiments/" path
+    then serveExperimentRoute st fd path
     else send404 fd path
   where
     serveSessionRoute : StoreState -> Int -> String -> IO ()
@@ -701,6 +721,27 @@ serveGetRoute st eid fd path =
                   , ("timestamp", jStr (show ts))
                   ]) (take 200 allTrace)
           primIO (prim__httpSendResponse fd "application/json" (jArr traceJson))
+        _ => send404 fd path
+
+    serveExperimentRoute : StoreState -> Int -> String -> IO ()
+    serveExperimentRoute st fd path = do
+      -- /api/experiments/<id>/... => strip prefix (17 chars for "/api/experiments/")
+      let rest = substr 17 (length path) path
+      let expIdStr = pack (takeWhile (\c => c /= '/') (unpack rest))
+      let subPath = substr (length expIdStr) (length rest) rest
+      let scopedEid = MkId {a=ExperimentTag} expIdStr
+      case subPath of
+        "/memes" => do
+          allMemes <- readIORef st.memes
+          let memes = filter (\m => m.experimentId == scopedEid) allMemes
+          primIO (prim__httpSendResponse fd "application/json" (jArr (map memeJson memes)))
+        "/sessions" => do
+          allSess <- readIORef st.sessions
+          let sessions = filter (\s => s.experimentId == scopedEid) allSess
+          primIO (prim__httpSendResponse fd "application/json" (jArr (map sessionJson sessions)))
+        "/graph" => do
+          body <- exportGraphJson st scopedEid
+          primIO (prim__httpSendResponse fd "application/json" body)
         _ => send404 fd path
 
 ------------------------------------------------------------------------

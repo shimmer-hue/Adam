@@ -314,6 +314,7 @@ record Meme where
   lastActiveAt       : Timestamp
   createdAt          : Timestamp
   updatedAt          : Timestamp
+  metadataJson       : String
 
 ------------------------------------------------------------------------
 -- Memode (derived, requires >= 2 behavior memes)
@@ -339,6 +340,7 @@ record Memode where
   lastActiveAt  : Timestamp
   createdAt     : Timestamp
   updatedAt     : Timestamp
+  metadataJson  : String
 
 ||| Proof that a memode has >= 2 behavior-domain member memes.
 public export
@@ -540,16 +542,25 @@ Show TraceEventType where
 ------------------------------------------------------------------------
 
 public export
-data MeasurementAction = EdgeAdd | EdgeUpdate | EdgeRemove | MemodeAssert | NodeEdit | MeasurementRevert
+data MeasurementAction
+  = EdgeAdd | EdgeUpdate | EdgeRemove
+  | MemodeAssert | MemodeUpdateMembership
+  | NodeEdit | MotifAnnotation
+  | GeometryMeasurementRun | AblationMeasurementRun
+  | MeasurementRevert
 
 public export
 Show MeasurementAction where
-  show EdgeAdd           = "edge_add"
-  show EdgeUpdate        = "edge_update"
-  show EdgeRemove        = "edge_remove"
-  show MemodeAssert      = "memode_assert"
-  show NodeEdit          = "node_edit"
-  show MeasurementRevert = "revert"
+  show EdgeAdd                = "edge_add"
+  show EdgeUpdate             = "edge_update"
+  show EdgeRemove             = "edge_remove"
+  show MemodeAssert           = "memode_assert"
+  show MemodeUpdateMembership = "memode_update_membership"
+  show NodeEdit               = "node_edit"
+  show MotifAnnotation        = "motif_annotation"
+  show GeometryMeasurementRun = "geometry_measurement_run"
+  show AblationMeasurementRun = "ablation_measurement_run"
+  show MeasurementRevert      = "revert"
 
 public export
 data MeasurementState = Previewed | Committed | Reverted
@@ -559,6 +570,28 @@ Show MeasurementState where
   show Previewed = "previewed"
   show Committed = "committed"
   show Reverted  = "reverted"
+
+------------------------------------------------------------------------
+-- Evidence and provenance labels
+------------------------------------------------------------------------
+
+public export
+data EvidenceLabel = Observed | Derived | Speculative
+
+public export
+Show EvidenceLabel where
+  show Observed    = "OBSERVED"
+  show Derived     = "DERIVED"
+  show Speculative = "SPECULATIVE"
+
+public export
+data ProvenanceLabel = OperatorAsserted | OperatorRefined | AutoDerived
+
+public export
+Show ProvenanceLabel where
+  show OperatorAsserted = "OPERATOR_ASSERTED"
+  show OperatorRefined  = "OPERATOR_REFINED"
+  show AutoDerived      = "AUTO_DERIVED"
 
 ------------------------------------------------------------------------
 -- Regard breakdown
@@ -672,18 +705,24 @@ record ActiveSetEntry where
 public export
 record MeasurementEvent where
   constructor MkMeasurementEvent
-  id             : String
-  experimentId   : ExperimentId
-  sessionId      : SessionId
-  action         : MeasurementAction
-  state          : MeasurementState
-  operator       : String
-  evidence       : String
-  beforeState    : String
-  proposedState  : String
-  committedState : String
-  revertOf       : String
-  createdAt      : Timestamp
+  id                : String
+  experimentId      : ExperimentId
+  sessionId         : SessionId
+  action            : MeasurementAction
+  state             : MeasurementState
+  operator          : String
+  evidence          : String
+  beforeState       : String
+  proposedState     : String
+  committedState    : String
+  revertOf          : String
+  turnId            : String
+  targetIdsJson     : String
+  rationale         : String
+  operatorLabel     : String
+  measurementMethod : String
+  confidence        : Double
+  createdAt         : Timestamp
 
 ------------------------------------------------------------------------
 -- Export artifact registry

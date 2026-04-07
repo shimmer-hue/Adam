@@ -141,17 +141,20 @@ serializeMeme m =
               , show m.membraneConflicts, show m.feedbackCount
               , show m.activationTau
               , show m.lastActiveAt, show m.createdAt, show m.updatedAt
+              , escField m.metadataJson
               ]
 
 ||| Deserialize a meme from tab-separated fields.
+||| Accepts 21 fields (legacy, no metadataJson) or 22 fields (with metadataJson).
 export
 deserializeMeme : List String -> Maybe Meme
 deserializeMeme fields =
   let n = length fields in
-  if n /= 21 then Nothing
+  if n /= 21 && n /= 22 then Nothing
   else
     let idx : Nat -> String
         idx i = fromMaybe "" (head' (drop i fields))
+        metaJ = if n == 22 then unescField (idx 21) else ""
     in Just (MkMeme (MkId (idx 1)) (MkId (idx 2))
       (unescField (idx 3)) (toLower (unescField (idx 3))) (unescField (idx 4))
       (parseDomain (idx 5)) (parseSourceKind (idx 6)) (parseScope (idx 7))
@@ -159,7 +162,8 @@ deserializeMeme fields =
       (myParseDouble (idx 10)) (myParseDouble (idx 11)) (myParseDouble (idx 12))
       (parseNat (idx 13)) (parseNat (idx 14)) (parseNat (idx 15)) (parseNat (idx 16))
       (myParseDouble (idx 17))
-      (MkTimestamp (idx 18)) (MkTimestamp (idx 19)) (MkTimestamp (idx 20)))
+      (MkTimestamp (idx 18)) (MkTimestamp (idx 19)) (MkTimestamp (idx 20))
+      metaJ)
 
 ------------------------------------------------------------------------
 -- Edge serialization
@@ -287,21 +291,24 @@ deserializeSession fields =
 ||| Deserialize a memode from tab-separated fields.
 ||| Format: MEMODE id experimentId label memberHash summary domain scope
 |||   evidenceN usageCount rewardEma riskEma editEma feedbackCount
-|||   activationTau lastActiveAt createdAt updatedAt (18 fields)
+|||   activationTau lastActiveAt createdAt updatedAt [metadataJson] (18 or 19 fields)
 export
 deserializeMemode : List String -> Maybe Memode
 deserializeMemode fields =
-  if length fields /= 18 then Nothing
+  let n = length fields in
+  if n /= 18 && n /= 19 then Nothing
   else
     let idx : Nat -> String
         idx i = fromMaybe "" (head' (drop i fields))
+        metaJ = if n == 19 then unescField (idx 18) else ""
     in Just (MkMemode (MkId (idx 1)) (MkId (idx 2))
       (unescField (idx 3)) (unescField (idx 4)) (unescField (idx 5))
       (parseDomain (idx 6)) (parseScope (idx 7))
       (myParseDouble (idx 8)) (parseNat (idx 9))
       (myParseDouble (idx 10)) (myParseDouble (idx 11)) (myParseDouble (idx 12))
       (parseNat (idx 13)) (myParseDouble (idx 14))
-      (MkTimestamp (idx 15)) (MkTimestamp (idx 16)) (MkTimestamp (idx 17)))
+      (MkTimestamp (idx 15)) (MkTimestamp (idx 16)) (MkTimestamp (idx 17))
+      metaJ)
 
 ------------------------------------------------------------------------
 -- Agent serialization
@@ -380,12 +387,16 @@ parseDocStatus "failed"     = Failed
 parseDocStatus _            = Processing
 
 parseMeasurementAction : String -> MeasurementAction
-parseMeasurementAction "edge_add"      = EdgeAdd
-parseMeasurementAction "edge_update"   = EdgeUpdate
-parseMeasurementAction "edge_remove"   = EdgeRemove
-parseMeasurementAction "memode_assert" = MemodeAssert
-parseMeasurementAction "node_edit"     = NodeEdit
-parseMeasurementAction _               = MeasurementRevert
+parseMeasurementAction "edge_add"                 = EdgeAdd
+parseMeasurementAction "edge_update"              = EdgeUpdate
+parseMeasurementAction "edge_remove"              = EdgeRemove
+parseMeasurementAction "memode_assert"            = MemodeAssert
+parseMeasurementAction "memode_update_membership" = MemodeUpdateMembership
+parseMeasurementAction "node_edit"                = NodeEdit
+parseMeasurementAction "motif_annotation"         = MotifAnnotation
+parseMeasurementAction "geometry_measurement_run" = GeometryMeasurementRun
+parseMeasurementAction "ablation_measurement_run" = AblationMeasurementRun
+parseMeasurementAction _                          = MeasurementRevert
 
 parseMeasurementState : String -> MeasurementState
 parseMeasurementState "committed" = Committed
@@ -423,10 +434,22 @@ deserializeMeasurementEvent fields =
   else
     let idx : Nat -> String
         idx i = fromMaybe "" (head' (drop i fields))
+        n = length fields
+        -- New fields: turnId, targetIdsJson, rationale, operatorLabel, measurementMethod, confidence
+        -- Legacy format (12 fields): these default to "" / 1.0
+        mTurnId  = if n >= 18 then idx 11 else ""
+        mTargets = if n >= 18 then idx 12 else ""
+        mRationale = if n >= 18 then unescField (idx 13) else ""
+        mOpLabel = if n >= 18 then idx 14 else ""
+        mMethod  = if n >= 18 then idx 15 else ""
+        mConf    = if n >= 18 then myParseDouble (idx 16) else 1.0
+        mCreated = if n >= 18 then MkTimestamp (idx 17) else MkTimestamp (idx 11)
+        mRevertOf = if n >= 18 then idx 10 else idx 10
     in Just (MkMeasurementEvent (idx 0) (MkId (idx 1)) (MkId (idx 2))
              (parseMeasurementAction (idx 3)) (parseMeasurementState (idx 4))
              (idx 5) (idx 6) (unescField (idx 7)) (unescField (idx 8))
-             (unescField (idx 9)) (idx 10) (MkTimestamp (idx 11)))
+             (unescField (idx 9)) mRevertOf
+             mTurnId mTargets mRationale mOpLabel mMethod mConf mCreated)
 
 ------------------------------------------------------------------------
 -- Full graph save/load
@@ -924,6 +947,28 @@ exportGraphJson st eid = do
       measJson = map measurementEventToJson meas
       -- Regard history (current snapshot for each meme)
       regardHist = map memeRegardToJson memes
+      -- Assembly planes (§4.2): assembly_nodes and assembly_edges
+      assemblyNodes = jsonArr []
+      assemblyEdges = jsonArr []
+      -- Memode audit plane (§4.2): id, label, member_count, admissible
+      memodeAudit = map (\md =>
+        let memberIds = parseMemberHash md.memberHash
+            memberCount = length memberIds
+            admissible = memberCount >= 2
+        in jsonObj
+          [ ("id",           jsonStr (show md.id))
+          , ("label",        jsonStr md.label)
+          , ("member_count", jsonNat memberCount)
+          , ("admissible",   jsonBool admissible)
+          ]) memodes
+      -- Graph metadata (§4.2)
+      layoutFamilies = jsonArr (map jsonStr ["force", "spectral", "circular"])
+      layoutCatalog = jsonObj []
+      layoutDefaults = jsonObj [("default", jsonStr "force")]
+      appearanceDims = jsonArr (map jsonStr ["domain", "source_kind", "scope"])
+      filterDims = jsonArr (map jsonStr ["domain", "source_kind"])
+      statsCaps = jsonArr (map jsonStr ["clustering", "degree_distribution", "modularity"])
+      exportFormats = jsonArr (map jsonStr ["json", "graphml", "csv"])
   pure (jsonObj
     [ ("experiment_id",       jsonStr (show eid))
     , ("export_manifest_id",  jsonStr ("idris-" ++ show eid))
@@ -934,9 +979,12 @@ exportGraphJson st eid = do
     , ("assembly_render_modes", jsonArr (map jsonStr ["hulls", "collapsed-meta-node", "hidden"]))
     , ("semantic_nodes",      jsonArr semanticNodes)
     , ("semantic_edges",      jsonArr semanticEdges)
+    , ("assembly_nodes",      assemblyNodes)
+    , ("assembly_edges",      assemblyEdges)
     , ("runtime_nodes",       jsonArr rtNodes)
     , ("runtime_edges",       jsonArr rtEdges)
     , ("assemblies",          jsonArr assemblies)
+    , ("memode_audit",        jsonArr memodeAudit)
     , ("cluster_summaries",   jsonArr clusters)
     , ("active_set_slices",   jsonArr slices)
     , ("session_summaries",   jsonArr sessSummaries)
@@ -945,6 +993,13 @@ exportGraphJson st eid = do
     , ("regard_history",      jsonArr regardHist)
     , ("counts",              counts)
     , ("ontology",            ontology)
+    , ("layout_families",          layoutFamilies)
+    , ("layout_catalog",           layoutCatalog)
+    , ("layout_defaults",          layoutDefaults)
+    , ("appearance_dimensions",    appearanceDims)
+    , ("filter_dimensions",        filterDims)
+    , ("statistics_capabilities",  statsCaps)
+    , ("export_formats",           exportFormats)
     ])
 
 ------------------------------------------------------------------------
@@ -963,21 +1018,21 @@ formatHumArtifact hp =
     , "Session: " ++ show hp.hpSessionId
     , "Status: " ++ show hp.hpStatus
     , ""
-    , "## Metrics"
+    , "[HUM_STATS]"
+    , "Lines: " ++ show hp.surfaceStats.lineCount
+        ++ " | Words: " ++ show hp.surfaceStats.wordCount
+        ++ " | Chars: " ++ show hp.surfaceStats.charCount
+    , ""
+    , "[HUM_METRICS]"
     , "- Turns covered: " ++ show hp.metrics.turnsCovered
     , "- Feedback events: " ++ show hp.metrics.hmFeedbackEvts
     , "- Membrane events: " ++ show hp.metrics.hmMembraneEvts
     , "- Recurring motifs: " ++ show hp.metrics.recurringItems
     , "- Unique motifs: " ++ show hp.metrics.uniqueMotifs
     , ""
-    , "## Surface"
-    , "Lines: " ++ show hp.surfaceStats.lineCount
-        ++ " | Words: " ++ show hp.surfaceStats.wordCount
-        ++ " | Chars: " ++ show hp.surfaceStats.charCount
-    , ""
     , hp.textSurface
     , ""
-    , "## Motif Table"
+    , "[HUM_TABLE]"
     , unlines (map (\r => "  " ++ r.htToken ++ " x" ++ show r.htFrequency
                        ++ " (" ++ r.htSource ++ ")") hp.tokenTable)
     ]

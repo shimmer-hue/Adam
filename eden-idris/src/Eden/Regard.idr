@@ -171,6 +171,17 @@ propagateScale : Verdict -> Double
 propagateScale Edit = 0.65
 propagateScale _    = 0.80
 
+||| Default activation tau for memodes (§6.8): 172800 seconds (2 days).
+||| Memodes decay more slowly than individual memes (86400 = 1 day).
+public export
+memodeDefaultTau : Double
+memodeDefaultTau = 172800.0
+
+||| Default activation tau for memes: 86400 seconds (1 day).
+public export
+memeDefaultTau : Double
+memeDefaultTau = 86400.0
+
 ||| Apply feedback signal to a node's EMA channels.
 ||| Returns (newReward, newRisk, newEdit).
 public export

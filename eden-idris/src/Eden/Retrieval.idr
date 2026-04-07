@@ -475,13 +475,12 @@ scoreCandidate w curSess sim deltaSec tau reg scope rw rk fc mc =
 ------------------------------------------------------------------------
 
 public export
-buildCandidateScore : SelectionWeights -> SessionId
+buildCandidateScore : SelectionWeights -> SessionId -> GraphMetrics
                    -> (sim : Double) -> (deltaSec : Double)
                    -> Meme -> CandidateScore
-buildCandidateScore w curSess sim deltaSec m =
+buildCandidateScore w curSess gm sim deltaSec m =
   let act  = activationDecay deltaSec m.activationTau
       ns   = MkNodeState m.rewardEma m.riskEma m.evidenceN m.usageCount m.activationTau deltaSec m.feedbackCount m.editEma m.contradictionCount m.membraneConflicts
-      gm   = MkGraphMetrics 0.5 0.4 0.3
       rb   = regardBreakdown defaultRegardWeights ns gm
       reg  = rb.totalRegard
       sb   = calcSessionBias m.scope curSess
@@ -509,6 +508,38 @@ buildCandidateScore w curSess sim deltaSec m =
        }
 
 ------------------------------------------------------------------------
+-- Chunk candidate scoring
+------------------------------------------------------------------------
+
+||| Score a document chunk as a retrieval candidate.
+||| Uses similarity plus a base regard of 0.5 (chunks lack individual
+||| feedback channels). Returns a CandidateScore with nodeKind=ChunkNode.
+public export
+scoreChunkCandidate : SelectionWeights -> SessionId
+                   -> (sim : Double) -> Chunk -> CandidateScore
+scoreChunkCandidate w curSess sim c =
+  let baseRegard = 0.5
+      sel = w.wSemantic * sim + w.wRegard * baseRegard
+  in MkCandidateScore
+       { nodeKind           = ChunkNode
+       , nodeId             = show c.id
+       , label              = "chunk:" ++ show c.chunkIndex
+       , domain             = Knowledge
+       , scope              = Global
+       , sourceKind         = IngestSource
+       , semanticSimilarity = sim
+       , activationVal      = 0.0
+       , regard             = baseRegard
+       , sessionBias        = 0.0
+       , explicitFeedback   = 0.0
+       , scopePenalty        = 0.0
+       , membranePenalty    = 0.0
+       , selection          = sel
+       , text               = c.text
+       , provenance         = "document"
+       }
+
+------------------------------------------------------------------------
 -- Active-set selection (top-k)
 ------------------------------------------------------------------------
 
@@ -527,23 +558,23 @@ selectTopK k candidates =
 ||| actual embedding re-ranking requires IO and is done via assembleActiveSetEmbedding.
 public export
 assembleActiveSetWith : SimilarityMethod -> SelectionWeights -> SessionId
-                     -> (deltaSec : Double) -> (k : Nat)
+                     -> GraphMetrics -> (deltaSec : Double) -> (k : Nat)
                      -> (query : String) -> List Meme -> List CandidateScore
-assembleActiveSetWith method w curSess deltaSec k query memes =
+assembleActiveSetWith method w curSess gm deltaSec k query memes =
   let memeTexts = map (\m => tokenize (m.label ++ " " ++ m.text)) memes
       -- For Embedding method, use TF-IDF as pre-filter (re-ranking happens in IO)
       simFn = case method of
         TFIDF     => \mText => tfidfSimilarityCorpus query mText memeTexts
         Embedding => \mText => tfidfSimilarityCorpus query mText memeTexts
         _         => \mText => computeSimilarity method query mText
-      candidates = map (\m => buildCandidateScore w curSess
+      candidates = map (\m => buildCandidateScore w curSess gm
                           (simFn (m.label ++ " " ++ m.text))
                           deltaSec m) memes
   in selectTopK k candidates
 
-||| Score all memes and select the top k (backward-compatible signature).
+||| Score all memes and select the top k (default similarity method).
 public export
-assembleActiveSet : SelectionWeights -> SessionId
+assembleActiveSet : SelectionWeights -> SessionId -> GraphMetrics
                  -> (deltaSec : Double) -> (k : Nat)
                  -> (query : String) -> List Meme -> List CandidateScore
 assembleActiveSet = assembleActiveSetWith defaultSimilarityMethod
@@ -567,15 +598,15 @@ embeddingPrefilterFactor = 3
 ||| The getOrComputeEmbedding callback handles caching and CLI calls.
 ||| Falls back to pure TF-IDF if embeddings are empty/unavailable.
 export
-assembleActiveSetEmbedding : SelectionWeights -> SessionId
+assembleActiveSetEmbedding : SelectionWeights -> SessionId -> GraphMetrics
                           -> (deltaSec : Double) -> (k : Nat)
                           -> (query : String) -> List Meme
                           -> (getOrComputeEmbedding : String -> String -> IO (List Double))
                           -> IO (List CandidateScore)
-assembleActiveSetEmbedding w curSess deltaSec k query memes getEmb = do
+assembleActiveSetEmbedding w curSess gm deltaSec k query memes getEmb = do
   -- Step 1: TF-IDF pre-filter (wider than final k)
   let preK = k * embeddingPrefilterFactor
-      preFiltered = assembleActiveSetWith TFIDF w curSess deltaSec preK query memes
+      preFiltered = assembleActiveSetWith TFIDF w curSess gm deltaSec preK query memes
   -- Step 2: Get query embedding
   queryEmb <- getEmb "query" query
   if length queryEmb == 0
