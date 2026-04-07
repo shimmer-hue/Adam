@@ -16,45 +16,23 @@ AI governance frameworks have no shared theory of flourishing. Arrow's impossibi
 - **Tradition-specific modules.** A worked example with Tanakh/Hebrew hermeneutics (gematria, notarikon, temurah, at-bash) demonstrates how domain-specific interpretive traditions can be embedded as first-class graph operations.
 - **Idris2 verifies 55 runtime invariants at compile time.** Machine-checked proofs guarantee properties like "AdamAuto mode always resolves to RuntimeAuto (no hidden governor)" and "membrane never silently drops content without recording an event."
 
-## Two Implementations
-
-| | Python (reference) | Idris2 (machine-verified) |
-|---|---|---|
-| Purpose | Full-featured reference implementation | Dependently-typed verified core |
-| Runtime | Python 3.12, Textual TUI, Flask observatory | 1.3 MB native binary, no runtime dependencies |
-| Model backends | MLX (local Qwen), Claude CLI, mock | Claude CLI, mock |
-| TUI | Full modal interface (5,881 LOC) | Functional two-panel layout (620 LOC) |
-| Observatory | Live server with 20+ endpoints, React frontend | Static JSON export |
-| Proofs | 0 | 55 machine-checked theorems across 18 sections |
-| Storage | SQLite with migrations, FTS indexing | SQLite via C FFI, in-memory store |
-| Status | Production-ready for single operator | Core loop at functional parity, TUI and observatory in progress |
-
-Both implementations share the same ontology, turn loop, and graph schema. The Idris2 build compiles to a single native executable via the RefC backend.
-
 ## Quick Start
 
-**Path A: Idris2 with mock backend (no API key needed)**
+**With mock backend (no API key needed)**
 
 ```bash
 cd eden-idris && ./build.sh
 ./build/exec/eden.exe --repl --backend mock
 ```
 
-**Path B: Idris2 with Claude backend**
+**With Claude backend**
 
 ```bash
 cd eden-idris && ./build.sh
 ./build/exec/eden.exe --tui --backend claude
 ```
 
-**Path C: Python**
-
-```bash
-pip install -r requirements.txt
-python -m eden app
-```
-
-The Idris2 build requires a custom Idris2 fork (branch `progressive-stage1`) with the RefC backend, plus GCC and GMP. See `eden-idris/build.sh` for the full toolchain invocation.
+The Idris2 build requires a custom Idris2 fork (branch `progressive-stage1`) with the RefC backend, plus GCC and GMP. See `eden-idris/build.sh` for the full toolchain invocation. The build compiles to a single native executable (~2.5 MB) with no runtime dependencies.
 
 ## Architecture in One Diagram
 
@@ -73,19 +51,13 @@ The `Eden.Tanakh` module (`eden-idris/src/Eden/Tanakh.idr`) is a worked example 
 ## Project Structure
 
 ```
-eden/                  Python reference implementation
-  agents/adam/         Agent profile, seed constitution
-  models/              Model adapters (MLX, Claude, mock)
-  storage/             SQLite persistence, migrations
-  observatory/         Flask server, live graph API
-  ingest/              Document extraction pipeline
 eden-idris/            Idris2 verified implementation
   src/Eden/            All Idris2 modules
   support/             C FFI (terminal I/O)
   build/exec/          Compiled native binary
+eden/agents/adam/      Agent profile, seed constitution
 web/observatory/       React/TypeScript browser observatory (Vite, Graphology/Sigma)
 docs/                  Normative specs and status tracking
-tests/                 Python test suite
 ```
 
 ## Documentation
@@ -115,9 +87,8 @@ tests/                 Python test suite
 - `docs/MEASUREMENT_EVENT_MODEL.md` -- Measurement event provenance model
 
 **Status tracking:**
-- `docs/IDRIS_IMPLEMENTATION_STATUS.md` -- Idris2 port coverage vs Python reference
-- `docs/IMPLEMENTATION_ROADMAP.md` -- Prioritized roadmap for remaining work
 - `docs/IMPLEMENTATION_TRUTH_TABLE.md` -- Feature-by-feature implementation state
+- `docs/IMPLEMENTATION_ROADMAP.md` -- Prioritized roadmap for remaining work
 - `docs/KNOWN_LIMITATIONS.md` -- What does not work yet
 
 ## License
