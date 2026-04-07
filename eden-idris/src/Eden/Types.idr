@@ -563,6 +563,20 @@ Show MeasurementAction where
   show MeasurementRevert      = "revert"
 
 public export
+Eq MeasurementAction where
+  EdgeAdd                == EdgeAdd                = True
+  EdgeUpdate             == EdgeUpdate             = True
+  EdgeRemove             == EdgeRemove             = True
+  MemodeAssert           == MemodeAssert           = True
+  MemodeUpdateMembership == MemodeUpdateMembership = True
+  NodeEdit               == NodeEdit               = True
+  MotifAnnotation        == MotifAnnotation        = True
+  GeometryMeasurementRun == GeometryMeasurementRun = True
+  AblationMeasurementRun == AblationMeasurementRun = True
+  MeasurementRevert      == MeasurementRevert      = True
+  _                      == _                      = False
+
+public export
 data MeasurementState = Previewed | Committed | Reverted
 
 public export
@@ -570,6 +584,13 @@ Show MeasurementState where
   show Previewed = "previewed"
   show Committed = "committed"
   show Reverted  = "reverted"
+
+public export
+Eq MeasurementState where
+  Previewed == Previewed = True
+  Committed == Committed = True
+  Reverted  == Reverted  = True
+  _         == _         = False
 
 ------------------------------------------------------------------------
 -- Evidence and provenance labels
@@ -585,6 +606,13 @@ Show EvidenceLabel where
   show Speculative = "SPECULATIVE"
 
 public export
+Eq EvidenceLabel where
+  Observed    == Observed    = True
+  Derived     == Derived     = True
+  Speculative == Speculative = True
+  _           == _           = False
+
+public export
 data ProvenanceLabel = OperatorAsserted | OperatorRefined | AutoDerived
 
 public export
@@ -592,6 +620,13 @@ Show ProvenanceLabel where
   show OperatorAsserted = "OPERATOR_ASSERTED"
   show OperatorRefined  = "OPERATOR_REFINED"
   show AutoDerived      = "AUTO_DERIVED"
+
+public export
+Eq ProvenanceLabel where
+  OperatorAsserted == OperatorAsserted = True
+  OperatorRefined  == OperatorRefined  = True
+  AutoDerived      == AutoDerived      = True
+  _                == _                = False
 
 ------------------------------------------------------------------------
 -- Regard breakdown

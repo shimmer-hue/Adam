@@ -804,16 +804,34 @@ humMotifToJson r = jsonObj
 
 humToJson : HumPayload -> String
 humToJson hp = jsonObj
-  [ ("version",     jsonStr hp.artifactVersion)
-  , ("status",      jsonStr (show hp.hpStatus))
-  , ("generated_at", jsonStr (show hp.generatedAt))
-  , ("turns_covered", jsonNat hp.metrics.turnsCovered)
-  , ("recurring_motifs", jsonNat hp.metrics.recurringItems)
-  , ("unique_motifs",    jsonNat hp.metrics.uniqueMotifs)
-  , ("surface_lines",   jsonNat hp.surfaceStats.lineCount)
-  , ("surface_words",   jsonNat hp.surfaceStats.wordCount)
-  , ("surface_chars",   jsonNat hp.surfaceStats.charCount)
-  , ("motifs",          jsonArr (map humMotifToJson hp.tokenTable))
+  [ ("artifact_version", jsonStr hp.artifactVersion)
+  , ("generated_at",     jsonStr (show hp.generatedAt))
+  , ("experiment_id",    jsonStr (show hp.hpExperimentId))
+  , ("session_id",       jsonStr (show hp.hpSessionId))
+  , ("latest_turn_id",   case hp.latestTurnId of
+                            Nothing => jsonStr ""
+                            Just tid => jsonStr (show tid))
+  , ("turn_ids",         jsonArr (map (\tid => jsonStr (show tid)) hp.turnIds))
+  , ("turn_indices",     jsonArr (map (\i => jsonNat i) hp.turnIndices))
+  , ("derived_from",     jsonArr (map jsonStr hp.derivedFrom))
+  , ("boundedness",      jsonStr hp.boundedness)
+  , ("status",           jsonStr (show hp.hpStatus))
+  , ("continuity",       jsonStr hp.continuity)
+  , ("metrics", jsonObj
+      [ ("turns_covered",    jsonNat hp.metrics.turnsCovered)
+      , ("feedback_events",  jsonNat hp.metrics.hmFeedbackEvts)
+      , ("membrane_events",  jsonNat hp.metrics.hmMembraneEvts)
+      , ("recurring_motifs", jsonNat hp.metrics.recurringItems)
+      , ("unique_motifs",    jsonNat hp.metrics.uniqueMotifs)
+      ])
+  , ("text_surface",     jsonStr hp.textSurface)
+  , ("surface_lines",    jsonArr (map jsonStr hp.surfaceLines))
+  , ("surface_stats", jsonObj
+      [ ("line_count", jsonNat hp.surfaceStats.lineCount)
+      , ("char_count", jsonNat hp.surfaceStats.charCount)
+      , ("word_count", jsonNat hp.surfaceStats.wordCount)
+      ])
+  , ("token_table",      jsonArr (map humMotifToJson hp.tokenTable))
   ]
 
 ------------------------------------------------------------------------
