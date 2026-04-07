@@ -1,6 +1,5 @@
 ||| In-memory graph store backed by mutable IORef lists.
-||| This is the test/development store -- the production path would
-||| use SQLite via FFI.
+||| When dbHandle is Just, every mutation writes through to SQLite.
 module Eden.Store.InMemory
 
 import Data.IORef
@@ -9,6 +8,68 @@ import Data.String
 import Eden.Types
 import Eden.Config
 import Eden.Storage
+import Eden.Retrieval
+import Eden.Regard
+
+%hide Eden.Retrieval.tokenize
+
+------------------------------------------------------------------------
+-- SQLite FFI (inline declarations to avoid circular import)
+------------------------------------------------------------------------
+
+%foreign "C:eden_db_save_experiment,eden_sqlite"
+prim__wt_exp : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_session,eden_sqlite"
+prim__wt_sess : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_turn,eden_sqlite"
+prim__wt_turn : AnyPtr -> String -> String -> String -> Int -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_meme_tsv,eden_sqlite"
+prim__wt_meme_tsv : AnyPtr -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_memode_tsv,eden_sqlite"
+prim__wt_memode_tsv : AnyPtr -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_edge,eden_sqlite"
+prim__wt_edge : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> Double -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_feedback,eden_sqlite"
+prim__wt_fb : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> Double -> Double -> Double -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_membrane_event,eden_sqlite"
+prim__wt_mbe : AnyPtr -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_trace_event,eden_sqlite"
+prim__wt_tre : AnyPtr -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_update_meme_channels,eden_sqlite"
+prim__wt_memech : AnyPtr -> String -> Double -> Double -> Double -> PrimIO Int
+
+%foreign "C:eden_db_set_config,eden_sqlite"
+prim__wt_config : AnyPtr -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_document,eden_sqlite"
+prim__wt_doc : AnyPtr -> String -> String -> String -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_chunk,eden_sqlite"
+prim__wt_chunk : AnyPtr -> String -> String -> String -> Int -> Int -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_agent,eden_sqlite"
+prim__wt_agent : AnyPtr -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_active_set_tsv,eden_sqlite"
+prim__wt_aset_tsv : AnyPtr -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_measurement_event_tsv,eden_sqlite"
+prim__wt_meas_tsv : AnyPtr -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_export_artifact,eden_sqlite"
+prim__wt_export : AnyPtr -> String -> String -> String -> String -> String -> String -> PrimIO Int
+
+%foreign "C:eden_db_save_turn_metadata_tsv,eden_sqlite"
+prim__wt_tmeta_tsv : AnyPtr -> String -> PrimIO Int
 
 ------------------------------------------------------------------------
 -- Feedback record (cleaner than 8-tuple, which also hits Idris2 parse limit)
@@ -27,10 +88,36 @@ record FeedbackRecord where
   frSignal       : FeedbackSignal
 
 ------------------------------------------------------------------------
+-- Inverted index for FTS
+------------------------------------------------------------------------
+
+||| A single posting: a meme ID that contains a given term.
+public export
+record Posting where
+  constructor MkPosting
+  postingMemeId : MemeId
+  postingField  : String  -- "label" or "text"
+
+||| Inverted index: maps lowercased terms to lists of postings.
+||| Backed by a flat association list (sufficient for in-memory use).
+public export
+record InvertedIndex where
+  constructor MkInvertedIndex
+  iiEntries : IORef (List (String, List Posting))
+
+||| Create a fresh empty inverted index.
+export
+newInvertedIndex : IO InvertedIndex
+newInvertedIndex = do
+  ref <- newIORef []
+  pure (MkInvertedIndex ref)
+
+------------------------------------------------------------------------
 -- Store state
 ------------------------------------------------------------------------
 
 ||| Mutable in-memory store state.
+||| When dbHandle holds a Just ptr, mutations write through to SQLite.
 public export
 record StoreState where
   constructor MkStoreState
@@ -44,6 +131,16 @@ record StoreState where
   membraneEvts   : IORef (List (MembraneEventType, String, Timestamp))
   traceEvts      : IORef (List (TraceEventType, TraceLevel, String, Timestamp))
   nextId         : IORef Nat
+  dbHandle       : IORef (Maybe AnyPtr)
+  agents         : IORef (List Agent)
+  activeSetSnaps : IORef (List ActiveSetEntry)
+  measurements   : IORef (List MeasurementEvent)
+  exportArtifacts: IORef (List ExportArtifact)
+  turnMetadata   : IORef (List TurnMetadata)
+  chunks         : IORef (List Chunk)
+  documents      : IORef (List Document)
+  ftsIndex       : InvertedIndex
+  embeddings     : EmbeddingCache
 
 ------------------------------------------------------------------------
 -- Create a fresh store
@@ -62,7 +159,93 @@ newStore = do
   mbes  <- newIORef []
   tres  <- newIORef []
   nid   <- newIORef 1
-  pure (MkStoreState exps sess trns mms mds eds fbs mbes tres nid)
+  dbh   <- newIORef Nothing
+  ags   <- newIORef []
+  asets <- newIORef []
+  msev  <- newIORef []
+  exart <- newIORef []
+  tmeta <- newIORef []
+  chnks <- newIORef []
+  docs  <- newIORef []
+  fts   <- newInvertedIndex
+  embc  <- newEmbeddingCache
+  pure (MkStoreState exps sess trns mms mds eds fbs mbes tres nid dbh ags asets msev exart tmeta chnks docs fts embc)
+
+------------------------------------------------------------------------
+-- FTS tokenization helpers
+------------------------------------------------------------------------
+
+||| Check if a character is a word boundary (not alphanumeric).
+isWordChar : Char -> Bool
+isWordChar c = isAlphaNum c || c == '_'
+
+||| Tokenize a string into lowercased terms, splitting on non-word chars.
+||| Filters out terms shorter than 2 characters.
+tokenize : String -> List String
+tokenize s = filter (\t => length t >= 2) (go (unpack (toLower s)) [] [])
+  where
+    go : List Char -> List Char -> List String -> List String
+    go []          acc toks = reverse (if acc == [] then toks else pack (reverse acc) :: toks)
+    go (c :: rest) acc toks =
+      if isWordChar c
+        then go rest (c :: acc) toks
+        else go rest [] (if acc == [] then toks else pack (reverse acc) :: toks)
+
+||| Add postings for a meme to the inverted index.
+indexMemeTerms : InvertedIndex -> MemeId -> String -> String -> IO ()
+indexMemeTerms idx mid label text = do
+  let labelTerms : List (String, Posting)
+      labelTerms = map (\t => (t, MkPosting mid "label")) (tokenize label)
+      textTerms  : List (String, Posting)
+      textTerms  = map (\t => (t, MkPosting mid "text"))  (tokenize text)
+      allTerms   : List (String, Posting)
+      allTerms   = Prelude.List.(++) labelTerms textTerms
+  entries <- readIORef idx.iiEntries
+  let updated = foldl addPosting entries allTerms
+  writeIORef idx.iiEntries updated
+  where
+    addPosting : List (String, List Posting) -> (String, Posting) -> List (String, List Posting)
+    addPosting [] (term, posting) = [(term, [posting])]
+    addPosting ((k, ps) :: rest) (term, posting) =
+      if k == term
+        then (k, posting :: ps) :: rest
+        else (k, ps) :: addPosting rest (term, posting)
+
+------------------------------------------------------------------------
+-- Write-through helpers
+------------------------------------------------------------------------
+
+||| Discard PrimIO Int result.
+wt_ : IO Int -> IO ()
+wt_ act = do _ <- act; pure ()
+
+||| Call f(db) if SQLite handle is open, else no-op.
+withDB : StoreState -> (AnyPtr -> IO ()) -> IO ()
+withDB st f = do
+  mdb <- readIORef st.dbHandle
+  case mdb of
+    Nothing => pure ()
+    Just db => f db
+
+||| Join strings with tab separator.
+joinTSV : List String -> String
+joinTSV [] = ""
+joinTSV [x] = x
+joinTSV (x :: xs) = x ++ "\t" ++ joinTSV xs
+
+wtMeme : StoreState -> Meme -> IO ()
+wtMeme st m =
+  let tsv = joinTSV [ show m.id, show m.experimentId
+                    , m.label, m.canonicalLabel, m.text
+                    , show m.domain, show m.sourceKind, show m.scope
+                    , show m.evidenceN, show m.usageCount
+                    , show m.rewardEma, show m.riskEma, show m.editEma
+                    , show m.skipCount, show m.contradictionCount
+                    , show m.membraneConflicts, show m.feedbackCount
+                    , show m.activationTau
+                    , show m.lastActiveAt, show m.createdAt, show m.updatedAt
+                    , m.metadataJson ]
+  in withDB st (\db => wt_ (primIO (prim__wt_meme_tsv db tsv)))
 
 ------------------------------------------------------------------------
 -- ID generation
@@ -72,7 +255,9 @@ export
 genId : StoreState -> String -> IO String
 genId st pfx = do
   n <- readIORef st.nextId
-  writeIORef st.nextId (n + 1)
+  let next = n + 1
+  writeIORef st.nextId next
+  withDB st (\db => wt_ (primIO (prim__wt_config db "next_id" (show next))))
   pure (pfx ++ "-" ++ show n)
 
 ------------------------------------------------------------------------
@@ -85,6 +270,7 @@ createExperiment st name slug mode now = do
   eid <- genId st "exp"
   let exp = MkExperiment (MkId eid) name slug mode Active now now
   modifyIORef st.experiments (exp ::)
+  withDB st (\db => wt_ (primIO (prim__wt_exp db eid name slug (show mode) (show Active) (show now) (show now))))
   pure exp
 
 export
@@ -103,6 +289,7 @@ createSession st eid aid title now = do
   sid <- genId st "sess"
   let sess = MkSession (MkId sid) eid aid title now now Nothing
   modifyIORef st.sessions (sess ::)
+  withDB st (\db => wt_ (primIO (prim__wt_sess db sid (show eid) (show aid) title (show now) (show now) "")))
   pure sess
 
 export
@@ -122,6 +309,8 @@ recordTurn st eid sid idx userText promptCtx respText membText now = do
   tid <- genId st "turn"
   let turn = MkTurn (MkId tid) eid sid idx userText promptCtx respText membText now
   modifyIORef st.turns (turn ::)
+  withDB st (\db => wt_ (primIO (prim__wt_turn db tid (show eid) (show sid)
+    (cast idx) userText promptCtx respText membText (show now))))
   pure turn
 
 export
@@ -158,12 +347,15 @@ upsertMeme st eid label text domain sk scope now = do
                     , updatedAt := now } m
           others = filter (\x => x.id /= m.id) allMemes
       writeIORef st.memes (updated :: others)
+      wtMeme st updated
       pure updated
     Nothing => do
       mid <- genId st "meme"
       let meme = MkMeme (MkId mid) eid label canonical text domain sk scope
-                        0.0 1 0.0 0.0 0.0 0 0 0 0 86400.0 now now now
+                        0.0 1 0.0 0.0 0.0 0 0 0 0 86400.0 now now now ""
       modifyIORef st.memes (meme ::)
+      wtMeme st meme
+      indexMemeTerms st.ftsIndex (MkId mid) label text
       pure meme
 
 export
@@ -193,8 +385,14 @@ upsertMemode st eid lbl summary dom memberIds now = do
   mid <- genId st "memode"
   let hash = show (length memberIds) ++ ":" ++ show (map show memberIds)
       md = MkMemode (MkId mid) eid lbl hash summary dom Global
-                    0.0 1 0.0 0.0 0.0 0 86400.0 now now now
+                    0.0 1 0.0 0.0 0.0 0 86400.0 now now now ""
   modifyIORef st.memodes (md ::)
+  let tsv = joinTSV [ mid, show eid, lbl, hash, summary
+                    , show dom, show Global
+                    , "0.0", "1", "0.0", "0.0", "0.0"
+                    , "0", "86400.0"
+                    , show now, show now, show now, "" ]
+  withDB st (\db => wt_ (primIO (prim__wt_memode_tsv db tsv)))
   pure md
 
 export
@@ -235,8 +433,10 @@ createEdge : StoreState -> ExperimentId -> NodeKind -> String -> NodeKind -> Str
           -> EdgeType -> Double -> Timestamp -> IO Edge
 createEdge st eid sk sid dk did et w now = do
   edgeId <- genId st "edge"
-  let edge = MkEdge (MkId edgeId) eid sk sid dk did et w now now
+  let edge = MkEdge (MkId edgeId) eid sk sid dk did et w "" now now
   modifyIORef st.edges (edge ::)
+  withDB st (\db => wt_ (primIO (prim__wt_edge db edgeId (show eid)
+    (show sk) sid (show dk) did (show et) w (show now) (show now))))
   pure edge
 
 export
@@ -265,6 +465,8 @@ recordFeedback st eid sid tid v expl corr sig now = do
   let fbid = MkId {a=FeedbackTag} fid
       rec  = MkFeedbackRecord fbid eid sid tid v expl corr sig
   modifyIORef st.feedbackEvents (rec ::)
+  withDB st (\db => wt_ (primIO (prim__wt_fb db fid (show eid) (show sid) (show tid)
+    (show v) expl corr sig.reward sig.risk sig.edit (show now))))
   pure fbid
 
 ------------------------------------------------------------------------
@@ -273,13 +475,19 @@ recordFeedback st eid sid tid v expl corr sig now = do
 
 export
 recordMembraneEvent : StoreState -> MembraneEventType -> String -> Timestamp -> IO ()
-recordMembraneEvent st evt detail now =
+recordMembraneEvent st evt detail now = do
   modifyIORef st.membraneEvts ((evt, detail, now) ::)
+  nid <- readIORef st.nextId
+  let mid = "mbe-" ++ show nid
+  withDB st (\db => wt_ (primIO (prim__wt_mbe db mid (show evt) detail (show now))))
 
 export
 recordTraceEvent : StoreState -> TraceEventType -> TraceLevel -> String -> Timestamp -> IO ()
-recordTraceEvent st evt lvl msg now =
+recordTraceEvent st evt lvl msg now = do
   modifyIORef st.traceEvts ((evt, lvl, msg, now) ::)
+  nid <- readIORef st.nextId
+  let tid = "tre-" ++ show nid
+  withDB st (\db => wt_ (primIO (prim__wt_tre db tid (show evt) (show lvl) msg (show now))))
 
 ------------------------------------------------------------------------
 -- Document operations
@@ -289,16 +497,20 @@ export
 createDocument : StoreState -> ExperimentId -> String -> DocKind -> String -> String -> Timestamp -> IO Document
 createDocument st eid path kind title sha now = do
   did <- genId st "doc"
-  let doc = MkDocument (MkId did) eid path kind title sha Processing now
-  -- Store in edges IORef repurposed... actually we need a docs IORef
-  -- For now, return the document (stateless creation)
+  let doc = MkDocument (MkId did) eid path kind title sha Processing "" now
+  modifyIORef st.documents (doc ::)
+  withDB st (\db => wt_ (primIO (prim__wt_doc db did (show eid) path (show kind) title sha (show Processing) (show now))))
   pure doc
 
 export
 createChunk : StoreState -> ExperimentId -> DocumentId -> Nat -> Maybe Nat -> String -> Timestamp -> IO Chunk
 createChunk st eid did idx pageNum text now = do
   cid <- genId st "chunk"
-  pure (MkChunk (MkId cid) eid did idx pageNum text now)
+  let chunk = MkChunk (MkId cid) eid did idx pageNum text "" now
+      pn : Int = case pageNum of Just p => cast p; Nothing => 0
+  modifyIORef st.chunks (chunk ::)
+  withDB st (\db => wt_ (primIO (prim__wt_chunk db cid (show eid) (show did) (cast idx) pn text (show now))))
+  pure chunk
 
 ------------------------------------------------------------------------
 -- Graph counts
@@ -312,10 +524,11 @@ graphCounts st = do
   es  <- readIORef st.edges
   ts  <- readIORef st.turns
   fs  <- readIORef st.feedbackEvents
+  mev <- readIORef st.measurements
   mbe <- readIORef st.membraneEvts
   tre <- readIORef st.traceEvts
   pure (MkGraphCounts (length ms) (length mds) (length es) (length ts)
-                      (length fs) 0 (length mbe) (length tre))
+                      (length fs) (length mev) (length mbe) (length tre))
 
 ------------------------------------------------------------------------
 -- Update feedback channels on a meme
@@ -329,3 +542,472 @@ updateMemeChannels st mid newRw newRk newEd = do
                            then { rewardEma := newRw, riskEma := newRk, editEma := newEd } m
                            else m) allMemes
   writeIORef st.memes updated
+  withDB st (\db => wt_ (primIO (prim__wt_memech db (show mid) newRw newRk newEd)))
+
+------------------------------------------------------------------------
+-- Update feedback channels on a memode
+------------------------------------------------------------------------
+
+export
+updateMemodeChannels : StoreState -> MemodeId -> Double -> Double -> Double -> IO ()
+updateMemodeChannels st mid newRw newRk newEd = do
+  allMemodes <- readIORef st.memodes
+  let updated = map (\m => if m.id == mid
+                           then { rewardEma := newRw, riskEma := newRk, editEma := newEd } m
+                           else m) allMemodes
+  writeIORef st.memodes updated
+
+------------------------------------------------------------------------
+-- Agent operations
+------------------------------------------------------------------------
+
+export
+createAgent : StoreState -> ExperimentId -> String -> String -> Timestamp -> IO Agent
+createAgent st eid name persona now = do
+  aid <- genId st "agent"
+  let agent = MkAgent (MkId aid) eid name persona now
+  modifyIORef st.agents (agent ::)
+  withDB st (\db => wt_ (primIO (prim__wt_agent db aid (show eid) name persona (show now))))
+  pure agent
+
+------------------------------------------------------------------------
+-- Active set snapshot operations
+------------------------------------------------------------------------
+
+export
+recordActiveSetEntry : StoreState -> ExperimentId -> SessionId -> TurnId
+                    -> String -> String -> Domain -> Double -> Double -> Double -> Double
+                    -> Timestamp -> IO ()
+recordActiveSetEntry st eid sid tid nid label dom sel sem act reg now = do
+  asid <- genId st "aset"
+  let entry = MkActiveSetEntry asid eid sid tid MemeNode nid label dom sel sem act reg now
+  modifyIORef st.activeSetSnaps (entry ::)
+  let tsv = joinTSV [ asid, show eid, show sid, show tid
+                    , show MemeNode, nid, label, show dom
+                    , show sel, show sem, show act, show reg
+                    , show now ]
+  withDB st (\db => wt_ (primIO (prim__wt_aset_tsv db tsv)))
+
+------------------------------------------------------------------------
+-- Measurement event operations
+------------------------------------------------------------------------
+
+export
+recordMeasurementEvent : StoreState -> ExperimentId -> SessionId
+                      -> MeasurementAction -> MeasurementState
+                      -> String -> String -> String -> String -> String -> String
+                      -> Timestamp -> IO MeasurementEvent
+recordMeasurementEvent st eid sid action state operator evidence
+                       before proposed committed revertOf now = do
+  mid <- genId st "meas"
+  let evt = MkMeasurementEvent mid eid sid action state operator evidence
+                               before proposed committed revertOf
+                               "" "" "" "" "" 1.0 now
+  modifyIORef st.measurements (evt ::)
+  let tsv = joinTSV [ mid, show eid, show sid, show action, show state
+                    , operator, evidence, before, proposed, committed
+                    , revertOf, "", "", "", "", "", "1.0", show now ]
+  withDB st (\db => wt_ (primIO (prim__wt_meas_tsv db tsv)))
+  pure evt
+
+------------------------------------------------------------------------
+-- Export artifact operations
+------------------------------------------------------------------------
+
+export
+recordExportArtifact : StoreState -> ExperimentId -> String -> String -> String
+                    -> Timestamp -> IO ExportArtifact
+recordExportArtifact st eid artType path graphHash now = do
+  aid <- genId st "expart"
+  let art = MkExportArtifact aid eid artType path graphHash now
+  modifyIORef st.exportArtifacts (art ::)
+  withDB st (\db => wt_ (primIO (prim__wt_export db aid (show eid) artType path graphHash (show now))))
+  pure art
+
+------------------------------------------------------------------------
+-- Turn metadata operations
+------------------------------------------------------------------------
+
+export
+recordTurnMetadata : StoreState -> TurnMetadata -> IO ()
+recordTurnMetadata st meta = do
+  modifyIORef st.turnMetadata (meta ::)
+  let tsv = joinTSV [ show meta.turnId
+                    , meta.inferenceModeReq, meta.inferenceModeEff
+                    , meta.budgetMode, meta.budgetPressure
+                    , show meta.budgetUsedTokens, show meta.budgetRemainingTokens
+                    , show meta.activeSetSize, meta.reasoningText
+                    , show meta.temperature, show meta.maxOutput
+                    , show meta.responseCap
+                    , meta.profileName, meta.selectionSource, meta.countMethod
+                    , show meta.createdAt ]
+  withDB st (\db => wt_ (primIO (prim__wt_tmeta_tsv db tsv)))
+
+------------------------------------------------------------------------
+-- Chunk CRUD operations
+------------------------------------------------------------------------
+
+||| Get a chunk by ID.
+export
+getChunk : StoreState -> ChunkId -> IO (Maybe Chunk)
+getChunk st cid = do
+  allChunks <- readIORef st.chunks
+  pure (find (\c => c.id == cid) allChunks)
+
+||| Get all chunks (filtered by experiment).
+export
+getChunks : StoreState -> ExperimentId -> IO (List Chunk)
+getChunks st eid = do
+  allChunks <- readIORef st.chunks
+  pure (filter (\c => c.experimentId == eid) allChunks)
+
+||| Get chunks belonging to a specific document.
+export
+getChunksByDocument : StoreState -> DocumentId -> IO (List Chunk)
+getChunksByDocument st did = do
+  allChunks <- readIORef st.chunks
+  pure (sortBy (\a, b => compare a.chunkIndex b.chunkIndex)
+    (filter (\c => c.documentId == did) allChunks))
+
+------------------------------------------------------------------------
+-- Document read operations
+------------------------------------------------------------------------
+
+||| Get a document by ID.
+export
+getDocument : StoreState -> DocumentId -> IO (Maybe Document)
+getDocument st did = do
+  allDocs <- readIORef st.documents
+  pure (find (\d => d.id == did) allDocs)
+
+||| Get all documents for an experiment.
+export
+getDocuments : StoreState -> ExperimentId -> IO (List Document)
+getDocuments st eid = do
+  allDocs <- readIORef st.documents
+  pure (filter (\d => d.experimentId == eid) allDocs)
+
+------------------------------------------------------------------------
+-- Document SHA deduplication
+------------------------------------------------------------------------
+
+||| Check whether a document with the given SHA256 hash already exists
+||| in the experiment. Prevents duplicate ingestion of the same content.
+export
+documentExistsBySha : StoreState -> ExperimentId -> String -> IO Bool
+documentExistsBySha st eid sha = do
+  allDocs <- readIORef st.documents
+  pure (any (\d => d.experimentId == eid && d.sha256 == sha) allDocs)
+
+------------------------------------------------------------------------
+-- FTS search
+------------------------------------------------------------------------
+
+||| Search memes using the inverted index.
+||| Tokenizes the query, looks up each term in the index,
+||| and returns memes that match any query term, ranked by hit count.
+export
+ftsSearchMemes : StoreState -> ExperimentId -> String -> IO (List Meme)
+ftsSearchMemes st eid query = do
+  let queryTerms = Eden.Store.InMemory.tokenize query
+  entries <- readIORef st.ftsIndex.iiEntries
+  allMemes <- readIORef st.memes
+  -- Collect all matching meme IDs with hit counts
+  let matchedPostings = concatMap (\qt =>
+        case lookup qt entries of
+          Nothing => []
+          Just ps => map (\p => p.postingMemeId) ps) queryTerms
+      -- Count occurrences per meme ID
+      memeIdStrs = map show matchedPostings
+      uniqueIds  = nub memeIdStrs
+      -- Sort by hit count (descending)
+      ranked = sortBy (\a, b => compare (countHits b memeIdStrs) (countHits a memeIdStrs)) uniqueIds
+      -- Resolve to actual memes in this experiment
+      results = mapMaybe (\idStr =>
+        find (\m => show m.id == idStr && m.experimentId == eid) allMemes) ranked
+  pure results
+  where
+    countHits : String -> List String -> Nat
+    countHits target xs = length (filter (== target) xs)
+
+||| Rebuild the FTS index from all memes currently in the store.
+||| Called after bulk loading from SQLite.
+export
+rebuildFtsIndex : StoreState -> IO ()
+rebuildFtsIndex st = do
+  writeIORef st.ftsIndex.iiEntries []
+  allMemes <- readIORef st.memes
+  traverse_ (\m => indexMemeTerms st.ftsIndex m.id m.label m.text) allMemes
+
+------------------------------------------------------------------------
+-- Measurement event queries
+------------------------------------------------------------------------
+
+||| Get all measurement events for an experiment.
+export
+getMeasurementEvents : StoreState -> ExperimentId -> IO (List MeasurementEvent)
+getMeasurementEvents st eid = do
+  allEvts <- readIORef st.measurements
+  pure (filter (\e => e.experimentId == eid) allEvts)
+
+||| Get measurement events targeting specific node IDs.
+||| Checks the beforeState and proposedState fields for the target ID string.
+export
+getMeasurementEventsByTarget : StoreState -> ExperimentId -> String -> IO (List MeasurementEvent)
+getMeasurementEventsByTarget st eid targetId = do
+  allEvts <- readIORef st.measurements
+  pure (filter (\e => e.experimentId == eid
+                   && (isInfixOf targetId e.beforeState
+                    || isInfixOf targetId e.proposedState
+                    || isInfixOf targetId e.committedState)) allEvts)
+
+||| Revert a measurement event by creating a new revert event.
+||| Reversion is itself part of the measurement ledger — history is never
+||| silently mutated.
+export
+revertMeasurementEvent : StoreState -> ExperimentId -> SessionId
+                      -> String -> Timestamp -> IO (Maybe MeasurementEvent)
+revertMeasurementEvent st eid sid originalEventId now = do
+  allEvts <- readIORef st.measurements
+  case find (\e => e.id == originalEventId && e.experimentId == eid) allEvts of
+    Nothing => pure Nothing
+    Just orig => do
+      -- Create a revert event that references the original
+      revEvt <- recordMeasurementEvent st eid sid
+                  MeasurementRevert Committed
+                  orig.operator orig.evidence
+                  orig.committedState orig.beforeState orig.beforeState
+                  originalEventId now
+      pure (Just revEvt)
+
+------------------------------------------------------------------------
+-- Embedding cache operations
+------------------------------------------------------------------------
+
+||| Get a cached embedding, or compute and cache it using the provided callback.
+||| The callback (e.g., Claude CLI call) is only invoked on cache miss.
+export
+getOrComputeEmbedding : StoreState -> String -> (String -> IO (List Double)) -> IO (List Double)
+getOrComputeEmbedding st key compute = do
+  cached <- lookupEmbedding st.embeddings key
+  case cached of
+    Just vec => pure vec
+    Nothing  => do
+      vec <- compute key
+      cacheEmbedding st.embeddings key vec
+      pure vec
+
+||| Get the number of cached embeddings.
+export
+embeddingCacheSize : StoreState -> IO Nat
+embeddingCacheSize st = do
+  entries <- readIORef st.embeddings.ecEntries
+  pure (length entries)
+
+||| Clear the embedding cache.
+export
+clearEmbeddingCache : StoreState -> IO ()
+clearEmbeddingCache st = writeIORef st.embeddings.ecEntries []
+
+------------------------------------------------------------------------
+-- FTS search for memodes
+------------------------------------------------------------------------
+
+||| Search memodes using token matching against label and summary fields.
+||| Tokenizes the query, matches against each memode's label and summary,
+||| and returns memodes ranked by hit count (descending).
+export
+ftsSearchMemodes : StoreState -> ExperimentId -> String -> IO (List Memode)
+ftsSearchMemodes st eid query = do
+  let queryTerms = Eden.Store.InMemory.tokenize query
+  allMemodes <- readIORef st.memodes
+  let expMemodes = filter (\m => m.experimentId == eid) allMemodes
+      -- Score each memode by counting query term hits in its label + summary tokens
+      scored = map (\m =>
+        let labelToks = Eden.Store.InMemory.tokenize m.label
+            summToks  = Eden.Store.InMemory.tokenize m.summary
+            allToks   = Prelude.List.(++) labelToks summToks
+            hits      = foldl (\acc, qt => if any (== qt) allToks then acc + 1 else acc) 0 queryTerms
+        in (m, hits)) expMemodes
+      -- Filter to those with at least one hit, sort descending by hits
+      matched : List (Memode, Nat)
+      matched = filter (\p => snd p > 0) scored
+      ranked  = sortBy (\a, b => compare (snd b) (snd a)) matched
+  pure (map (\p => fst p) ranked)
+
+------------------------------------------------------------------------
+-- FTS search for chunks
+------------------------------------------------------------------------
+
+||| Search chunks using token matching against the chunk text field.
+||| Tokenizes the query, matches against each chunk's text tokens,
+||| and returns chunks ranked by hit count (descending).
+export
+ftsSearchChunks : StoreState -> ExperimentId -> String -> IO (List Chunk)
+ftsSearchChunks st eid query = do
+  let queryTerms = Eden.Store.InMemory.tokenize query
+  allChunks <- readIORef st.chunks
+  let expChunks = filter (\c => c.experimentId == eid) allChunks
+      scored = map (\c =>
+        let textToks = Eden.Store.InMemory.tokenize c.text
+            hits     = foldl (\acc, qt => if any (== qt) textToks then acc + 1 else acc) 0 queryTerms
+        in (c, hits)) expChunks
+      matched : List (Chunk, Nat)
+      matched = filter (\p => snd p > 0) scored
+      ranked  = sortBy (\a, b => compare (snd b) (snd a)) matched
+  pure (map (\p => fst p) ranked)
+
+------------------------------------------------------------------------
+-- Graph health report
+------------------------------------------------------------------------
+
+||| Report on structural health of the meme graph.
+public export
+record GraphHealthReport where
+  constructor MkGraphHealthReport
+  isolatedMemeCount : Nat
+  dyadRatio         : Double
+  feedbackCoverage  : Double
+  avgEdgesPerMeme   : Double
+  totalNodes        : Nat
+  totalEdges        : Nat
+
+------------------------------------------------------------------------
+-- Compute real graph metrics
+------------------------------------------------------------------------
+
+||| Compute real graph metrics (clustering coefficient, normalized degree,
+||| triangle participation) from the edge store.
+export
+computeGraphMetrics : StoreState -> ExperimentId -> IO GraphMetrics
+computeGraphMetrics st eid = do
+  allMemes <- readIORef st.memes
+  allEdges <- readIORef st.edges
+  let expMemes = filter (\m => m.experimentId == eid) allMemes
+      expEdges = filter (\e => e.experimentId == eid) allEdges
+      nodeIds  = map (\m => show m.id) expMemes
+      n        = length nodeIds
+  if n == 0
+    then pure (MkGraphMetrics 0.0 0.0 0.0)
+    else do
+      -- Build adjacency: for each node, collect its undirected neighbors
+      let neighbors : String -> List String
+          neighbors nid =
+            let outN = map (\e => e.dstId) (filter (\e => e.srcId == nid) expEdges)
+                inN  = map (\e => e.srcId) (filter (\e => e.dstId == nid) expEdges)
+            in nub (Prelude.List.(++) outN inN)
+
+          -- Degree of each node
+          degrees : List (String, Nat)
+          degrees = map (\nid => (nid, length (neighbors nid))) nodeIds
+
+          -- Max degree
+          maxDeg : Nat
+          maxDeg = foldl (\mx, p => max mx (snd p)) 0 degrees
+
+          -- Average degree
+          sumDeg : Nat
+          sumDeg = foldl (\s, p => s + snd p) 0 degrees
+
+          avgDeg : Double
+          avgDeg = cast sumDeg / cast n
+
+          -- Normalized degree: avg / max (0 if max is 0)
+          nd : Double
+          nd = if maxDeg == 0 then 0.0 else avgDeg / cast maxDeg
+
+          -- Check if an edge exists between two nodes (undirected)
+          hasEdge : String -> String -> Bool
+          hasEdge a b = any (\e => (e.srcId == a && e.dstId == b)
+                                || (e.srcId == b && e.dstId == a)) expEdges
+
+          -- Local clustering coefficient for a node
+          localClustering : String -> Double
+          localClustering nid =
+            let nbrs = neighbors nid
+                k    = length nbrs
+            in if k < 2 then 0.0
+               else
+                 let pairs = concatMap (\u => map (\v => (u, v))
+                               (filter (\v => v > u) nbrs)) nbrs
+                     edgeCount = foldl (\cnt, p =>
+                       if hasEdge (fst p) (snd p) then cnt + 1 else cnt) 0 pairs
+                     possible : Double
+                     possible  = cast (k * (minus k 1)) / 2.0
+                 in if possible <= 0.0 then 0.0
+                    else cast edgeCount / possible
+
+          -- Average clustering coefficient
+          clusterVals : List Double
+          clusterVals = map localClustering nodeIds
+
+          sumClust : Double
+          sumClust = foldl (+) 0.0 clusterVals
+
+          avgClust : Double
+          avgClust = sumClust / cast n
+
+          -- Triangle participation: fraction of nodes in at least one triangle
+          participatesInTriangle : String -> Bool
+          participatesInTriangle nid =
+            let nbrs = neighbors nid
+                pairs = concatMap (\u => map (\v => (u, v))
+                          (filter (\v => v > u) nbrs)) nbrs
+            in any (\p => hasEdge (fst p) (snd p)) pairs
+
+          triCount : Nat
+          triCount = length (filter participatesInTriangle nodeIds)
+
+          tp : Double
+          tp = cast triCount / cast n
+
+      pure (MkGraphMetrics avgClust nd tp)
+
+------------------------------------------------------------------------
+-- Graph health
+------------------------------------------------------------------------
+
+||| Compute a graph health report: isolated memes, dyad ratio,
+||| feedback coverage, average edges per meme, totals.
+export
+getGraphHealth : StoreState -> ExperimentId -> IO GraphHealthReport
+getGraphHealth st eid = do
+  allMemes <- readIORef st.memes
+  allEdges <- readIORef st.edges
+  let expMemes = filter (\m => m.experimentId == eid) allMemes
+      expEdges = filter (\e => e.experimentId == eid) allEdges
+      n        = length expMemes
+      eCount   = length expEdges
+  if n == 0
+    then pure (MkGraphHealthReport 0 0.0 0.0 0.0 0 0)
+    else do
+      let -- Count edges per meme (undirected: count as src or dst)
+          edgeCount : String -> Nat
+          edgeCount nid = length (filter (\e => e.srcId == nid || e.dstId == nid) expEdges)
+
+          -- Isolated: 0 edges
+          isolated : Nat
+          isolated = length (filter (\m => edgeCount (show m.id) == 0) expMemes)
+
+          -- Dyad: exactly 1 edge
+          dyads : Nat
+          dyads = length (filter (\m => edgeCount (show m.id) == 1) expMemes)
+
+          dyadR : Double
+          dyadR = cast dyads / cast n
+
+          -- Feedback coverage: fraction with feedbackCount > 0
+          withFb : Nat
+          withFb = length (filter (\m => m.feedbackCount > 0) expMemes)
+
+          fbCov : Double
+          fbCov = cast withFb / cast n
+
+          -- Average edges per meme
+          totalEdgeRefs : Nat
+          totalEdgeRefs = foldl (\s, m => s + edgeCount (show m.id)) 0 expMemes
+
+          avgE : Double
+          avgE = cast totalEdgeRefs / cast n
+
+      pure (MkGraphHealthReport isolated dyadR fbCov avgE n eCount)

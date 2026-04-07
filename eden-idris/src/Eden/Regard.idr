@@ -66,13 +66,15 @@ feedbackSignal Skip   = MkFeedbackSignal 0.0    0.05    0.0
 -- Component scoring
 ------------------------------------------------------------------------
 
+||| Spec: reward_i = reward_ema + 0.35 * edit_ema
 public export
-rewardScore : (rewardEma : Double) -> (riskEma : Double) -> Double
-rewardScore rw rk = bounded (-2.0) 2.0 (rw - 0.3 * rk)
+rewardScore : (rewardEma : Double) -> (editEma : Double) -> Double
+rewardScore rw ed = bounded (-2.0) 2.0 (rw + 0.35 * ed)
 
+||| Spec: evidence_i = log(1 + evidence_n + usage_count + 0.5 * feedback_count)
 public export
-evidenceScore : (evidenceN : Double) -> Double
-evidenceScore n = bounded 0.0 2.0 (log (n + 1.0) / log 10.0)
+evidenceScore : (evidenceN : Double) -> (usageCount : Nat) -> (feedbackCount : Nat) -> Double
+evidenceScore n uc fc = bounded 0.0 2.0 (log (1.0 + n + cast uc + 0.5 * cast fc) / log 10.0)
 
 public export
 persistenceScore : (usageCount : Nat) -> (evidenceN : Double) -> (act : Double) -> Double
@@ -90,9 +92,10 @@ public export
 isolationPenalty : (normDegree : Double) -> Double
 isolationPenalty deg = bounded 0.0 1.5 (1.0 - deg)
 
+||| Spec: risk_i = risk_ema + 0.35 * contradiction_count + 0.3 * membrane_conflicts
 public export
-riskScore : (riskEma : Double) -> Double
-riskScore rk = bounded 0.0 2.0 rk
+riskScore : (riskEma : Double) -> (contradictionCount : Nat) -> (membraneConflicts : Nat) -> Double
+riskScore rk cc mc = bounded 0.0 2.0 (rk + 0.35 * cast cc + 0.3 * cast mc)
 
 ------------------------------------------------------------------------
 -- Graph metrics input
@@ -112,12 +115,16 @@ record GraphMetrics where
 public export
 record NodeState where
   constructor MkNodeState
-  nsRewardEma  : Double
-  nsRiskEma    : Double
-  nsEvidenceN  : Double
-  nsUsageCount : Nat
-  nsActivTau   : Double
-  nsDeltaSec   : Double
+  nsRewardEma          : Double
+  nsRiskEma            : Double
+  nsEvidenceN          : Double
+  nsUsageCount         : Nat
+  nsActivTau           : Double
+  nsDeltaSec           : Double
+  nsFeedbackCount      : Nat
+  nsEditEma            : Double
+  nsContradictionCount : Nat
+  nsMembraneConflicts  : Nat
 
 ------------------------------------------------------------------------
 -- Regard breakdown computation
@@ -128,13 +135,13 @@ public export
 regardBreakdown : RegardWeights -> NodeState -> GraphMetrics -> RegardBreakdown
 regardBreakdown w ns gm =
   let act   = activationDecay ns.nsDeltaSec ns.nsActivTau
-      rw    = rewardScore ns.nsRewardEma ns.nsRiskEma
-      ev    = evidenceScore ns.nsEvidenceN
+      rw    = rewardScore ns.nsRewardEma ns.nsEditEma
+      ev    = evidenceScore ns.nsEvidenceN ns.nsUsageCount ns.nsFeedbackCount
       coh   = coherenceFromMetrics gm.clustering gm.normDegree gm.trianglePart
       pers  = persistenceScore ns.nsUsageCount ns.nsEvidenceN act
       dec   = 1.0 - act
       iso   = isolationPenalty gm.normDegree
-      rsk   = riskScore ns.nsRiskEma
+      rsk   = riskScore ns.nsRiskEma ns.nsContradictionCount ns.nsMembraneConflicts
       tot   = w.wReward      * rw
             + w.wEvidence    * ev
             + w.wCoherence   * coh
@@ -163,6 +170,17 @@ public export
 propagateScale : Verdict -> Double
 propagateScale Edit = 0.65
 propagateScale _    = 0.80
+
+||| Default activation tau for memodes (§6.8): 172800 seconds (2 days).
+||| Memodes decay more slowly than individual memes (86400 = 1 day).
+public export
+memodeDefaultTau : Double
+memodeDefaultTau = 172800.0
+
+||| Default activation tau for memes: 86400 seconds (1 day).
+public export
+memeDefaultTau : Double
+memeDefaultTau = 86400.0
 
 ||| Apply feedback signal to a node's EMA channels.
 ||| Returns (newReward, newRisk, newEdit).

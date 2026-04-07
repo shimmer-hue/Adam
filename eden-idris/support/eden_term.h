@@ -4,11 +4,23 @@
 /* Low-level terminal I/O */
 int eden_term_init(void);
 void eden_term_cleanup(void);
+void eden_term_rearm(void);
 int eden_term_width(void);
 int eden_term_height(void);
 int eden_term_read_key(int timeout_ms);
 void eden_term_write(char *s);
 void eden_term_flush(void);
+
+/* Paste drain: read all available chars with short timeout */
+char *eden_term_drain_paste(int timeout_ms);
+
+/* Mouse tracking (SGR mode) */
+void eden_term_enable_mouse(void);
+void eden_term_disable_mouse(void);
+int eden_term_mouse_button(void);
+int eden_term_mouse_col(void);
+int eden_term_mouse_row(void);
+int eden_term_mouse_press(void);
 
 /* Subprocess execution — returns "<exit_code>\n<output>" */
 char *eden_run_cmd(const char *cmd);

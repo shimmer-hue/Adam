@@ -20,6 +20,22 @@
 #include <sys/wait.h>   /* WIFEXITED, WEXITSTATUS — needed on macOS */
 #endif
 
+/* Forward declarations — defined in platform sections below. */
+void eden_term_rearm(void);
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+/* Variables — declared here, defined/initialized in the Win32 section below. */
+static int raw_active = 0;
+static volatile int reader_running = 0;
+static HANDLE reader_thread = NULL;
+/* Ring buffer + reader thread forward declarations (used by eden_run_cmd) */
+static int ring_empty(void);
+static int ring_pop(void);
+static DWORD WINAPI reader_fn(LPVOID arg);
+#endif
+
 /* ================================================================== */
 /* Subprocess execution                                                */
 /* ================================================================== */
@@ -30,12 +46,39 @@
  * followed by a newline, then the command output.
  * Format: "<exit_code>\n<output>"
  * Caller must free the returned string.
+ *
+ * On Win32 (TUI mode), pauses the reader thread before popen and restarts
+ * it after pclose.  This prevents the reader thread from competing with
+ * the child process for stdin and avoids console mode corruption.
  */
 char *eden_run_cmd(const char *cmd) {
+#ifdef _WIN32
+    /* Pause reader thread before popen to avoid CRT fd-table contention.
+     * ReadFile (used by reader_fn) is cancellable via CancelSynchronousIo,
+     * so the thread exits cleanly — no TerminateThread needed. */
+    int had_reader = 0;
+    if (raw_active && reader_running && reader_thread) {
+        had_reader = 1;
+        reader_running = 0;
+        CancelSynchronousIo(reader_thread);
+        WaitForSingleObject(reader_thread, 1000);
+        CloseHandle(reader_thread);
+        reader_thread = NULL;
+    }
+#endif
+
     FILE *fp = popen(cmd, "r");
     if (!fp) {
         char *err = malloc(32);
         if (err) strcpy(err, "-1\n(popen failed)");
+#ifdef _WIN32
+        if (had_reader) {
+            eden_term_rearm();
+            while (!ring_empty()) ring_pop();
+            reader_running = 1;
+            reader_thread = CreateThread(NULL, 0, reader_fn, NULL, 0, NULL);
+        }
+#endif
         return err ? err : "";
     }
 
@@ -59,10 +102,18 @@ char *eden_run_cmd(const char *cmd) {
     body[len] = '\0';
 
     int status = pclose(fp);
+
 #ifdef _WIN32
     int code = status;
+    if (had_reader) {
+        eden_term_rearm();
+        while (!ring_empty()) ring_pop();
+        reader_running = 1;
+        reader_thread = CreateThread(NULL, 0, reader_fn, NULL, 0, NULL);
+    }
 #else
     int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    eden_term_rearm();
 #endif
 
     /* Build result: "<code>\n<body>" */
@@ -111,6 +162,20 @@ void eden_term_cleanup(void) {
     }
 }
 
+/* Re-apply raw mode after a subprocess may have reset termios. */
+void eden_term_rearm(void) {
+    if (!raw_active) return;
+    struct termios raw;
+    tcgetattr(STDIN_FILENO, &raw);
+    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_oflag &= ~(OPOST);
+    raw.c_cflag |= CS8;
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    raw.c_cc[VMIN] = 0;
+    raw.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
 int eden_term_width(void) {
     struct winsize ws;
     return (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) ? ws.ws_col : 80;
@@ -134,18 +199,14 @@ static int read_byte(int timeout_ms) {
 
 #else  /* _WIN32 */
 
-#include <windows.h>
-#include <io.h>
-#include <fcntl.h>
+/* windows.h, io.h, fcntl.h already included via forward declarations above.
+ * raw_active, reader_running, reader_thread also declared above. */
 
 #define RING_SIZE 256
 
 static unsigned char  ring_buf[RING_SIZE];
 static volatile LONG  ring_head = 0, ring_tail = 0;
 static HANDLE         has_data;
-static HANDLE         reader_thread;
-static volatile int   reader_running = 0;
-static int            raw_active = 0;
 static int            is_console = 0;
 static HANDLE         hOut = INVALID_HANDLE_VALUE;
 static DWORD          orig_out_mode = 0;
@@ -174,11 +235,34 @@ static int ring_pop(void) {
 
 static DWORD WINAPI reader_fn(LPVOID arg) {
     (void)arg;
-    while (reader_running) {
-        unsigned char c;
-        int n = _read(0, &c, 1);
-        if (n == 1) ring_push(c);
-        else if (n <= 0) Sleep(1);
+    HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD ftype = GetFileType(hIn);
+    if (ftype == FILE_TYPE_PIPE) {
+        /* Pipe stdin (mintty / MSYS2 pty): non-blocking poll.
+         * PeekNamedPipe checks for available data without blocking,
+         * so the thread can exit within ~2ms when reader_running = 0. */
+        while (reader_running) {
+            DWORD avail = 0;
+            if (PeekNamedPipe(hIn, NULL, 0, NULL, &avail, NULL) && avail > 0) {
+                unsigned char c;
+                DWORD nRead = 0;
+                if (ReadFile(hIn, &c, 1, &nRead, NULL) && nRead == 1)
+                    ring_push(c);
+            } else {
+                Sleep(2);
+            }
+        }
+    } else {
+        /* Console stdin (cmd.exe, Windows Terminal): use ReadFile.
+         * CancelSynchronousIo can cancel this cleanly. */
+        while (reader_running) {
+            unsigned char c;
+            DWORD nRead = 0;
+            BOOL ok = ReadFile(hIn, &c, 1, &nRead, NULL);
+            if (ok && nRead == 1) ring_push(c);
+            else if (!reader_running) break;
+            else Sleep(1);
+        }
     }
     return 0;
 }
@@ -230,6 +314,32 @@ void eden_term_cleanup(void) {
     raw_active = 0;
 }
 
+/* Re-apply raw console mode after a subprocess may have reset it.
+ * Also cancels any pending blocking _read in the reader thread so it
+ * picks up the restored console mode immediately. */
+void eden_term_rearm(void) {
+    if (!raw_active) return;
+    SetConsoleOutputCP(65001);
+    SetConsoleCP(65001);
+    _setmode(0, _O_BINARY);
+    _setmode(1, _O_BINARY);
+    if (is_console) {
+        HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
+        DWORD im;
+        if (GetConsoleMode(hIn, &im))
+            SetConsoleMode(hIn, (im & ~(ENABLE_LINE_INPUT|ENABLE_ECHO_INPUT|ENABLE_PROCESSED_INPUT)) | 0x0200);
+        DWORD m;
+        if (GetConsoleMode(hOut, &m))
+            SetConsoleMode(hOut, m | 0x0004);
+    }
+    /* Cancel any pending _read in the reader thread so it restarts
+     * with the restored console mode. */
+    if (reader_thread)
+        CancelSynchronousIo(reader_thread);
+    /* Drain stale bytes from the ring buffer */
+    while (!ring_empty()) ring_pop();
+}
+
 int eden_term_width(void) {
     if (is_console) {
         CONSOLE_SCREEN_BUFFER_INFO i;
@@ -262,6 +372,63 @@ static int read_byte(int timeout_ms) {
 #endif /* _WIN32 */
 
 /* ================================================================== */
+/* Mouse tracking (SGR mode 1006)                                     */
+/* ================================================================== */
+
+/* Last mouse event data (read by FFI after key code indicates mouse) */
+static volatile int mouse_button = 0;
+static volatile int mouse_col = 0;
+static volatile int mouse_row = 0;
+static volatile int mouse_press = 0;  /* 1=press, 0=release */
+
+/* Read last mouse event fields */
+int eden_term_mouse_button(void) { return mouse_button; }
+int eden_term_mouse_col(void)    { return mouse_col; }
+int eden_term_mouse_row(void)    { return mouse_row; }
+int eden_term_mouse_press(void)  { return mouse_press; }
+
+/* Parse an SGR mouse sequence: ESC [ < button ; col ; row M/m
+ * Returns 1 if successfully parsed, 0 otherwise.
+ * Consumes bytes from the input. */
+static int parse_sgr_mouse(void) {
+    /* Already consumed ESC [ <, now read button;col;row;M/m */
+    int nums[3] = {0, 0, 0};
+    int ni = 0;
+    while (ni < 3) {
+        int c = read_byte(100);
+        if (c < 0) return 0;
+        if (c >= '0' && c <= '9') {
+            nums[ni] = nums[ni] * 10 + (c - '0');
+        } else if (c == ';') {
+            ni++;
+        } else if (c == 'M' || c == 'm') {
+            if (ni == 2) {
+                mouse_button = nums[0];
+                mouse_col = nums[1];
+                mouse_row = nums[2];
+                mouse_press = (c == 'M') ? 1 : 0;
+                return 1;
+            }
+            return 0;
+        } else {
+            return 0;
+        }
+    }
+    /* If we got here with ni==3, read the terminator */
+    {
+        int c = read_byte(100);
+        if (c == 'M' || c == 'm') {
+            mouse_button = nums[0];
+            mouse_col = nums[1];
+            mouse_row = nums[2];
+            mouse_press = (c == 'M') ? 1 : 0;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* ================================================================== */
 /* Shared: ANSI key parser                                            */
 /* ================================================================== */
 
@@ -279,6 +446,11 @@ int eden_term_read_key(int timeout_ms) {
         if (b3 == 'C') return 1003; if (b3 == 'D') return 1004;
         if (b3 == 'H') return 1005; if (b3 == 'F') return 1006;
         if (b3 == 'Z') return 5001;
+        /* SGR mouse: ESC [ < button ; col ; row M/m */
+        if (b3 == '<') {
+            if (parse_sgr_mouse()) return 7001;  /* mouse event */
+            return 27;
+        }
         if (b3 >= '0' && b3 <= '9') {
             int b4 = read_byte(100);
             if (b4 == '~') {
@@ -306,12 +478,67 @@ int eden_term_read_key(int timeout_ms) {
     return 27;
 }
 
+/* ================================================================== */
+/* Paste drain: read all available printable bytes with short timeout  */
+/* Returns malloc'd string of available chars (caller frees).         */
+/* Used by Idris TUI to detect paste bursts.                          */
+/* ================================================================== */
+
+char *eden_term_drain_paste(int timeout_ms) {
+    int cap = 1024, len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) return "";
+    while (1) {
+        int c = read_byte(timeout_ms > 0 ? timeout_ms : 5);
+        if (c < 0) break;
+        /* Skip escape sequences during paste */
+        if (c == 27) {
+            int b2 = read_byte(5);
+            if (b2 < 0) break;
+            if (b2 == '[') {
+                int b3 = read_byte(5);
+                if (b3 >= '0' && b3 <= '9') {
+                    int b4 = read_byte(5);
+                    if (b4 >= '0' && b4 <= '9') read_byte(5);
+                }
+            } else if (b2 == 'O') {
+                read_byte(5);
+            }
+            continue;
+        }
+        /* Collapse newlines to spaces for single-line composer */
+        if (c == 10 || c == 13) c = ' ';
+        /* Only accept printable ASCII + space */
+        if (c >= 32 && c <= 126) {
+            if (len + 2 > cap) {
+                cap *= 2;
+                char *nb = realloc(buf, cap);
+                if (!nb) break;
+                buf = nb;
+            }
+            buf[len++] = (char)c;
+        }
+    }
+    buf[len] = '\0';
+    return buf;
+}
+
 /* Raw fd write — bypasses stdio buffering */
 #ifdef _WIN32
 #define RAW_WRITE(buf, len) _write(1, (buf), (len))
 #else
 #define RAW_WRITE(buf, len) write(STDOUT_FILENO, (buf), (len))
 #endif
+
+void eden_term_enable_mouse(void) {
+    const char *seq = "\x1b[?1000h\x1b[?1006h";
+    RAW_WRITE(seq, (int)strlen(seq));
+}
+
+void eden_term_disable_mouse(void) {
+    const char *seq = "\x1b[?1000l\x1b[?1006l";
+    RAW_WRITE(seq, (int)strlen(seq));
+}
 
 void eden_term_write(char *s) {
     if (s) {

@@ -57,19 +57,35 @@ stripAnswerLabel s =
               then (ltrim (substr 9 (cast (length t)) t) ++ "\n" ++ unlines rest, True)
             else (s, False)
 
-||| Split out reasoning block (delimited by </think>).
+||| Split out reasoning block (delimited by <think>...</think>).
+||| Handles both formats:
+|||   - "reasoning text</think>body"  (reasoning before closing tag)
+|||   - "<think>reasoning</think>body" (standard think wrapper)
 export
 splitReasoning : String -> (String, String, Bool)
 splitReasoning s =
-  case break (== '<') (unpack s) of
-    (_, []) => ("", s, False)
-    (before, rest) =>
-      let restStr = pack rest
-      in if isPrefixOf "</think>" restStr
-           then (trim (pack before),
-                 trim (substr 8 (cast (length restStr)) restStr),
-                 True)
-         else ("", s, False)
+  -- Try <think>...</think> format first
+  if isPrefixOf "<think>" (ltrim s)
+    then let after = ltrim (substr 7 (length s) (ltrim s))
+         in case findClose (unpack after) [] of
+              Just (reasoning, body) => (trim reasoning, trim body, True)
+              Nothing => ("", s, False)
+    else -- Try old format: reasoning</think>body
+      case break (== '<') (unpack s) of
+        (_, []) => ("", s, False)
+        (before, rest) =>
+          let restStr = pack rest
+          in if isPrefixOf "</think>" restStr
+               then (trim (pack before),
+                     trim (substr 8 (cast (length restStr)) restStr),
+                     True)
+             else ("", s, False)
+  where
+    findClose : List Char -> List Char -> Maybe (String, String)
+    findClose [] acc = Nothing
+    findClose ('<' :: '/' :: 't' :: 'h' :: 'i' :: 'n' :: 'k' :: '>' :: rest) acc =
+      Just (pack (reverse acc), pack rest)
+    findClose (c :: rest) acc = findClose rest (c :: acc)
 
 ||| Strip support section (everything after "Basis:" or "Next Step:" line).
 export
@@ -128,6 +144,10 @@ applyMembrane cap raw =
       -- Step 6: character cap
       (s6, e6) = enforceCharCap cap s5
       ev6 = if e6 then [Trimmed] else []
-      allEvents = ev1 ++ ev2 ++ ev3 ++ ev4 ++ ev6
+      -- Step 7: fail-closed — reject reasoning-only responses
+      (s7, ev7) = if trim s6 == ""
+                    then ("(Response contained only reasoning with no operator-facing content)", [Trimmed])
+                    else (s6, [])
+      allEvents = ev1 ++ ev2 ++ ev3 ++ ev4 ++ ev6 ++ ev7
       finalEvents = if isNil allEvents then [Passthrough] else allEvents
-  in MkMembraneResult s6 finalEvents reasoning
+  in MkMembraneResult s7 finalEvents reasoning

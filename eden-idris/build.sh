@@ -24,8 +24,11 @@ esac
 # ── Idris2 location ────────────────────────────────────────────────
 
 if [ -z "$IDRIS2" ]; then
-    # Try common locations
-    if [ -x "/home/natanh/Idris2/build/exec/idris2.exe" ]; then
+    # Try common locations (prefer stack64 — idris2.exe truncates RefC for large projects)
+    if [ -x "/home/natanh/Idris2/build/exec/idris2_stack64.exe" ]; then
+        IDRIS2="/home/natanh/Idris2/build/exec/idris2_stack64.exe"
+        IDRIS2_SUPPORT="/home/natanh/Idris2/support"
+    elif [ -x "/home/natanh/Idris2/build/exec/idris2.exe" ]; then
         IDRIS2="/home/natanh/Idris2/build/exec/idris2.exe"
         IDRIS2_SUPPORT="/home/natanh/Idris2/support"
     elif command -v idris2 >/dev/null 2>&1; then
@@ -78,35 +81,58 @@ EDEN_C="build/exec/eden.c"
 
 echo "=== Platform: $PLATFORM | CC=$CC | Idris2=$IDRIS2 ==="
 
-# ── Clean TTC cache ───────────────────────────────────────────────
+# ── Clean TTC cache (only on first build or if forced) ─────────────
 
-rm -rf build/ttc
+if [ "${CLEAN_TTC:-0}" = "1" ]; then
+    rm -rf build/ttc
+fi
 
 # ── Phase 1: Idris2 type-check + RefC codegen ─────────────────────
+#
+# The Idris2 compiler on MSYS2 can fail with "Module not found" errors
+# due to memory pressure preventing TTC files from being read back.
+# TTC files already on disk survive, so retrying progressively builds
+# the cache until all 37 modules succeed.
 
 echo "=== Phase 1: Idris2 type-check + RefC codegen ==="
 
-# Record eden.c timestamp before codegen so we can detect stale output
-OLD_TS=""
-if [ -f "$EDEN_C" ]; then
-    OLD_TS=$(eval $STAT_FMT "$EDEN_C" 2>/dev/null || echo "")
-fi
+export IDRIS2_PREFIX="${IDRIS2_PREFIX:-/home/natanh/.idris2}"
 
-if ! $IDRIS2 --no-banner --cg refc --build eden.ipkg 2>&1; then
-    echo ""
-    echo "WARNING: Idris2 exited with non-zero status."
-    echo "Checking if codegen output was produced anyway..."
-fi
+MAX_ATTEMPTS=5
+ATTEMPT=0
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    ATTEMPT=$((ATTEMPT + 1))
+
+    # Record eden.c timestamp before codegen so we can detect stale output
+    OLD_TS=""
+    if [ -f "$EDEN_C" ]; then
+        OLD_TS=$(eval $STAT_FMT "$EDEN_C" 2>/dev/null || echo "")
+    fi
+
+    echo "--- Attempt $ATTEMPT/$MAX_ATTEMPTS ---"
+    if $IDRIS2 --no-banner --cg refc --build eden.ipkg 2>&1; then
+        break
+    fi
+
+    # Check if codegen output was produced despite non-zero exit
+    if [ -f "$EDEN_C" ]; then
+        NEW_TS=$(eval $STAT_FMT "$EDEN_C" 2>/dev/null || echo "")
+        if [ -z "$OLD_TS" ] || [ "$OLD_TS" != "$NEW_TS" ]; then
+            echo "Codegen output produced despite warnings."
+            break
+        fi
+    fi
+
+    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+        echo "ERROR: Idris2 codegen failed after $MAX_ATTEMPTS attempts (no $EDEN_C)"
+        exit 1
+    fi
+
+    echo "Retrying (TTC cache preserved)..."
+done
 
 if [ ! -f "$EDEN_C" ]; then
     echo "ERROR: Idris2 codegen failed (no $EDEN_C)"
-    exit 1
-fi
-
-# Check if eden.c was actually regenerated
-NEW_TS=$(eval $STAT_FMT "$EDEN_C" 2>/dev/null || echo "")
-if [ -n "$OLD_TS" ] && [ "$OLD_TS" = "$NEW_TS" ]; then
-    echo "ERROR: eden.c was NOT regenerated (timestamp unchanged). Codegen likely failed."
     exit 1
 fi
 
@@ -115,8 +141,8 @@ fi
 echo "=== Phase 2: GCC compile + link ==="
 
 # Build include/library flags
-CFLAGS="-Wno-error=implicit-function-declaration"
-IFLAGS="-include support/eden_term.h"
+CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-conversion"
+IFLAGS="-include support/eden_term.h -include support/eden_sqlite.h -include support/eden_http.h"
 LDFLAGS="-lm -lpthread $PLAT_LDFLAGS"
 
 # Add Idris2 support paths if they exist
@@ -146,9 +172,22 @@ else
     LDFLAGS="$LDFLAGS -lgmp"
 fi
 
+# SQLite3: find include/lib paths
+if pkg-config --exists sqlite3 2>/dev/null; then
+    IFLAGS="$IFLAGS $(pkg-config --cflags sqlite3)"
+    LDFLAGS="$LDFLAGS $(pkg-config --libs sqlite3)"
+elif [ -d "/ucrt64/include" ]; then
+    IFLAGS="$IFLAGS -I/ucrt64/include"
+    LDFLAGS="$LDFLAGS -L/ucrt64/lib -lsqlite3"
+else
+    LDFLAGS="$LDFLAGS -lsqlite3"
+fi
+
 $CC -o "$EDEN_BIN" \
     "$EDEN_C" \
     support/eden_term.c \
+    support/eden_sqlite.c \
+    support/eden_http.c \
     $IFLAGS $CFLAGS \
     -lidris2_refc -lidris2_support \
     $LDFLAGS

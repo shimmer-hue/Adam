@@ -198,12 +198,21 @@ data EdgeType
   | AuthorOf
   | Influences
   | Supports
+  | Reinforces
+  | Refines
   | ContradictsEdge
   | DerivedFrom
   | RelatesTo
   | ChunkOf
   | MemberOf
   | SourceDocument
+  | HasTurn
+  | HasFeedback
+  | BelongsToSession
+  | BelongsToAgent
+  | ContextualizesDocument
+  | FedBackBy
+  | OccursIn
 
 public export
 Show EdgeType where
@@ -211,12 +220,21 @@ Show EdgeType where
   show AuthorOf        = "AUTHOR_OF"
   show Influences      = "INFLUENCES"
   show Supports        = "SUPPORTS"
+  show Reinforces      = "REINFORCES"
+  show Refines         = "REFINES"
   show ContradictsEdge = "CONTRADICTS"
   show DerivedFrom     = "DERIVED_FROM"
   show RelatesTo       = "RELATES_TO"
   show ChunkOf         = "CHUNK_OF"
   show MemberOf        = "MEMBER_OF"
   show SourceDocument  = "SOURCE_DOCUMENT"
+  show HasTurn         = "HAS_TURN"
+  show HasFeedback     = "HAS_FEEDBACK"
+  show BelongsToSession = "BELONGS_TO_SESSION"
+  show BelongsToAgent  = "BELONGS_TO_AGENT"
+  show ContextualizesDocument = "CONTEXTUALIZES_DOCUMENT"
+  show FedBackBy       = "FED_BACK_BY"
+  show OccursIn        = "OCCURS_IN"
 
 public export
 Eq EdgeType where
@@ -224,16 +242,26 @@ Eq EdgeType where
   AuthorOf        == AuthorOf        = True
   Influences      == Influences      = True
   Supports        == Supports        = True
+  Reinforces      == Reinforces      = True
+  Refines         == Refines         = True
   ContradictsEdge == ContradictsEdge = True
   DerivedFrom     == DerivedFrom     = True
   RelatesTo       == RelatesTo       = True
   ChunkOf         == ChunkOf         = True
   MemberOf        == MemberOf        = True
   SourceDocument  == SourceDocument  = True
+  HasTurn         == HasTurn         = True
+  HasFeedback     == HasFeedback     = True
+  BelongsToSession == BelongsToSession = True
+  BelongsToAgent  == BelongsToAgent  = True
+  ContextualizesDocument == ContextualizesDocument = True
+  FedBackBy       == FedBackBy       = True
+  OccursIn        == OccursIn        = True
   _               == _               = False
 
 public export
 data NodeKind = MemeNode | MemodeNode | DocumentNode | TurnNode | ChunkNode
+              | SessionNode | AgentNode | FeedbackNode
 
 public export
 Show NodeKind where
@@ -242,6 +270,9 @@ Show NodeKind where
   show DocumentNode = "document"
   show TurnNode     = "turn"
   show ChunkNode    = "chunk"
+  show SessionNode  = "session"
+  show AgentNode    = "agent"
+  show FeedbackNode = "feedback"
 
 public export
 Eq NodeKind where
@@ -250,6 +281,9 @@ Eq NodeKind where
   DocumentNode == DocumentNode = True
   TurnNode     == TurnNode     = True
   ChunkNode    == ChunkNode    = True
+  SessionNode  == SessionNode  = True
+  AgentNode    == AgentNode    = True
+  FeedbackNode == FeedbackNode = True
   _            == _            = False
 
 ------------------------------------------------------------------------
@@ -280,6 +314,7 @@ record Meme where
   lastActiveAt       : Timestamp
   createdAt          : Timestamp
   updatedAt          : Timestamp
+  metadataJson       : String
 
 ------------------------------------------------------------------------
 -- Memode (derived, requires >= 2 behavior memes)
@@ -305,6 +340,7 @@ record Memode where
   lastActiveAt  : Timestamp
   createdAt     : Timestamp
   updatedAt     : Timestamp
+  metadataJson  : String
 
 ||| Proof that a memode has >= 2 behavior-domain member memes.
 public export
@@ -320,16 +356,17 @@ data AdmissibleMemode : Type where
 public export
 record Edge where
   constructor MkEdge
-  id           : EdgeId
-  experimentId : ExperimentId
-  srcKind      : NodeKind
-  srcId        : String
-  dstKind      : NodeKind
-  dstId        : String
-  edgeType     : EdgeType
-  weight       : Double
-  createdAt    : Timestamp
-  updatedAt    : Timestamp
+  id             : EdgeId
+  experimentId   : ExperimentId
+  srcKind        : NodeKind
+  srcId          : String
+  dstKind        : NodeKind
+  dstId          : String
+  edgeType       : EdgeType
+  weight         : Double
+  provenanceJson : String
+  createdAt      : Timestamp
+  updatedAt      : Timestamp
 
 ------------------------------------------------------------------------
 -- Session, Turn, Experiment
@@ -421,6 +458,7 @@ record Document where
   title        : String
   sha256       : String
   status       : DocStatus
+  metadataJson : String
   createdAt    : Timestamp
 
 public export
@@ -432,6 +470,7 @@ record Chunk where
   chunkIndex   : Nat
   pageNumber   : Maybe Nat
   text         : String
+  metadataJson : String
   createdAt    : Timestamp
 
 ------------------------------------------------------------------------
@@ -478,6 +517,10 @@ data TraceEventType
   | TraceHumRefresh
   | TraceObservatoryCommit
   | TraceObservatoryRevert
+  | TraceGraphNormalization
+  | TraceGraphTaxonomy
+  | TraceGraphCoherence
+  | TraceGraphWakeup
 
 public export
 Show TraceEventType where
@@ -489,20 +532,49 @@ Show TraceEventType where
   show TraceHumRefresh        = "HUM_REFRESH"
   show TraceObservatoryCommit = "OBSERVATORY_COMMIT"
   show TraceObservatoryRevert = "OBSERVATORY_REVERT"
+  show TraceGraphNormalization = "GRAPH_NORMALIZATION"
+  show TraceGraphTaxonomy     = "GRAPH_TAXONOMY_AUDIT"
+  show TraceGraphCoherence    = "GRAPH_COHERENCE_REWEAVE"
+  show TraceGraphWakeup       = "GRAPH_WAKEUP_AUDIT"
 
 ------------------------------------------------------------------------
 -- Measurement events (observatory)
 ------------------------------------------------------------------------
 
 public export
-data MeasurementAction = EdgeAdd | EdgeRemove | NodeEdit | MeasurementRevert
+data MeasurementAction
+  = EdgeAdd | EdgeUpdate | EdgeRemove
+  | MemodeAssert | MemodeUpdateMembership
+  | NodeEdit | MotifAnnotation
+  | GeometryMeasurementRun | AblationMeasurementRun
+  | MeasurementRevert
 
 public export
 Show MeasurementAction where
-  show EdgeAdd           = "edge_add"
-  show EdgeRemove        = "edge_remove"
-  show NodeEdit          = "node_edit"
-  show MeasurementRevert = "revert"
+  show EdgeAdd                = "edge_add"
+  show EdgeUpdate             = "edge_update"
+  show EdgeRemove             = "edge_remove"
+  show MemodeAssert           = "memode_assert"
+  show MemodeUpdateMembership = "memode_update_membership"
+  show NodeEdit               = "node_edit"
+  show MotifAnnotation        = "motif_annotation"
+  show GeometryMeasurementRun = "geometry_measurement_run"
+  show AblationMeasurementRun = "ablation_measurement_run"
+  show MeasurementRevert      = "revert"
+
+public export
+Eq MeasurementAction where
+  EdgeAdd                == EdgeAdd                = True
+  EdgeUpdate             == EdgeUpdate             = True
+  EdgeRemove             == EdgeRemove             = True
+  MemodeAssert           == MemodeAssert           = True
+  MemodeUpdateMembership == MemodeUpdateMembership = True
+  NodeEdit               == NodeEdit               = True
+  MotifAnnotation        == MotifAnnotation        = True
+  GeometryMeasurementRun == GeometryMeasurementRun = True
+  AblationMeasurementRun == AblationMeasurementRun = True
+  MeasurementRevert      == MeasurementRevert      = True
+  _                      == _                      = False
 
 public export
 data MeasurementState = Previewed | Committed | Reverted
@@ -512,6 +584,49 @@ Show MeasurementState where
   show Previewed = "previewed"
   show Committed = "committed"
   show Reverted  = "reverted"
+
+public export
+Eq MeasurementState where
+  Previewed == Previewed = True
+  Committed == Committed = True
+  Reverted  == Reverted  = True
+  _         == _         = False
+
+------------------------------------------------------------------------
+-- Evidence and provenance labels
+------------------------------------------------------------------------
+
+public export
+data EvidenceLabel = Observed | Derived | Speculative
+
+public export
+Show EvidenceLabel where
+  show Observed    = "OBSERVED"
+  show Derived     = "DERIVED"
+  show Speculative = "SPECULATIVE"
+
+public export
+Eq EvidenceLabel where
+  Observed    == Observed    = True
+  Derived     == Derived     = True
+  Speculative == Speculative = True
+  _           == _           = False
+
+public export
+data ProvenanceLabel = OperatorAsserted | OperatorRefined | AutoDerived
+
+public export
+Show ProvenanceLabel where
+  show OperatorAsserted = "OPERATOR_ASSERTED"
+  show OperatorRefined  = "OPERATOR_REFINED"
+  show AutoDerived      = "AUTO_DERIVED"
+
+public export
+Eq ProvenanceLabel where
+  OperatorAsserted == OperatorAsserted = True
+  OperatorRefined  == OperatorRefined  = True
+  AutoDerived      == AutoDerived      = True
+  _                == _                = False
 
 ------------------------------------------------------------------------
 -- Regard breakdown
@@ -583,3 +698,101 @@ record IndexResult where
   newMemes   : Nat
   newMemodes : Nat
   newEdges   : Nat
+
+------------------------------------------------------------------------
+-- Agent
+------------------------------------------------------------------------
+
+public export
+record Agent where
+  constructor MkAgent
+  id           : AgentId
+  experimentId : ExperimentId
+  name         : String
+  persona      : String
+  createdAt    : Timestamp
+
+------------------------------------------------------------------------
+-- Active set entry (per-turn snapshot)
+------------------------------------------------------------------------
+
+public export
+record ActiveSetEntry where
+  constructor MkActiveSetEntry
+  id             : String
+  experimentId   : ExperimentId
+  sessionId      : SessionId
+  turnId         : TurnId
+  nodeKind       : NodeKind
+  nodeId         : String
+  label          : String
+  domain         : Domain
+  selectionScore : Double
+  semanticSim    : Double
+  activationVal  : Double
+  regardVal      : Double
+  createdAt      : Timestamp
+
+------------------------------------------------------------------------
+-- Measurement event (observatory audit trail)
+------------------------------------------------------------------------
+
+public export
+record MeasurementEvent where
+  constructor MkMeasurementEvent
+  id                : String
+  experimentId      : ExperimentId
+  sessionId         : SessionId
+  action            : MeasurementAction
+  state             : MeasurementState
+  operator          : String
+  evidence          : String
+  beforeState       : String
+  proposedState     : String
+  committedState    : String
+  revertOf          : String
+  turnId            : String
+  targetIdsJson     : String
+  rationale         : String
+  operatorLabel     : String
+  measurementMethod : String
+  confidence        : Double
+  createdAt         : Timestamp
+
+------------------------------------------------------------------------
+-- Export artifact registry
+------------------------------------------------------------------------
+
+public export
+record ExportArtifact where
+  constructor MkExportArtifact
+  id           : String
+  experimentId : ExperimentId
+  artifactType : String
+  path         : String
+  graphHash    : String
+  createdAt    : Timestamp
+
+------------------------------------------------------------------------
+-- Turn metadata (inference profile, budget, reasoning)
+------------------------------------------------------------------------
+
+public export
+record TurnMetadata where
+  constructor MkTurnMetadata
+  turnId                : TurnId
+  inferenceModeReq      : String
+  inferenceModeEff      : String
+  budgetMode            : String
+  budgetPressure        : String
+  budgetUsedTokens      : Nat
+  budgetRemainingTokens : Nat
+  activeSetSize         : Nat
+  reasoningText         : String
+  temperature           : Double
+  maxOutput             : Nat
+  responseCap           : Nat
+  profileName           : String
+  selectionSource       : String
+  countMethod           : String
+  createdAt             : Timestamp

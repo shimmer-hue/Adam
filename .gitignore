@@ -28,3 +28,42 @@ eden-idris/build/
 *.ttc
 *.ttm
 *.snap
+
+# Idris2 runtime data
+eden-idris/data/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Windows
+Thumbs.db
+
+# Compiled objects / libraries
+eden-idris/support/*.o
+eden-idris/support/*.dll
+eden-idris/support/*.a
+
+# Temporary scripts / patches
+apply_v4_patch.py
+apply_v5_patch.py
+fix_record_update_leaks*.py
+eden-idris/write_*.py
+
+# Backup files
+*.bak
+
+# Misc artifacts
+crash.md
+claude_code_instructions.md
+eden_adam.egg-info/
+eden-idris/install-deps.sh
+eden-idris/support/runtime_debug.c
+
+# Claude Code
+.claude/
+
+# Idris2 dependency sources (fetched by install-deps.sh)
+eden-idris/deps/

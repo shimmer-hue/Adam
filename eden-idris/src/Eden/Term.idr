@@ -292,6 +292,97 @@ truncate w s =
   else substr 0 (cast (minus w 3)) s ++ "..."
 
 ------------------------------------------------------------------------
+-- Theme support
+------------------------------------------------------------------------
+
+||| A color theme for the TUI. Each field is an RGB triple (r, g, b).
+public export
+record Theme where
+  constructor MkTheme
+  thPrimary    : (Nat, Nat, Nat)
+  thSecondary  : (Nat, Nat, Nat)
+  thAccent     : (Nat, Nat, Nat)
+  thBackground : (Nat, Nat, Nat)
+  thForeground : (Nat, Nat, Nat)
+  thDimmed     : (Nat, Nat, Nat)
+  thError      : (Nat, Nat, Nat)
+  thSuccess    : (Nat, Nat, Nat)
+
+||| Amber Dark theme (default EDEN palette).
+public export
+amberDark : Theme
+amberDark = MkTheme
+  (255, 217, 138)   -- primary: amber
+  (255, 122, 215)   -- secondary: rose
+  (132, 255, 208)   -- accent: neon green
+  (18, 8, 10)       -- background: dark
+  (255, 241, 210)   -- foreground: warm cream
+  (230, 171, 90)    -- dimmed: muted amber
+  (255, 174, 87)    -- error: ember
+  (132, 255, 208)   -- success: neon green
+
+||| Green phosphor retro terminal theme.
+public export
+greenPhosphor : Theme
+greenPhosphor = MkTheme
+  (0, 255, 65)      -- primary: bright green
+  (0, 200, 50)      -- secondary: medium green
+  (0, 255, 130)     -- accent: cyan-green
+  (0, 0, 0)         -- background: black
+  (0, 230, 60)      -- foreground: green
+  (0, 140, 35)      -- dimmed: dark green
+  (255, 80, 80)     -- error: red
+  (0, 255, 65)      -- success: bright green
+
+||| High contrast accessibility theme.
+public export
+highContrast : Theme
+highContrast = MkTheme
+  (255, 255, 255)   -- primary: white
+  (255, 255, 0)     -- secondary: yellow
+  (0, 255, 255)     -- accent: cyan
+  (0, 0, 0)         -- background: black
+  (255, 255, 255)   -- foreground: white
+  (180, 180, 180)   -- dimmed: light gray
+  (255, 100, 100)   -- error: light red
+  (100, 255, 100)   -- success: light green
+
+||| Typewriter Light theme (light background, ink-on-paper).
+public export
+typewriterLight : Theme
+typewriterLight = MkTheme
+  (40, 40, 40)        -- primary: dark ink
+  (80, 60, 40)        -- secondary: sepia
+  (0, 90, 140)        -- accent: ink blue
+  (245, 240, 230)     -- background: paper cream
+  (30, 30, 30)        -- foreground: near-black
+  (140, 130, 120)     -- dimmed: faded ink
+  (180, 40, 40)       -- error: red ink
+  (40, 120, 40)       -- success: green ink
+
+||| All built-in themes.
+public export
+allThemes : List (String, Theme)
+allThemes = [("amberDark", amberDark), ("greenPhosphor", greenPhosphor), ("highContrast", highContrast), ("typewriterLight", typewriterLight)]
+
+||| Cycle to the next theme given the current theme name.
+public export
+nextThemeName : String -> String
+nextThemeName "amberDark"        = "greenPhosphor"
+nextThemeName "greenPhosphor"    = "highContrast"
+nextThemeName "highContrast"     = "typewriterLight"
+nextThemeName "typewriterLight"  = "amberDark"
+nextThemeName _                  = "amberDark"
+
+||| Look up a theme by name.
+public export
+lookupTheme : String -> Theme
+lookupTheme "greenPhosphor"   = greenPhosphor
+lookupTheme "highContrast"    = highContrast
+lookupTheme "typewriterLight" = typewriterLight
+lookupTheme _                 = amberDark
+
+------------------------------------------------------------------------
 -- Meter bar rendering
 ------------------------------------------------------------------------
 

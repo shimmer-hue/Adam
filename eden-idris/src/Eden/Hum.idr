@@ -81,6 +81,8 @@ record HumPayload where
   surfaceLines    : List String
   surfaceStats    : HumSurfaceStats
   tokenTable      : List HumTokenRow
+  boundedness     : String
+  continuity      : String
 
 ------------------------------------------------------------------------
 -- Boundedness invariant
@@ -154,12 +156,12 @@ buildHumPayload eid sid allTurns feedbackCtx membraneCtx now =
                              feedbackCtx membraneCtx
       motifs      = extractMotifs turnTexts now
       turnIndices = map (\t => t.turnIndex) boundedTurns
-      derivedFrom = map (\t => show t.id) boundedTurns
+      derivedFrom = ["turns.active_set_json", "feedback_events", "membrane_events"]
       status      = case boundedTurns of
                       [] => HumUnavailable
                       _  => HumFresh
   in MkHumPayload
-       { artifactVersion = "hum-v1"
+       { artifactVersion = "hum.v1"
        , generatedAt     = now
        , hpExperimentId  = eid
        , hpSessionId     = sid
@@ -180,4 +182,9 @@ buildHumPayload eid sid allTurns feedbackCtx membraneCtx now =
        , surfaceLines    = surfLines
        , surfaceStats    = stats
        , tokenTable      = motifs
+       , boundedness     = "turn_cap=" ++ show HumTurnCap
+                        ++ ", max_text_chars=320"
+       , continuity      = case motifs of
+                             [] => "none"
+                             ms => "recurring_anchors=" ++ show (length ms)
        }

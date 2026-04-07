@@ -92,7 +92,15 @@
 | Default Qwen 3.5 MLX local pathing | Implemented | runtime prepares repo-local model storage automatically when MLX is selected |
 | Weight training / fine-tuning / LoRA | Deferred by design | explicitly out of scope |
 | Governor / hidden planner | Deferred by design | explicitly absent |
-| Embedding-based semantic retrieval | Deferred | lexical/graph retrieval only |
+| Idris term-overlap retrieval similarity | Implemented | Jaccard word-overlap replaces hardcoded 0.5 placeholder; per-meme similarity computed against user query text |
+| Idris full regard in retrieval | Implemented | `buildCandidateScore` now computes full `regardBreakdown` (7 components) instead of simple `rewardScore` |
+| Idris feedback graph-wide propagation | Implemented | feedback propagates to all memes with 0.85x exponential attenuation per rank, replacing `take 3` |
+| Idris system clock timestamps | Implemented | `currentTimestamp` uses `System.time` + Hinnant civil-from-days; replaces all hardcoded timestamp strings |
+| Idris turn trace enrichment | Implemented | pipeline traces 6 events per turn: candidates, profile/budget, backend/tokens, membrane, indexing, completion |
+| Idris hum file persistence | Implemented | hum artifacts written to `data/hum/<session-id>.md` after every hum build |
+| Idris observatory JSON export | Implemented | `--export` CLI; graph state written as JSON to `data/export/<experiment-id>.json` matching observatory contract |
+| Idris agent profile loading | Implemented | `seed_constitution.md` read at startup, injected via `gPrinciples` IORef into system prompt assembly |
+| Embedding-based semantic retrieval | Deferred | Jaccard word-overlap is lexical; embedding-based similarity remains future work |
 
 Validated in this patch:
 

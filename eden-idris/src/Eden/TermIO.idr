@@ -50,6 +50,30 @@ prim__screenNebula : Int -> Int -> Int -> Int -> Int -> Int -> Int -> PrimIO ()
 %foreign "C:eden_screen_present,eden_term"
 prim__screenPresent : PrimIO ()
 
+%foreign "C:eden_term_rearm,eden_term"
+prim__termRearm : PrimIO ()
+
+%foreign "C:eden_term_drain_paste,eden_term"
+prim__drainPaste : Int -> PrimIO String
+
+%foreign "C:eden_term_enable_mouse,eden_term"
+prim__enableMouse : PrimIO ()
+
+%foreign "C:eden_term_disable_mouse,eden_term"
+prim__disableMouse : PrimIO ()
+
+%foreign "C:eden_term_mouse_button,eden_term"
+prim__mouseButton : PrimIO Int
+
+%foreign "C:eden_term_mouse_col,eden_term"
+prim__mouseCol : PrimIO Int
+
+%foreign "C:eden_term_mouse_row,eden_term"
+prim__mouseRow : PrimIO Int
+
+%foreign "C:eden_term_mouse_press,eden_term"
+prim__mousePress : PrimIO Int
+
 ------------------------------------------------------------------------
 -- Terminal size
 ------------------------------------------------------------------------
@@ -85,6 +109,54 @@ export
 cleanupTerminal : IO ()
 cleanupTerminal = primIO prim__termCleanup
 
+||| Re-apply raw mode after a subprocess may have reset terminal state.
+export
+rearmTerminal : IO ()
+rearmTerminal = primIO prim__termRearm
+
+||| Drain all available paste input with a short timeout (ms).
+||| Returns a string of printable characters found in the buffer.
+||| Newlines in pasted text are converted to spaces.
+export
+drainPaste : (timeout_ms : Int) -> IO String
+drainPaste t = primIO (prim__drainPaste t)
+
+------------------------------------------------------------------------
+-- Mouse support
+------------------------------------------------------------------------
+
+||| Mouse event representation.
+public export
+data MouseEvent
+  = MouseClick Int Int     -- x (col), y (row), 1-based
+  | MouseScroll Bool Int Int  -- isUp, x, y
+  | MouseNone
+
+||| Enable SGR mouse tracking.
+export
+enableMouse : IO ()
+enableMouse = primIO prim__enableMouse
+
+||| Disable SGR mouse tracking.
+export
+disableMouse : IO ()
+disableMouse = primIO prim__disableMouse
+
+||| Read the last mouse event fields from C globals.
+||| Call this after readKey returns KeyMouse.
+export
+readMouseEvent : IO MouseEvent
+readMouseEvent = do
+  btn <- primIO prim__mouseButton
+  col <- primIO prim__mouseCol
+  row <- primIO prim__mouseRow
+  press <- primIO prim__mousePress
+  -- Button 64 = scroll up, 65 = scroll down in SGR mode
+  pure (if btn == 64 then MouseScroll True col row
+        else if btn == 65 then MouseScroll False col row
+        else if press == 1 then MouseClick col row
+        else MouseNone)
+
 ------------------------------------------------------------------------
 -- Key input
 ------------------------------------------------------------------------
@@ -111,6 +183,7 @@ data KeyEvent
   | KeyF9 | KeyF10 | KeyF11 | KeyF12
   | KeyCtrl Char
   | KeyShiftEnter
+  | KeyMouse  -- mouse event; read details via readMouseEvent
   | KeyNone  -- no key available (non-blocking returned empty)
 
 ||| Read a key event. timeout_ms=0 for non-blocking.
@@ -148,6 +221,8 @@ readKey timeout = do
       else if c >= 3001 && c <= 3026 then KeyCtrl (chr (c - 3001 + ord 'a'))
       -- Shift+Enter encoded as 4001
       else if c == 4001 then KeyShiftEnter
+      -- Mouse event encoded as 7001
+      else if c == 7001 then KeyMouse
       -- Regular printable character
       else if c >= 32 && c <= 126 then KeyChar (chr c)
       else KeyNone
@@ -275,7 +350,7 @@ runCommand cmd = do
 -- High-level terminal setup/teardown
 ------------------------------------------------------------------------
 
-||| Enter TUI mode: alt screen, raw mode, hide cursor.
+||| Enter TUI mode: alt screen, raw mode, hide cursor, enable mouse.
 export
 enterTUI : IO Bool
 enterTUI = do
@@ -283,12 +358,14 @@ enterTUI = do
   if ok
     then do
       termPut (enterAltScreen ++ hideCursor ++ clearScreen ++ moveTo 1 1)
+      enableMouse
       pure True
     else pure False
 
-||| Leave TUI mode: show cursor, leave alt screen, restore terminal.
+||| Leave TUI mode: disable mouse, show cursor, leave alt screen, restore terminal.
 export
 leaveTUI : IO ()
 leaveTUI = do
+  disableMouse
   termPut (showCursor ++ leaveAltScreen)
   cleanupTerminal
