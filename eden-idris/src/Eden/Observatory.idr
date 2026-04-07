@@ -658,6 +658,128 @@ computeGeometry memes edges =
   in MkGeometryDiagnostics n m density avgDeg components diamEst avgClust
        circularity linearity communityCount triadicClosure mirrorSym projection
 
+------------------------------------------------------------------------
+-- Ablation computation (§4.3)
+------------------------------------------------------------------------
+
+||| Result of a single ablation run.
+record AblationResult where
+  constructor MkAblationResult
+  arAblationType   : String    -- "mask_co_occurs" | "remove_dominant_community" | "subgraph_compare"
+  arDetail         : String    -- human-readable explanation
+  arBeforeScores   : GeometryDiagnostics
+  arAfterScores    : GeometryDiagnostics
+  arPersistence    : Double    -- 0..1, higher = property survives ablation
+
+||| Persistence score: how much of the geometry survives the ablation.
+||| Compares key metrics (clustering, density, circularity, triadic closure)
+||| between before and after, returning the average ratio.
+persistenceScore : GeometryDiagnostics -> GeometryDiagnostics -> Double
+persistenceScore before after =
+  let ratios = [ safeRatio after.gdClusteringCoeff before.gdClusteringCoeff
+               , safeRatio after.gdDensity         before.gdDensity
+               , safeRatio after.gdCircularity      before.gdCircularity
+               , safeRatio after.gdTriadicClosure   before.gdTriadicClosure
+               ]
+      sum = foldl (+) 0.0 ratios
+  in sum / 4.0
+  where
+    safeRatio : Double -> Double -> Double
+    safeRatio _ 0.0 = 1.0   -- if before was 0, property trivially persists
+    safeRatio a b   = min 1.0 (a / b)
+
+||| Compute ablation by masking CO_OCCURS_WITH edges.
+ablationMaskCoOccurs : List Meme -> List Edge -> AblationResult
+ablationMaskCoOccurs memes edges =
+  let before = computeGeometry memes edges
+      masked = filter (\e => e.edgeType /= CoOccursWith) edges
+      after  = computeGeometry memes masked
+      detail = "Masked " ++ show (length edges `minus` length masked)
+            ++ " CO_OCCURS_WITH edges (" ++ show (length masked) ++ " remaining)"
+  in MkAblationResult "mask_co_occurs" detail before after (persistenceScore before after)
+
+||| Find the dominant community (largest connected component) and remove it.
+ablationRemoveDominantCommunity : List Meme -> List Edge -> AblationResult
+ablationRemoveDominantCommunity memes edges =
+  let before   = computeGeometry memes edges
+      nodeIds  = map (\m => show m.id) memes
+      -- BFS to find connected components
+      comps    = findComponents nodeIds edges [] []
+      -- Find largest component
+      largest  = foldl (\best, c => if length c > length best then c else best) [] comps
+      -- Remove memes in dominant component
+      filtMemes = filter (\m => not (any (== show m.id) largest)) memes
+      filtEdges = filter (\e => not (any (== e.srcId) largest) && not (any (== e.dstId) largest)) edges
+      after    = computeGeometry filtMemes filtEdges
+      detail   = "Removed dominant community (" ++ show (length largest)
+              ++ " nodes), " ++ show (length filtMemes) ++ " nodes remaining"
+  in MkAblationResult "remove_dominant_community" detail before after (persistenceScore before after)
+  where
+    bfsNeighbors : String -> List Edge -> List String
+    bfsNeighbors nid es =
+      Prelude.List.(++) (map (.dstId) (filter (\e => e.srcId == nid) es))
+                        (map (.srcId) (filter (\e => e.dstId == nid) es))
+    bfs : List String -> List String -> List Edge -> List String
+    bfs [] visited _ = visited
+    bfs (q :: qs) visited es =
+      let nbrs = filter (\n => not (any (== n) visited)) (bfsNeighbors q es)
+      in bfs (Prelude.List.(++) qs nbrs) (Prelude.List.(++) visited nbrs) es
+    findComponents : List String -> List Edge -> List String -> List (List String) -> List (List String)
+    findComponents [] _ _ acc = acc
+    findComponents (n :: ns) es visited acc =
+      if any (== n) visited
+        then findComponents ns es visited acc
+        else let comp = bfs [n] [n] es
+                 visited' = Prelude.List.(++) visited comp
+             in findComponents ns es visited' (comp :: acc)
+
+||| Compare a local subgraph (nodes with degree >= 2) against the full graph.
+ablationSubgraphCompare : List Meme -> List Edge -> AblationResult
+ablationSubgraphCompare memes edges =
+  let before   = computeGeometry memes edges
+      nodeIds  = map (\m => show m.id) memes
+      -- Select nodes with degree >= 2 as the "core" subgraph
+      coreIds  = filter (\nid => nodeDegree nid edges >= 2) nodeIds
+      coreMemes = filter (\m => any (== show m.id) coreIds) memes
+      coreEdges = filter (\e => any (== e.srcId) coreIds && any (== e.dstId) coreIds) edges
+      after    = computeGeometry coreMemes coreEdges
+      detail   = "Core subgraph (degree >= 2): " ++ show (length coreMemes)
+              ++ " of " ++ show (length memes) ++ " nodes"
+  in MkAblationResult "subgraph_compare" detail before after (persistenceScore before after)
+
+||| Run all three ablation types and return results.
+runAllAblations : List Meme -> List Edge -> List AblationResult
+runAllAblations memes edges =
+  [ ablationMaskCoOccurs memes edges
+  , ablationRemoveDominantCommunity memes edges
+  , ablationSubgraphCompare memes edges
+  ]
+
+||| Serialize an AblationResult to JSON.
+ablationResultJson : AblationResult -> String
+ablationResultJson ar = jObj
+  [ ("ablation_type", jStr ar.arAblationType)
+  , ("detail",        jStr ar.arDetail)
+  , ("persistence",   jNum ar.arPersistence)
+  , ("before_scores", jObj
+      [ ("clustering_coefficient", jNum ar.arBeforeScores.gdClusteringCoeff)
+      , ("density",                jNum ar.arBeforeScores.gdDensity)
+      , ("circularity",            jNum ar.arBeforeScores.gdCircularity)
+      , ("triadic_closure",        jNum ar.arBeforeScores.gdTriadicClosure)
+      , ("node_count",             jNat ar.arBeforeScores.gdNodeCount)
+      , ("edge_count",             jNat ar.arBeforeScores.gdEdgeCount)
+      ])
+  , ("after_scores", jObj
+      [ ("clustering_coefficient", jNum ar.arAfterScores.gdClusteringCoeff)
+      , ("density",                jNum ar.arAfterScores.gdDensity)
+      , ("circularity",            jNum ar.arAfterScores.gdCircularity)
+      , ("triadic_closure",        jNum ar.arAfterScores.gdTriadicClosure)
+      , ("node_count",             jNat ar.arAfterScores.gdNodeCount)
+      , ("edge_count",             jNat ar.arAfterScores.gdEdgeCount)
+      ])
+  , ("evidence_label", jStr "DERIVED")
+  ]
+
 sessionAsets : Maybe Session -> List ActiveSetEntry -> List ActiveSetEntry
 sessionAsets Nothing  _     = []
 sessionAsets (Just s) asets = filter (\a => a.sessionId == s.id) asets
@@ -768,6 +890,7 @@ indexHtml = unlines
   , "  <li><a href=\"/api/turns\">/api/turns</a></li>"
   , "  <li><a href=\"/api/basins\">/api/basins</a></li>"
   , "  <li><a href=\"/api/geometry\">/api/geometry</a></li>"
+  , "  <li><a href=\"/api/ablations\">/api/ablations</a></li>"
   , "  <li><a href=\"/api/measurements\">/api/measurements</a></li>"
   , "  <li><a href=\"/api/models\">/api/models</a></li>"
   , "  <li><a href=\"/api/experiments\">/api/experiments</a></li>"
@@ -853,6 +976,16 @@ serveGetRoute st eid fd "/api/geometry" = do
   let memes = filter (\m => m.experimentId == eid) allMemes
   let edges = filter (\e => e.experimentId == eid) allEdges
   primIO (prim__httpSendResponse fd "application/json" (geometryJson (computeGeometry memes edges)))
+serveGetRoute st eid fd "/api/ablations" = do
+  allMemes <- readIORef st.memes
+  allEdges <- readIORef st.edges
+  let memes = filter (\m => m.experimentId == eid) allMemes
+  let edges = filter (\e => e.experimentId == eid) allEdges
+  let results = runAllAblations memes edges
+  primIO (prim__httpSendResponse fd "application/json"
+    (jObj [ ("ablation_results", jArr (map ablationResultJson results))
+          , ("experiment_id",    jStr (show eid))
+          ]))
 serveGetRoute st eid fd "/api/measurements" = do
   allMeas <- readIORef st.measurements
   let meas = filter (\e => e.experimentId == eid) allMeas
@@ -1188,7 +1321,18 @@ handlePostPreview st eid pvRef fd body = do
         AblationMeasurementRun => jObj [ ("type", jStr "ablation_measurement_run") ]
         MeasurementRevert => jObj [ ("type", jStr "measurement_revert"),
                                    ("edge_id", jStr edgeId) ]
-  let resp = jObj
+  -- For ablation runs, compute and include ablation results
+  let ablationField = case action of
+        AblationMeasurementRun =>
+          let ablationType = extractJsonString "ablation_type" body
+              results = case ablationType of
+                "mask_co_occurs"            => [ablationMaskCoOccurs memes edges]
+                "remove_dominant_community" => [ablationRemoveDominantCommunity memes edges]
+                "subgraph_compare"          => [ablationSubgraphCompare memes edges]
+                _                           => runAllAblations memes edges
+          in [ ("ablation_results", jArr (map ablationResultJson results)) ]
+        _ => []
+  let resp = jObj (Prelude.List.(++)
         [ ("status",         jStr "previewed")
         , ("action",         jStr actionStr)
         , ("before_state",   beforeState)
@@ -1200,7 +1344,7 @@ handlePostPreview st eid pvRef fd body = do
              , ("proposed_density", jNum proposedGeom.gdDensity)
              ])
         , ("preview_graph_patch", graphPatch)
-        ]
+        ] ablationField)
   primIO (prim__httpSendResponse fd "application/json" resp)
 
 handlePostCommit : StoreState -> ExperimentId -> IORef (Maybe PreviewState) -> Int -> String -> IO ()
@@ -1266,8 +1410,18 @@ handlePostCommit st eid pvRef fd body = do
             "geometry_measurement_run: computed" now
           pure "geometry-run"
         AblationMeasurementRun => do
+          -- Run all ablations and record the aggregate persistence
+          allMemes <- readIORef st.memes
+          allEdges2 <- readIORef st.edges
+          let expMemes = filter (\m => m.experimentId == eid) allMemes
+              expEdges = filter (\e => e.experimentId == eid) allEdges2
+              results = runAllAblations expMemes expEdges
+              avgPersist = case results of
+                [] => 0.0
+                rs => foldl (\s, r => s + r.arPersistence) 0.0 rs / cast (length rs)
           recordTraceEvent st TraceObservatoryCommit Info
-            "ablation_measurement_run: computed" now
+            ("ablation_measurement_run: persistence=" ++ show avgPersist
+              ++ " ablations=" ++ show (length results)) now
           pure "ablation-run"
         MeasurementRevert => do
           recordTraceEvent st TraceObservatoryCommit Info

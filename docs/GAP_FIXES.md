@@ -184,7 +184,8 @@ Last audited: 2026-04-07 (branch `david`, final gap-fix session).
 ### 4.3 Geometry lab
 **Spec:** `OBSERVATORY_SPEC.md` §geometry, `OBSERVATORY_GEOMETRY_SPEC.md`
 - [x] Force-directed layout (Fruchterman-Reingold), symmetry diagnostics (circularity, mirror, triadic closure), geometry slicing
-- [-] Ablation support deferred
+- [x] Ablation: `mask_co_occurs`, `remove_dominant_community`, `subgraph_compare` with persistence scores
+- [x] `GET /api/ablations` endpoint, ablation results in preview response, real computation in commit handler
 
 ### 4.4 Basin projection
 **Spec:** `OBSERVATORY_SPEC.md` §basin
@@ -298,7 +299,7 @@ Last audited: 2026-04-07 (branch `david`, final gap-fix session).
 
 1. **CRITICAL** (2 items): §1.6 ✅, §2.1 ✅
 2. **HIGH** (12 items): §2.2 ✅, §2.5 ✅, §2.6 ✅, §2.7 ✅, §2.8 ✅, §3.6 ✅, §3.7 ✅, §3.8 ✅, §4.1 ✅, §4.2 ✅, §5.1 ✅, §5.2 ✅
-3. **MEDIUM** (14 items): §2.3 ✅, §3.5 ✅, §3.9 ✅, §3.10 ✅, §3.11 ✅, §3.12 ✅, §3.13 ✅, §4.3 ✅ (ablation deferred), §4.4 ✅, §4.5 ✅, §5.5 ✅, §5.6 ✅, §5.7 ✅, §5.8 ✅
+3. **MEDIUM** (14 items): §2.3 ✅, §3.5 ✅, §3.9 ✅, §3.10 ✅, §3.11 ✅, §3.12 ✅, §3.13 ✅, §4.3 ✅, §4.4 ✅, §4.5 ✅, §5.5 ✅, §5.6 ✅, §5.7 ✅, §5.8 ✅
 4. **LOW** (6 items): §6.1 ✅, §6.2 ✅, §6.3 ✅, §6.4 ✅, §6.5 ✅, §6.6 ✅, §6.7 ✅, §6.8 ✅
 
-Total: 52 done, 1 deferred (§4.3 ablation support).
+Total: 53 done, 0 deferred. All gaps closed.
