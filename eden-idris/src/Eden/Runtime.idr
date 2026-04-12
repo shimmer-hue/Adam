@@ -1,8 +1,10 @@
 ||| EdenRuntime: central orchestrator for the direct turn loop.
 |||
 ||| The v1 turn loop is:
-|||   input -> retrieve/assemble -> Adam response -> membrane -> feedback -> graph update
+|||   input -> retrieve/assemble -> deliberate -> Adam response -> membrane -> feedback -> graph update
 |||
+||| The deliberation phase (Talmud layer) checks coverage, surfaces
+||| dissent, and retrieves precedent — all observable, all logged.
 ||| NO hidden governor, NO recursive decomposition, NO latent planning layer.
 ||| adam_auto falls back to runtime_auto.
 |||
@@ -32,6 +34,7 @@ public export
 data TurnPhase
   = Idle
   | Assembling
+  | Deliberating
   | Generating
   | MembraneApplied
   | AwaitingFeedback
@@ -40,13 +43,14 @@ data TurnPhase
 ||| Valid phase transitions (only forward along the pipeline).
 public export
 data ValidTransition : TurnPhase -> TurnPhase -> Type where
-  IdleToAssemble      : ValidTransition Idle Assembling
-  AssembleToGenerate  : ValidTransition Assembling Generating
-  GenerateToMembrane  : ValidTransition Generating MembraneApplied
-  MembraneToFeedback  : ValidTransition MembraneApplied AwaitingFeedback
-  FeedbackToIntegrate : ValidTransition AwaitingFeedback FeedbackIntegrated
-  IntegrateToIdle     : ValidTransition FeedbackIntegrated Idle
-  MembraneToIdle      : ValidTransition MembraneApplied Idle
+  IdleToAssemble       : ValidTransition Idle Assembling
+  AssembleToDeliberate : ValidTransition Assembling Deliberating
+  DeliberateToGenerate : ValidTransition Deliberating Generating
+  GenerateToMembrane   : ValidTransition Generating MembraneApplied
+  MembraneToFeedback   : ValidTransition MembraneApplied AwaitingFeedback
+  FeedbackToIntegrate  : ValidTransition AwaitingFeedback FeedbackIntegrated
+  IntegrateToIdle      : ValidTransition FeedbackIntegrated Idle
+  MembraneToIdle       : ValidTransition MembraneApplied Idle
 
 ------------------------------------------------------------------------
 -- Turn preview (pre-generation assembly)
@@ -170,6 +174,28 @@ interface GraphStore m => ObservatoryOps (m : Type -> Type) where
   obsRevert  : (eventId : String) -> HasCommit eventId -> m ()
 
 ------------------------------------------------------------------------
+-- Deliberation result (Talmud layer output)
+------------------------------------------------------------------------
+
+||| Output of the deliberation phase: coverage assessment, dissenting
+||| positions, and precedent from prior turns. All observable.
+public export
+record DeliberationResult where
+  constructor MkDeliberation
+  ||| Fraction of query concepts covered by active set [0.0, 1.0].
+  dlCoverage       : Double
+  ||| Concepts in the query not covered by any active-set meme.
+  dlGaps           : List String
+  ||| Memes with relevant content but low regard (minority opinions).
+  dlDissent        : List (MemeId, Double)
+  ||| Prior turns with similar context (precedent retrieval).
+  dlPrecedents     : List TurnId
+  ||| Whether a second retrieval pass was triggered by low coverage.
+  dlSecondPassUsed : Bool
+  ||| Visible deliberation trace (the shakla v'tarya).
+  dlTrace          : String
+
+------------------------------------------------------------------------
 -- Phase-enforced turn pipeline
 ------------------------------------------------------------------------
 
@@ -185,6 +211,13 @@ data PhasedTurn : TurnPhase -> Type where
               -> (budget : BudgetEstimate)
               -> (convPrompt : String)
               -> PhasedTurn Assembling
+  ||| Deliberation complete: coverage assessed, dissent surfaced.
+  PTDeliberated : (activeSet : List CandidateScore)
+               -> (deliberation : DeliberationResult)
+               -> (profile : ResolvedProfile)
+               -> (budget : BudgetEstimate)
+               -> (convPrompt : String)
+               -> PhasedTurn Deliberating
   ||| Generation complete: raw response available.
   PTGenerated  : (rawText : String)
               -> (reasoningText : String)
@@ -338,14 +371,16 @@ manualRespected = Refl
 ||| This documents the intended state machine for the reader.
 public export
 fullPipelineWitness : ( ValidTransition Idle Assembling
-                      , ValidTransition Assembling Generating
+                      , ValidTransition Assembling Deliberating
+                      , ValidTransition Deliberating Generating
                       , ValidTransition Generating MembraneApplied
                       , ValidTransition MembraneApplied AwaitingFeedback
                       , ValidTransition AwaitingFeedback FeedbackIntegrated
                       , ValidTransition FeedbackIntegrated Idle )
 fullPipelineWitness =
   ( IdleToAssemble
-  , AssembleToGenerate
+  , AssembleToDeliberate
+  , DeliberateToGenerate
   , GenerateToMembrane
   , MembraneToFeedback
   , FeedbackToIntegrate

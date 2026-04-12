@@ -121,6 +121,100 @@ cmdGenerateViaFile name prompt cmd = do
   let toks = length (words answer)
   pure (MkModelResult name (if exitCode /= 0 then "(" ++ name ++ " error)" else answer) toks answer "" answer)
 
+------------------------------------------------------------------------
+-- Deliberation (Talmud layer)
+------------------------------------------------------------------------
+
+||| Extract concept terms from query text for coverage assessment.
+||| Uses the same word-level tokenization as retrieval.
+extractQueryConcepts : String -> List String
+extractQueryConcepts text =
+  let ws = words (toLower text)
+  in filter (\w => length w > 2 && not (elem w defaultStopwords)) ws
+  where
+    defaultStopwords : List String
+    defaultStopwords = ["the", "and", "for", "are", "but", "not", "you",
+                        "all", "can", "had", "her", "was", "one", "our",
+                        "out", "has", "have", "been", "will", "with",
+                        "this", "that", "from", "they", "were", "said"]
+
+||| Check if a concept is covered by any meme in the active set.
+conceptCovered : String -> List CandidateScore -> Bool
+conceptCovered concept candidates =
+  any (\c => isInfixOf concept (toLower c.text)) candidates
+
+||| Compute coverage: fraction of query concepts found in active set.
+computeCoverage : List String -> List CandidateScore -> Double
+computeCoverage [] _ = 1.0
+computeCoverage concepts candidates =
+  let covered = filter (\c => conceptCovered c candidates) concepts
+  in cast (length covered) / cast (length concepts)
+
+||| Find memes with relevant content but low regard (minority opinions).
+||| These are the Beit Shammai positions — rejected but preserved.
+findDissentingMemes : String -> List CandidateScore -> List Meme -> List (MemeId, Double)
+findDissentingMemes query activeSet allMemes =
+  let activeIds = map (\c => c.nodeId) activeSet
+      relevant  = filter (\m => not (elem (show m.id) activeIds)
+                              && computeSimilarity TFIDF query m.text > 0.15) allMemes
+      lowRegard = filter (\m => m.rewardEma < 0.0 || m.riskEma > 0.3) relevant
+  in map (\m => (m.id, m.rewardEma)) lowRegard
+
+||| Find prior turns with similar context (precedent retrieval).
+findPrecedentTurns : String -> List Turn -> List TurnId
+findPrecedentTurns query turns =
+  let similar = filter (\t => computeSimilarity TFIDF query t.userText > 0.25) turns
+  in map (\t => t.id) (take 3 similar)
+
+||| Build a human-readable deliberation trace (the shakla v'tarya).
+buildDeliberationTrace : Double -> List String -> List (MemeId, Double)
+                      -> List TurnId -> Bool -> String
+buildDeliberationTrace cov gaps dissent precs secondPass =
+  "coverage=" ++ show cov
+  ++ " gaps=" ++ show (length gaps)
+  ++ " dissent=" ++ show (length dissent)
+  ++ " precedents=" ++ show (length precs)
+  ++ " second_pass=" ++ show secondPass
+  ++ (if length gaps > 0
+      then " uncovered=[" ++ unwords (take 5 gaps) ++ "]"
+      else "")
+
+||| Step 2.5: Deliberate — the Talmud layer.
+||| Assesses coverage, surfaces dissent, retrieves precedent.
+||| If coverage is below threshold, triggers second retrieval pass.
+||| All decisions logged in trace. Observable. Not hidden.
+export
+mDeliberate : String -> List CandidateScore -> EdenM (DeliberationResult, List CandidateScore)
+mDeliberate userText activeSet = do
+  -- Extract concepts from user query
+  let concepts = extractQueryConcepts userText
+  let coverage = computeCoverage concepts activeSet
+  let gaps = filter (\c => not (conceptCovered c activeSet)) concepts
+  -- Find dissenting memes (minority opinions with low regard)
+  allMemes <- eGetMemes
+  let dissent = findDissentingMemes userText activeSet allMemes
+  -- Find precedent turns
+  allTurns <- eGetSessionTurns
+  let precedents = findPrecedentTurns userText allTurns
+  -- Second retrieval pass if coverage is low (Binah: research more)
+  (enriched, secondPass) <-
+    if coverage < 0.4
+      then do
+        -- Re-retrieve with gap terms as additional query
+        let gapQuery = unwords gaps ++ " " ++ userText
+        extraCandidates <- mRetrieve gapQuery
+        let merged = selectTopK 7 (activeSet ++ extraCandidates)
+        pure (merged, True)
+      else pure (activeSet, False)
+  -- Build trace
+  let trace = buildDeliberationTrace coverage gaps dissent precedents secondPass
+  let result = MkDeliberation coverage gaps dissent precedents secondPass trace
+  pure (result, enriched)
+
+------------------------------------------------------------------------
+-- Generation
+------------------------------------------------------------------------
+
 ||| Step 3: Generate a response via the specified backend.
 ||| topP and repPen are taken from the resolved profile's sampling parameters.
 export
@@ -210,11 +304,14 @@ mExecuteTurnWith be mp historyDepth idx userText = do
   -- Step 1: Retrieve active set (similarity scored against user query)
   activeSet <- mRetrieve userText
   eTraceTurn turnId ("retrieve: " ++ show (length activeSet) ++ " candidates")
-  -- Step 1b: Snapshot active set
+  -- Step 1b: Deliberate (Talmud layer: coverage, dissent, precedent)
+  (deliberation, enrichedSet) <- mDeliberate userText activeSet
+  eTraceTurn turnId ("deliberate: " ++ deliberation.dlTrace)
+  -- Step 1c: Snapshot active set (post-deliberation, possibly enriched)
   traverse_ (\cs => eRecordActiveSetEntry turnId cs.nodeId cs.label cs.domain
-    cs.selection cs.semanticSimilarity cs.activationVal cs.regard) activeSet
+    cs.selection cs.semanticSimilarity cs.activationVal cs.regard) enrichedSet
   -- Step 2: Assemble prompt (§2.1: profile-driven history depth)
-  assembly0 <- mAssembleWith historyDepth activeSet userText
+  assembly0 <- mAssembleWith historyDepth enrichedSet userText
   -- §2.3: Budget-aware history trimming — if pressure is High, halve
   -- history depth and re-assemble to fit within the budget envelope
   assembly  <- case assembly0.arBudget.pressure of
