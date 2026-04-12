@@ -40,6 +40,7 @@ import Eden.SQLite
 import Eden.Observatory
 import Eden.Models.MLX
 import Eden.Browser
+import Eden.Shamash
 
 -- Helper for display
 showDouble : Double -> String
@@ -362,6 +363,11 @@ runIngest be dir = do
 -- CLI dispatch
 ------------------------------------------------------------------------
 
+findArg : String -> List String -> Maybe String
+findArg _ [] = Nothing
+findArg _ [_] = Nothing
+findArg key (x :: v :: rest) = if x == key then Just v else findArg key (v :: rest)
+
 parseBackend : String -> Backend
 parseBackend "claude" = Claude
 parseBackend "mlx"    = MLX
@@ -466,4 +472,29 @@ main = do
                      pure exp.id
 
       runObservatory 3141 store eid
+    ("--shamash-retrieve" :: rest) =>
+      let db = case findArg "--db" rest of
+                 Just p  => p
+                 Nothing => "/home/natanh/.eden/shamash.db"
+          query = findArg "--query" rest
+      in runShamashRetrieve db query
+    ("--shamash-feedback" :: signal :: rest) =>
+      let db = case findArg "--db" rest of
+                 Just p  => p
+                 Nothing => "/home/natanh/.eden/shamash.db"
+          content = case findArg "--content" rest of
+                      Just p  => p
+                      Nothing => "/dev/null"
+      in runShamashFeedback signal content db
+    ("--shamash-record-turn" :: rest) =>
+      let db = case findArg "--db" rest of
+                 Just p  => p
+                 Nothing => "/home/natanh/.eden/shamash.db"
+          userF = case findArg "--user" rest of
+                    Just p  => p
+                    Nothing => "/dev/null"
+          respF = case findArg "--response" rest of
+                    Just p  => p
+                    Nothing => "/dev/null"
+      in runShamashRecordTurn userF respF db
     _                 => runInvariantDemo

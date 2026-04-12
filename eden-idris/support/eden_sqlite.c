@@ -787,6 +787,7 @@ char *eden_db_load_edges(void *db) {
         sb_tab(&sb); sb_cat(&sb, col_s(s, 5));  /* dst_id */
         sb_tab(&sb); sb_cat(&sb, col_s(s, 6));  /* edge_type */
         sb_tab(&sb); sb_dbl(&sb, sqlite3_column_double(s, 7)); /* weight */
+        sb_tab(&sb); sb_cat(&sb, "");                         /* provenance_json */
         sb_tab(&sb); sb_cat(&sb, col_s(s, 8));  /* created_at */
         sb_tab(&sb); sb_cat(&sb, col_s(s, 9));  /* updated_at */
         sb_nl(&sb);
