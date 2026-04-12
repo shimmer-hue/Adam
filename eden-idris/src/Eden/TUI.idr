@@ -164,14 +164,9 @@ record UIState where
 -- Rendering primitives
 ------------------------------------------------------------------------
 putText : Int -> Int -> RGB -> RGB -> Bool -> Int -> String -> IO ()
-putText row col fg bg bd maxW s = go col (unpack s)
-  where
-    go : Int -> List Char -> IO ()
-    go c [] = pure ()
-    go c (x :: xs) =
-      if c >= col + maxW then pure ()
-      else do screenSet row c x fg bg bd
-              go (c + 1) xs
+putText row col fg bg bd maxW s = do
+  _ <- screenPutUTF8 row col maxW fg bg bd s
+  pure ()
 
 clearRow : Int -> Int -> Int -> RGB -> IO ()
 clearRow row col w bg = screenFill row col w ' ' colText bg
@@ -388,24 +383,26 @@ drawDialogue ui r c w h = do
   boxTitle r c " Dialogue Tape " colRose
   sectionTitle (r+1) (c+1) (w-2) "Adam Dialogue" colAmber
   where
-    -- Find last space position in a list of characters
-    findLastSpace : Nat -> Nat -> List Char -> Nat
-    findLastSpace best pos [] = best
-    findLastSpace best pos (' ' :: cs) = findLastSpace (pos + 1) (pos + 1) cs
-    findLastSpace best pos (_ :: cs)   = findLastSpace best (pos + 1) cs
-
-    -- Break a string into lines of at most maxW characters, preferring word boundaries
-    wrapLines : Nat -> String -> List String
-    wrapLines maxW s =
-      if length s <= maxW then [s]
-      else let chunk = substr 0 maxW s
-               rest  = substr maxW (length s) s
-               -- Find last space in chunk for word-boundary break
-               idx   = findLastSpace 0 0 (unpack chunk)
-           in if idx > 0
-                then substr 0 (cast idx) s
-                       :: wrapLines maxW (ltrim (substr (cast idx) (length s) s))
-                else chunk :: wrapLines maxW rest
+    -- Break a string into lines of at most maxW characters, preferring word boundaries.
+    -- Uses C-level UTF-8 helpers to correctly count codepoints, not bytes.
+    wrapLines : Nat -> String -> IO (List String)
+    wrapLines maxW s = do
+      sLen <- utf8Len s
+      let mw = cast {to=Int} maxW
+      case sLen <= mw of
+        True  => pure [s]
+        False => do
+          idx <- utf8LastSpace s mw
+          case idx > 0 of
+            True  => do before <- utf8Substr 0 idx s
+                        afterRaw <- utf8Substr idx (sLen - idx) s
+                        let after = ltrim afterRaw
+                        rest <- wrapLines maxW after
+                        pure (before :: rest)
+            False => do chunk <- utf8Substr 0 mw s
+                        restStr <- utf8Substr mw (sLen - mw) s
+                        rest <- wrapLines maxW restStr
+                        pure (chunk :: rest)
 
     -- Render wrapped lines starting at row, return next row
     putWrapped : Int -> Int -> Int -> Int -> RGB -> List String -> IO Int
@@ -434,7 +431,7 @@ drawDialogue ui r c w h = do
           let al = cast (length at)
           let tw = max 1 (cw - 1 - al)
           let pad = pack (replicate (length at) ' ')
-          let lines = wrapLines (cast tw) a
+          lines <- wrapLines (cast tw) a
           clearRow ar c' cw colBg
           putText ar (c'+1) colRose colBg False (cw-1) at
           case lines of
@@ -523,7 +520,9 @@ drawReasoning ui r c w h = do
         putText (r+1) (c+1) colNeon colBg True (w-1) "Response material"
         if h > 2 then do
           lastResp <- readIORef ui.uiLastResponse
-          putText (r+2) (c+1) colMuted colBg False (w-1) (if lastResp == "" then "(awaiting first turn)" else substr 0 (cast (w - 2)) lastResp)
+          respSnip <- if lastResp == "" then pure "(awaiting first turn)"
+                      else utf8Substr 0 (w - 2) lastResp
+          putText (r+2) (c+1) colMuted colBg False (w-1) respSnip
                  else pure ()
         if h > 4 then putText (r+4) (c+1) colAmber colBg True (w-1) "Reasoning signal"
                  else pure ()

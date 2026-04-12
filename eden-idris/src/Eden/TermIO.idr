@@ -41,6 +41,9 @@ prim__screenInit : Int -> Int -> PrimIO ()
 %foreign "C:eden_screen_set,eden_term"
 prim__screenSet : Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> PrimIO ()
 
+%foreign "C:eden_screen_put_utf8,eden_term"
+prim__screenPutUTF8 : Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> String -> PrimIO Int
+
 %foreign "C:eden_screen_clear,eden_term"
 prim__screenClear : PrimIO ()
 
@@ -55,6 +58,15 @@ prim__termRearm : PrimIO ()
 
 %foreign "C:eden_term_drain_paste,eden_term"
 prim__drainPaste : Int -> PrimIO String
+
+%foreign "C:eden_utf8_strlen,eden_term"
+prim__utf8Strlen : String -> PrimIO Int
+
+%foreign "C:eden_utf8_substr,eden_term"
+prim__utf8Substr : String -> Int -> Int -> PrimIO String
+
+%foreign "C:eden_utf8_last_space,eden_term"
+prim__utf8LastSpace : String -> Int -> PrimIO Int
 
 %foreign "C:eden_term_enable_mouse,eden_term"
 prim__enableMouse : PrimIO ()
@@ -120,6 +132,24 @@ rearmTerminal = primIO prim__termRearm
 export
 drainPaste : (timeout_ms : Int) -> IO String
 drainPaste t = primIO (prim__drainPaste t)
+
+||| Count Unicode codepoints in a UTF-8 string (display width).
+||| Unlike `length`, this counts characters, not bytes.
+export
+utf8Len : String -> IO Int
+utf8Len s = primIO (prim__utf8Strlen s)
+
+||| Extract a substring by codepoint offset and length.
+||| Unlike `substr`, this operates on characters, not bytes.
+export
+utf8Substr : (offset : Int) -> (len : Int) -> String -> IO String
+utf8Substr off len s = primIO (prim__utf8Substr s off len)
+
+||| Find the codepoint position of the last space within the first maxW codepoints.
+||| Returns 0 if no space found. Result is 1-based (0 = not found).
+export
+utf8LastSpace : String -> Int -> IO Int
+utf8LastSpace s maxW = primIO (prim__utf8LastSpace s maxW)
 
 ------------------------------------------------------------------------
 -- Mouse support
@@ -309,8 +339,16 @@ screenPutStr row col fg bg bd s = go col (unpack s)
     go : Int -> List Char -> IO ()
     go _ [] = pure ()
     go c (x :: xs) = do
-      screenSet row c x fg bg bd
+      screenSetCP row c (ord x) fg bg bd
       go (c + 1) xs
+
+||| Write a UTF-8 string directly via C FFI, bypassing Char 8-bit truncation.
+||| Returns the number of display cells written.
+export
+screenPutUTF8 : (row : Int) -> (col : Int) -> (maxW : Int)
+             -> (fg : RGB) -> (bg : RGB) -> (isBold : Bool) -> String -> IO Int
+screenPutUTF8 row col maxW fg bg bd s =
+  primIO (prim__screenPutUTF8 row col maxW fg.r fg.g fg.b bg.r bg.g bg.b (if bd then 1 else 0) s)
 
 ||| Fill a horizontal span with a character.
 export

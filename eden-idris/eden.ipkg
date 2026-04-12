@@ -45,3 +45,4 @@ modules = Eden.Analytics
         , Eden.Session
         , Eden.Observatory
         , Eden.Proofs
+        , Eden.Shamash

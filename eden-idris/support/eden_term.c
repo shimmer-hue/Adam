@@ -622,6 +622,120 @@ void eden_screen_set(int row, int col, int ch,
     c->bold = (unsigned char)bold;
 }
 
+/* Write a UTF-8 string into the screen buffer, decoding codepoints.
+ * Returns the number of characters (cells) written. */
+int eden_screen_put_utf8(int row, int col, int maxW,
+                         int fr, int fg, int fb,
+                         int br, int bg, int bb,
+                         int bold, const char *s) {
+    if (!screen_inited || !s) return 0;
+    int cx = col;
+    const unsigned char *p = (const unsigned char *)s;
+    while (*p && cx < col + maxW) {
+        int cp = 0;
+        if (*p < 0x80) {
+            cp = *p++;
+        } else if ((*p & 0xE0) == 0xC0) {
+            cp = (*p & 0x1F) << 6;
+            p++;
+            if ((*p & 0xC0) == 0x80) cp |= (*p++ & 0x3F);
+        } else if ((*p & 0xF0) == 0xE0) {
+            cp = (*p & 0x0F) << 12;
+            p++;
+            if ((*p & 0xC0) == 0x80) { cp |= (*p++ & 0x3F) << 6; }
+            if ((*p & 0xC0) == 0x80) { cp |= (*p++ & 0x3F); }
+        } else if ((*p & 0xF8) == 0xF0) {
+            cp = (*p & 0x07) << 18;
+            p++;
+            if ((*p & 0xC0) == 0x80) { cp |= (*p++ & 0x3F) << 12; }
+            if ((*p & 0xC0) == 0x80) { cp |= (*p++ & 0x3F) << 6; }
+            if ((*p & 0xC0) == 0x80) { cp |= (*p++ & 0x3F); }
+        } else {
+            p++; /* skip invalid byte */
+            continue;
+        }
+        if (row >= 0 && row < scr_h && cx >= 0 && cx < scr_w) {
+            Cell *c = &buf_back[row * scr_w + cx];
+            c->ch = cp;
+            c->fr = (unsigned char)fr; c->fg = (unsigned char)fg; c->fb = (unsigned char)fb;
+            c->br = (unsigned char)br; c->bg = (unsigned char)bg; c->bb = (unsigned char)bb;
+            c->bold = (unsigned char)bold;
+        }
+        cx++;
+    }
+    return cx - col;
+}
+
+/* Count the number of Unicode codepoints in a UTF-8 string.
+ * This gives the display width (assuming all codepoints are 1 cell wide). */
+int eden_utf8_strlen(const char *s) {
+    if (!s) return 0;
+    int count = 0;
+    const unsigned char *p = (const unsigned char *)s;
+    while (*p) {
+        if (*p < 0x80)       p += 1;
+        else if ((*p & 0xE0) == 0xC0) p += 2;
+        else if ((*p & 0xF0) == 0xE0) p += 3;
+        else if ((*p & 0xF8) == 0xF0) p += 4;
+        else p += 1; /* skip invalid */
+        count++;
+    }
+    return count;
+}
+
+/* Extract a substring by codepoint offset and length from a UTF-8 string.
+ * Returns a malloc'd string that the caller must free.
+ * If offset+len exceeds the string, returns what's available. */
+char *eden_utf8_substr(const char *s, int offset, int len) {
+    if (!s || offset < 0 || len < 0) {
+        char *e = malloc(1);
+        if (e) e[0] = '\0';
+        return e ? e : "";
+    }
+    const unsigned char *p = (const unsigned char *)s;
+    /* Skip 'offset' codepoints */
+    for (int i = 0; i < offset && *p; i++) {
+        if (*p < 0x80)       p += 1;
+        else if ((*p & 0xE0) == 0xC0) p += 2;
+        else if ((*p & 0xF0) == 0xE0) p += 3;
+        else if ((*p & 0xF8) == 0xF0) p += 4;
+        else p += 1;
+    }
+    const unsigned char *start = p;
+    /* Count 'len' codepoints */
+    for (int i = 0; i < len && *p; i++) {
+        if (*p < 0x80)       p += 1;
+        else if ((*p & 0xE0) == 0xC0) p += 2;
+        else if ((*p & 0xF0) == 0xE0) p += 3;
+        else if ((*p & 0xF8) == 0xF0) p += 4;
+        else p += 1;
+    }
+    int byte_len = (int)(p - start);
+    char *result = malloc(byte_len + 1);
+    if (!result) return "";
+    memcpy(result, start, byte_len);
+    result[byte_len] = '\0';
+    return result;
+}
+
+/* Find the codepoint position of the last space within the first maxW codepoints.
+ * Returns 0 if no space found. */
+int eden_utf8_last_space(const char *s, int maxW) {
+    if (!s) return 0;
+    int pos = 0, last_space = 0;
+    const unsigned char *p = (const unsigned char *)s;
+    while (*p && pos < maxW) {
+        if (*p == ' ') last_space = pos + 1; /* 1-based so 0 means "not found" */
+        if (*p < 0x80)       p += 1;
+        else if ((*p & 0xE0) == 0xC0) p += 2;
+        else if ((*p & 0xF0) == 0xE0) p += 3;
+        else if ((*p & 0xF8) == 0xF0) p += 4;
+        else p += 1;
+        pos++;
+    }
+    return last_space;
+}
+
 /* Clear back buffer to blanks. */
 void eden_screen_clear(void) {
     if (!screen_inited) return;

@@ -31,9 +31,18 @@ void eden_screen_set(int row, int col, int ch,
                      int fr, int fg, int fb,
                      int br, int bg, int bb,
                      int bold);
+int eden_screen_put_utf8(int row, int col, int maxW,
+                         int fr, int fg, int fb,
+                         int br, int bg, int bb,
+                         int bold, const char *s);
 void eden_screen_clear(void);
 void eden_screen_nebula(int row, int col, int w, int h,
                         int bgr, int bgg, int bgb);
 void eden_screen_present(void);
+
+/* UTF-8 string helpers */
+int eden_utf8_strlen(const char *s);
+char *eden_utf8_substr(const char *s, int offset, int len);
+int eden_utf8_last_space(const char *s, int maxW);
 
 #endif
