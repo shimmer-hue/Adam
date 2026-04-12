@@ -44,6 +44,7 @@ These subsystems are fully operational in the Idris2 build.
 | Graph audit pipelines | `Eden.GraphAudit` | Graph normalization, behavior taxonomy, coherence reweave, document contextualization |
 | Tanakh/Hebrew | `Eden.Tanakh` | 4 gematria schemes, notarikon, temurah, equivalence search, word/letter breakdowns, scene compiler skeleton |
 | Session management | `Eden.Session` | Session profiles, archiving, markdown export, state snapshots, wired into TUI |
+| Shamash (Claude Code bridge) | `Eden.Shamash` | Three-phase conversation-to-graph bridge: retrieve with deliberation (Talmud layer), feedback signal processing, turn recording. Query-aware context assembly with knowledge surfacing, dissent detection, edge traversal, coverage assessment, precedent retrieval. Runs as `UserPromptSubmit` hook. |
 | Document extraction | `Eden.Ingest.Extractors` | PDF, CSV, plaintext/markdown extraction with quality scoring |
 | Concept extraction | `Eden.Indexer` | Model-based (Claude) + keyword fallback. English and Hebrew. |
 
@@ -154,7 +155,9 @@ These subsystems are fully operational in the Idris2 build.
 | Session Management | ~500 LOC | ~200 LOC | **50%** (wired into TUI) |
 | Observatory | 6,700+ LOC | ~540 LOC | **20%** (read-only HTTP server, 11 endpoints) |
 | Export | ~3,700 LOC | ~680 LOC | **45%** (4 formats, richer JSON, provenance) |
+| Shamash (Claude Code bridge) | 0 | ~300 LOC | **Idris-only** (conversation-to-graph bridge with Talmud layer) |
 | Concept Extraction | keyword-based | keyword + model | **110%** (model-based exceeds Python) |
+| Shamash | 0 | ~300 LOC | **Idris-only** (conversation-to-graph with Talmud layer) |
 | Browser | ~50 LOC | ~45 LOC | **90%** |
 
 ## Idris-Only Advantages
@@ -167,6 +170,7 @@ These exist in the Idris build but not in Python:
 - **Total core functions** — the type checker guarantees termination for pure pipeline logic
 - **Native binary** — single 1.7MB executable, no Python/venv dependency at runtime
 - **Model-based concept extraction** — Claude-powered extraction exceeds Python's keyword-only indexer
+- **Shamash conversation bridge** — Talmud layer deliberation running as Claude Code hook, with query-aware knowledge surfacing, dissent, edge traversal, coverage assessment, and precedent retrieval
 
 ---
 
@@ -181,4 +185,7 @@ cd eden-idris && ./build.sh        # Type-check + RefC codegen + GCC link (37 mo
 ./build/exec/eden.exe --observatory             # HTTP server on port 8420
 ./build/exec/eden.exe --observatory 9000        # Custom port
 ./build/exec/eden.exe --ingest ~/docs --backend claude  # Model-based ingest
+./build/exec/eden.exe --shamash-retrieve --query /tmp/q.txt --db ~/.eden/shamash.db  # Retrieve with deliberation
+./build/exec/eden.exe --shamash-feedback correction --content /tmp/c.txt --db ~/.eden/shamash.db  # Process feedback
+./build/exec/eden.exe --shamash-record-turn --user /tmp/u.txt --response /tmp/r.txt --db ~/.eden/shamash.db  # Record turn
 ```

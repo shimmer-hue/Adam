@@ -10,7 +10,7 @@ This document is the technical architecture map for the EDEN/Adam runtime. Every
 
 **Externalized identity.** Adam's continuity is maintained by the persistent memetic graph, explicit feedback events, regard pressure, membrane traces, and the measurement ledger -- not by model weights, fine-tuning, LoRA, or hidden parameter updates. Swap the model, keep the identity. This is the core thesis under test: alignment should be a property of the governance layer, not of the generative substrate. The governance layer is fully auditable, reversible, and external to the system it governs.
 
-**Direct loop (no hidden governor).** The turn loop is: input, retrieve/assemble, generate, membrane, feedback, graph update. There is no hidden planner, no pre-generation governor, no recursive task decomposition, no multi-step reasoning orchestrator. This is an active constitutional boundary, not a missing feature. The `adam_auto` inference mode resolves to `runtime_auto` -- proven at the type level in Idris2 (`adamAutoIsRuntimeAuto : resolveMode AdamAuto = RuntimeAuto`). The inference layer records when `adam_auto` falls back to `runtime_auto` and logs both the requested mode and the effective mode, making the boundary visible rather than burying it.
+**Direct loop (no hidden governor).** The turn loop is: input, retrieve/assemble, deliberate, generate, membrane, feedback, graph update. There is no hidden planner, no pre-generation governor, no recursive task decomposition, no multi-step reasoning orchestrator. This is an active constitutional boundary, not a missing feature. The `adam_auto` inference mode resolves to `runtime_auto` -- proven at the type level in Idris2 (`adamAutoIsRuntimeAuto : resolveMode AdamAuto = RuntimeAuto`). The inference layer records when `adam_auto` falls back to `runtime_auto` and logs both the requested mode and the effective mode, making the boundary visible rather than burying it.
 
 **Honest instrumentation.** Every claim about the system is backed by code, tests, or runtime traces. Synthetic figures are labeled synthetic. Derived metrics carry evidence labels (`OBSERVED`, `DERIVED`, `SPECULATIVE`). Missing capabilities are documented as missing in `docs/KNOWN_LIMITATIONS.md` and `docs/IMPLEMENTATION_TRUTH_TABLE.md`. The hum artifact does not claim to be a hidden voice. The geometry lab does not claim sacred geometry. Projection provenance is explicit. Export freshness mismatches are surfaced rather than hidden. When a richer future mechanism is not yet implemented, the current build uses a bounded fallback with explicit persistence rather than a theatrical simulation of depth.
 
@@ -98,6 +98,16 @@ Bounded continuity artifact.
 
 **Defined in:** `docs/HUM_SPEC.md`; implemented in `eden-idris/src/Eden/Hum.idr`; turn cap boundedness proven in `eden-idris/src/Eden/Proofs.idr` (section 6).
 
+### Shamash
+
+Conversation-to-graph bridge for external tool integration (Claude Code hooks).
+
+**IS:** A three-phase pipeline that connects external conversations to the EDEN graph. Phase 1 (Retrieve with deliberation): query-aware context assembly that runs the Talmud layer - surfaces behavioral memes by regard, relevant knowledge memes by query keywords, dissenting positions (held tensions), connected concepts via edge traversal, coverage assessment with gap detection, and precedent from prior turns. The output is injected as additional context into the external conversation. Phase 2 (Feedback): model-classified signals update regard channels. Phase 3 (Record turn): captures the conversation exchange for precedent accumulation. Shamash runs as a hook on `UserPromptSubmit` events via a Node.js handler that calls the EDEN binary.
+
+**IS NOT:** A standalone agent, a planner, or a generation backend. Shamash does not generate responses. It enriches the context available to whatever tool is generating. It does not bypass the membrane or modify graph state during retrieval. Feedback and turn recording are separate, explicit phases.
+
+**Defined in:** Implemented in `eden-idris/src/Eden/Shamash.idr`; hook handler in `eden-idris/shamash-hook.js`; C FFI persistence in `eden-idris/support/eden_sqlite.c`.
+
 ---
 
 ## The Turn Loop
@@ -113,6 +123,15 @@ Bounded continuity artifact.
                     |   (candidates from graph,  |<------+
                     |    budget allocation,       |       |
                     |    active set selection)    |       |
+                    +-------------+--------------+       |
+                                  |                      |
+                                  v                      |
+                    +----------------------------+       |
+                    |      Deliberate            |       |
+                    |   (Talmud layer: coverage   |       |
+                    |    check, dissent surface,  |       |
+                    |    edge traversal,          |       |
+                    |    precedent retrieval)      |       |
                     +-------------+--------------+       |
                                   |                      |
                                   v                      |
@@ -156,11 +175,12 @@ Bounded continuity artifact.
 1. **Receive operator input** through the TUI or REPL.
 2. **Retrieve candidates** from the persisted graph. Score each candidate by semantic similarity, activation, regard, session bias, explicit feedback relevance, scope penalty, and membrane penalty.
 3. **Assemble the bounded active set** and prompt context under the current inference profile and token budget. Inputs: constitutional seed, retrieved active-set items with provenance, recent feedback summaries, bounded recent turn history.
-4. **Generate** Adam's response through the selected backend (mock, Claude CLI, or MLX in the Python build).
-5. **Apply the membrane** to the raw model output. Strip planning spills, enforce response contracts, clamp length, record membrane events.
-6. **Persist** turn data, active-set snapshot, trace events, and membrane events.
-7. **Accept explicit feedback.** Accept/reject require explanation; edit requires explanation plus corrected text; skip is neutral.
-8. **Update graph channels** and derive new memes/memodes from feedback. Regard scores change via EMA. Propagation attenuates across related graph nodes.
+4. **Deliberate** over the assembled context (Talmud layer). Check query coverage against the knowledge graph, surface dissenting positions (minority opinions with low regard), traverse edges from activated memes to find connected concepts, retrieve precedent from prior turns. When coverage is low, this is reported honestly rather than suppressed. The deliberation phase enriches the context with knowledge memes, held tensions, and gap detection before generation.
+5. **Generate** Adam's response through the selected backend (mock, Claude CLI, or MLX in the Python build).
+6. **Apply the membrane** to the raw model output. Strip planning spills, enforce response contracts, clamp length, record membrane events.
+7. **Persist** turn data, active-set snapshot, trace events, and membrane events.
+8. **Accept explicit feedback.** Accept/reject require explanation; edit requires explanation plus corrected text; skip is neutral.
+9. **Update graph channels** and derive new memes/memodes from feedback. Regard scores change via EMA. Propagation attenuates across related graph nodes.
 
 The loop is linear per turn. There is no recursion, no multi-step decomposition, no hidden pre-pass. The phase machine enforces ordering at compile time: `Idle -> Assembling -> Generating -> MembraneApplied -> AwaitingFeedback -> FeedbackIntegrated`. No phase can transition to itself (6 proofs). No phase can be skipped (3 proofs). No backward transition is valid (5 proofs). These are machine-checked in `Eden.Proofs` sections 3 and 18.
 
@@ -237,7 +257,7 @@ The project has two implementations: a Python reference (full-featured) and an I
 
 | Subsystem | Python | Idris2 | Coverage |
 |---|---|---|---|
-| Core turn loop | 3,724 LOC | 357 LOC | 90% |
+| Core turn loop + deliberation | 3,724 LOC | 357 LOC + ~300 LOC (Shamash) | 90% |
 | Retrieval + Regard | ~600 LOC | ~300 LOC | 95% |
 | Membrane + Feedback | ~400 LOC | ~200 LOC | 95% |
 | Machine-checked proofs | 0 | 800 LOC | Idris-only (55 theorems) |

@@ -5,11 +5,12 @@
 1. Receive operator input.
 2. Retrieve candidates from the persisted memgraph.
 3. Assemble the bounded active set and prompt context.
-4. Generate Adam’s response through the selected backend.
-5. Apply the membrane to the raw model output.
-6. Persist turn data, active set snapshot, trace, and membrane events.
-7. Accept explicit feedback.
-8. Update graph channels and derive new memes/memodes from feedback.
+4. Deliberate (Talmud layer): check query coverage against the knowledge graph, surface dissenting positions, traverse edges from activated memes, retrieve precedent from prior turns. Report coverage gaps honestly.
+5. Generate Adam’s response through the selected backend.
+6. Apply the membrane to the raw model output.
+7. Persist turn data, active set snapshot, trace, and membrane events.
+8. Accept explicit feedback.
+9. Update graph channels and derive new memes/memodes from feedback.
 
 ## Session-start graph wake-up audit
 
@@ -60,6 +61,7 @@
 
 - constitutional seed
 - retrieved active-set items, including direct `document_chunks` recall plus document-backed evidence blocks with explicit provenance and page/excerpt context when available
+- deliberation context: relevant knowledge memes, dissenting positions, connected concepts via edge traversal, coverage assessment, precedent turns
 - recent feedback summaries
 - bounded recent turn history
 

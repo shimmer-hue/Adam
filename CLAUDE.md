@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## User Context
+
+When the user references something obscure or unclear, or says "pasted", check `~/clip.md` for context. When the user references a screenshot, read `~/img.png`.
+
 ## Project Overview
 
 EDEN is a local-first experimental memetic persona runtime. ADAM is the first agent/persona instance. Identity persists in an explicit graph (memes, memodes, regard scores), not in model weights. The implementation is in **Idris2** with dependent-type verification, compiled to native code via the RefC backend.
@@ -46,7 +50,9 @@ gcc -o build/exec/eden.exe build/exec/eden.c support/eden_term.c \
 
 ## Architecture
 
-**Core loop (v1 invariant):** `input -> retrieve/assemble -> Adam response -> membrane -> feedback -> graph update`
+**Core loop (v1):** `input -> retrieve -> deliberate -> assemble -> generate -> membrane -> feedback -> graph update`
+
+The **deliberation phase** (Talmud layer) sits between retrieval and generation. It checks coverage of the query against the knowledge graph, surfaces dissenting positions (minority opinions with low regard), retrieves precedent from prior turns, and optionally triggers a second retrieval pass when coverage is low. This is encoded as a `Deliberating` phase in the `TurnPhase` state machine with compile-time transition proofs.
 
 ### Key modules in `eden-idris/src/Eden/`
 
@@ -69,10 +75,31 @@ gcc -o build/exec/eden.exe build/exec/eden.c support/eden_term.c \
 - **TermIO.idr** — C FFI bindings for raw terminal I/O via `support/eden_term.c`.
 - **TUI.idr** — Two-column TUI application: dialogue tape, aperture panel, hum panel, composer.
 - **Export.idr** — Hum file persistence (`data/hum/`), observatory JSON export (`data/export/`), minimal JSON serializer.
+- **Shamash.idr** — Conversation-to-graph bridge for Claude Code hooks. Three-phase architecture: (1) Retrieve with deliberation: query-aware context assembly surfacing behavioral memes, knowledge memes, dissent, edge traversal, coverage assessment, and precedent. (2) Feedback: model-classified signals update regard. (3) Record turn: captures conversation for precedent accumulation.
 - **Loop.idr** — REPL implementation.
+
+### Shamash (Claude Code Integration)
+
+Shamash is the bridge between Claude Code and the EDEN graph. It runs as a hook on every `UserPromptSubmit` event.
+
+```bash
+# Retrieve with deliberation (called by hook)
+./build/exec/eden.exe --shamash-retrieve --query /tmp/query.txt --db ~/.eden/shamash.db
+
+# Process feedback signal
+./build/exec/eden.exe --shamash-feedback correction --content /tmp/content.txt --db ~/.eden/shamash.db
+
+# Record a turn for precedent
+./build/exec/eden.exe --shamash-record-turn --user /tmp/user.txt --response /tmp/response.txt --db ~/.eden/shamash.db
+```
+
+The hook script (`eden-idris/shamash-hook.js`) handles the JSON protocol between Claude Code and EDEN. The hook configuration lives in the project's `.claude/settings.local.json`.
+
+The retrieve phase runs the **Talmud layer**: knowledge memes surfaced by query relevance, dissent (held tensions) always visible, edge traversal from activated memes, coverage assessment with gap detection, and precedent turn retrieval. The output is injected as `additionalContext` into every Claude Code conversation.
 
 ### C FFI Support
 
+- **support/eden_sqlite.c** — SQLite operations: schema creation, meme/edge/turn/feedback CRUD, bulk loading for graph restoration.
 - **support/eden_term.c** — Platform-aware terminal control (Win32 console API on Windows/MinGW, POSIX termios on macOS/Linux).
 - **support/eden_term.h** — Header for FFI function declarations.
 

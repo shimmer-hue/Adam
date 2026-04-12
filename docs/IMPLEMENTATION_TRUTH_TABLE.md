@@ -100,6 +100,9 @@
 | Idris hum file persistence | Implemented | hum artifacts written to `data/hum/<session-id>.md` after every hum build |
 | Idris observatory JSON export | Implemented | `--export` CLI; graph state written as JSON to `data/export/<experiment-id>.json` matching observatory contract |
 | Idris agent profile loading | Implemented | `seed_constitution.md` read at startup, injected via `gPrinciples` IORef into system prompt assembly |
+| Shamash conversation-to-graph bridge | Implemented | Three-phase pipeline: retrieve with deliberation (Talmud layer), feedback signal processing, turn recording. Runs as Claude Code `UserPromptSubmit` hook via `eden-idris/shamash-hook.js` -> `eden --shamash-retrieve`. |
+| Talmud layer (deliberation phase) | Implemented | Query-aware context assembly: behavioral memes by regard, knowledge memes by keyword relevance, dissent detection, edge traversal, coverage assessment with gap reporting, precedent retrieval from prior turns. Implemented in `Eden.Shamash.assembleFullContext`. |
+| Shamash SQLite persistence | Implemented | Full graph load/save through C FFI (`eden_sqlite.c`): memes, edges, turns, feedback. Schema migration on open. |
 | Embedding-based semantic retrieval | Deferred | Jaccard word-overlap is lexical; embedding-based similarity remains future work |
 
 Validated in this patch:
