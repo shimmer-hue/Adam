@@ -21,8 +21,8 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const EDEN_BIN = '/home/natanh/Adam/eden-idris/build/exec/eden.exe';
-const DB_PATH = '/home/natanh/.eden/shamash.db';
+const EDEN_BIN = path.join(__dirname, 'build', 'exec', 'eden.exe');
+const DB_PATH = path.join(__dirname, '..', '..', '.eden', 'shamash.db');
 const QUERY_FILE = '/tmp/shamash_query.txt';
 const BASH = String.raw`C:\msys64\usr\bin\bash.exe`;
 
