@@ -69,13 +69,13 @@ The **deliberation phase** (Talmud layer) sits between retrieval and generation.
 - **Ingest.idr** / **Ingest/Pipeline.idr** — Document concept extraction and meme seeding.
 - **Indexer.idr** — Turn response indexing, concept extraction, edge creation.
 - **Storage.idr** / **Store/InMemory.idr** — In-memory graph store (experiments, sessions, memes, edges, memodes, turns, feedback).
-- **Models/Base.idr** / **Models/Mock.idr** — Model adapter interface and mock implementation.
+- **Models/Base.idr** / **Models/Mock.idr** / **Models/MLX.idr** — Model types (GenerateParams, ModelResult), mock backend, MLX backend config and model registry.
 - **Proofs.idr** — 55 machine-checked theorems across 18 sections proving runtime invariants.
 - **Term.idr** — Pure ANSI escape sequences, EDEN palette (Amber Dark theme), styled text helpers.
 - **TermIO.idr** — C FFI bindings for raw terminal I/O via `support/eden_term.c`.
 - **TUI.idr** — Two-column TUI application: dialogue tape, aperture panel, hum panel, composer.
 - **Export.idr** — Hum file persistence (`data/hum/`), observatory JSON export (`data/export/`), minimal JSON serializer.
-- **Shamash.idr** — Conversation-to-graph bridge for Claude Code hooks. Three-phase architecture: (1) Retrieve with deliberation: query-aware context assembly surfacing behavioral memes, knowledge memes, dissent, edge traversal, coverage assessment, and precedent. (2) Feedback: model-classified signals update regard. (3) Record turn: captures conversation for precedent accumulation.
+- **Shamash.idr** — Conversation-to-graph bridge for Claude Code hooks. Four-phase architecture: (1) Retrieve with deliberation: query-aware context assembly surfacing behavioral memes, knowledge memes, dissent, edge traversal, coverage assessment, and precedent. (2) Feedback: model-classified signals update regard. (3) Upsert: manual knowledge/behavior meme insertion from conversation. (4) Record turn: captures conversation for precedent accumulation.
 - **Loop.idr** — REPL implementation.
 
 ### Shamash (Claude Code Integration)
@@ -88,6 +88,9 @@ Shamash is the bridge between Claude Code and the EDEN graph. It runs as a hook 
 
 # Process feedback signal
 ./build/exec/eden.exe --shamash-feedback correction --content /tmp/content.txt --db ~/.eden/shamash.db
+
+# Upsert a meme from conversation
+./build/exec/eden.exe --shamash-upsert --label "label" --content /tmp/content.txt --domain knowledge --db ~/.eden/shamash.db
 
 # Record a turn for precedent
 ./build/exec/eden.exe --shamash-record-turn --user /tmp/user.txt --response /tmp/response.txt --db ~/.eden/shamash.db

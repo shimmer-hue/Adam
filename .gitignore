@@ -16,6 +16,7 @@ data/tanakh_cache/
 exports/*
 !exports/.gitkeep
 models/
+!eden-idris/src/Eden/Models/
 data/cannonical_secondary_sources/
 assets/cannonical_secondary_sources/
 assets/cannonical_secondary_sources.zip

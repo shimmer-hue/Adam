@@ -497,4 +497,18 @@ main = do
                     Just p  => p
                     Nothing => "/dev/null"
       in runShamashRecordTurn userF respF db
+    ("--shamash-upsert" :: rest) =>
+      let db = case findArg "--db" rest of
+                 Just p  => p
+                 Nothing => "/home/natanh/.eden/shamash.db"
+          label = case findArg "--label" rest of
+                    Just l  => l
+                    Nothing => "unlabeled"
+          content = case findArg "--content" rest of
+                      Just p  => p
+                      Nothing => "/dev/null"
+          domain = case findArg "--domain" rest of
+                     Just d  => d
+                     Nothing => "knowledge"
+      in runShamashUpsertMeme label content domain db
     _                 => runInvariantDemo
